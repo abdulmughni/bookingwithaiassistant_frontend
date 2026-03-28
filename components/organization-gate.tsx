@@ -34,9 +34,8 @@ export function OrganizationGate({ children }: { children: React.ReactNode }) {
             <code className="rounded bg-zinc-100 px-1 text-sm dark:bg-zinc-800">tenant_id</code>.
           </Text>
           <Text className="mt-4 text-sm text-zinc-500">
-            In Clerk Dashboard, ensure <strong>Organizations</strong> are enabled. After you
-            create a workspace, add a matching tenant row in your database (same organization ID)
-            if you have not already.
+            In Clerk Dashboard, ensure <strong>Organizations</strong> are enabled. The API creates
+            your tenant record automatically on first authenticated request after you create a workspace.
           </Text>
           <div className="mt-8 flex justify-center">
             <CreateOrganization

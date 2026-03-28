@@ -1,6 +1,7 @@
 'use client'
 
 import * as Headless from '@headlessui/react'
+import clsx from 'clsx'
 import React, { useState } from 'react'
 import { NavbarItem } from './navbar'
 
@@ -48,11 +49,24 @@ export function SidebarLayout({
   navbar,
   sidebar,
   children,
-}: React.PropsWithChildren<{ navbar: React.ReactNode; sidebar: React.ReactNode }>) {
+  contentViewportLocked = false,
+}: React.PropsWithChildren<{
+  navbar: React.ReactNode
+  sidebar: React.ReactNode
+  /** When true, shell is exactly one viewport tall and does not scroll — children must scroll internally (e.g. chat messages). */
+  contentViewportLocked?: boolean
+}>) {
   let [showSidebar, setShowSidebar] = useState(false)
 
   return (
-    <div className="relative isolate flex min-h-svh w-full bg-white max-lg:flex-col lg:bg-zinc-100 dark:bg-zinc-900 dark:lg:bg-zinc-950">
+    <div
+      className={clsx(
+        'relative isolate flex w-full bg-white max-lg:flex-col lg:bg-zinc-100 dark:bg-zinc-900 dark:lg:bg-zinc-950',
+        contentViewportLocked
+          ? 'h-dvh max-h-dvh min-h-0 overflow-hidden lg:flex-row'
+          : 'min-h-svh lg:flex-row',
+      )}
+    >
       {/* Sidebar on desktop */}
       <div className="fixed inset-y-0 left-0 w-64 max-lg:hidden">{sidebar}</div>
 
@@ -62,7 +76,7 @@ export function SidebarLayout({
       </MobileSidebar>
 
       {/* Navbar on mobile */}
-      <header className="flex items-center px-4 lg:hidden">
+      <header className="flex shrink-0 items-center px-4 lg:hidden">
         <div className="py-2.5">
           <NavbarItem onClick={() => setShowSidebar(true)} aria-label="Open navigation">
             <OpenMenuIcon />
@@ -71,10 +85,20 @@ export function SidebarLayout({
         <div className="min-w-0 flex-1">{navbar}</div>
       </header>
 
-      {/* Content */}
-      <main className="flex flex-1 flex-col pb-2 lg:min-w-0 lg:pt-2 lg:pr-2 lg:pl-64">
-        <div className="grow p-6 lg:rounded-lg lg:bg-white lg:p-10 lg:shadow-xs lg:ring-1 lg:ring-zinc-950/5 dark:lg:bg-zinc-900 dark:lg:ring-white/10">
-          <div className="mx-auto max-w-6xl">{children}</div>
+      {/* Content — full width, no max-width card (pages add their own horizontal padding if needed) */}
+      <main
+        className={clsx(
+          'flex min-h-0 flex-1 flex-col lg:min-w-0 lg:pl-64 lg:pr-0 lg:pt-0 lg:pb-0',
+          contentViewportLocked && 'min-h-0 overflow-hidden',
+        )}
+      >
+        <div
+          className={clsx(
+            'flex min-h-0 flex-1 flex-col',
+            contentViewportLocked && 'min-h-0 overflow-hidden',
+          )}
+        >
+          {children}
         </div>
       </main>
     </div>

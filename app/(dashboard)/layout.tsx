@@ -33,9 +33,13 @@ export default function DashboardLayout({
   const { user } = useUser()
   const { signOut } = useClerk()
 
+  const fullBleedPage =
+    pathname === '/conversations' || pathname.startsWith('/conversations/')
+
   return (
     <OrganizationGate>
       <SidebarLayout
+      contentViewportLocked={fullBleedPage}
       navbar={
         <Navbar>
           <NavbarSpacer />
@@ -118,7 +122,11 @@ export default function DashboardLayout({
         </Sidebar>
       }
     >
-      {children}
+      {fullBleedPage ? (
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">{children}</div>
+      ) : (
+        <div className="px-4 py-6 sm:px-6 lg:px-8 lg:py-8">{children}</div>
+      )}
     </SidebarLayout>
     </OrganizationGate>
   )

@@ -18,19 +18,101 @@ import {
   DialogTitle,
 } from '@/components/dialog'
 import { Field, FieldGroup, Label } from '@/components/fieldset'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/table'
-import { useApiData, useApiToken } from '@/lib/hooks'
+import { Card, CardBody } from '@/components/card'
+import { useApiData, useApiToken, useFreshOrgToken } from '@/lib/hooks'
 import { ApiError, api } from '@/lib/api'
 import { notifyError, notifySuccess } from '@/lib/notify'
 import { channelColor, formatDate } from '@/lib/utils'
 import type { ChannelAccount } from '@/lib/types'
+
+const channelAccent: Record<string, string> = {
+  whatsapp: 'border-l-emerald-500',
+  facebook: 'border-l-sky-500',
+  instagram: 'border-l-fuchsia-500',
+  web: 'border-l-zinc-400',
+}
+
+function connectionBadgeColor(status: string): 'lime' | 'red' | 'amber' {
+  if (status === 'verified') return 'lime'
+  if (status === 'error') return 'red'
+  return 'amber'
+}
+
+function ChannelAccountCard({
+  ch,
+  verifying,
+  onVerify,
+  onToggle,
+  onDelete,
+}: {
+  ch: ChannelAccount
+  verifying: boolean
+  onVerify: () => void
+  onToggle: () => void
+  onDelete: () => void
+}) {
+  const accent = channelAccent[ch.channel] ?? channelAccent.web
+  const conn = ch.connection_status
+
+  return (
+    <Card
+      className={clsx(
+        'flex flex-col border-l-4 pl-4 transition-shadow hover:shadow-md dark:hover:shadow-none dark:hover:ring-1 dark:hover:ring-white/10 sm:pl-5',
+        accent,
+      )}
+    >
+      <CardBody className="flex flex-1 flex-col">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge color={channelColor(ch.channel)} className="capitalize">
+                {ch.channel}
+              </Badge>
+              <Badge color={ch.is_active ? 'lime' : 'zinc'}>
+                {ch.is_active ? 'Active' : 'Inactive'}
+              </Badge>
+            </div>
+            <h3 className="mt-3 text-base font-semibold tracking-tight text-zinc-950 dark:text-white">
+              {ch.label || 'Unnamed account'}
+            </h3>
+            <p className="mt-1 font-mono text-xs text-zinc-500 dark:text-zinc-400">{ch.account_id}</p>
+          </div>
+          <div className="flex shrink-0 flex-col items-end gap-1 text-right">
+            <Badge color={connectionBadgeColor(conn)}>
+              {conn === 'verified' ? 'Connected' : conn === 'error' ? 'Error' : 'Pending'}
+            </Badge>
+            <span className="text-[11px] text-zinc-400 dark:text-zinc-500">
+              {ch.last_verified_at ? formatDate(ch.last_verified_at) : 'Never verified'}
+            </span>
+          </div>
+        </div>
+
+        {ch.connection_message && (
+          <p className="mt-4 rounded-lg bg-zinc-50 px-3 py-2 text-xs leading-relaxed text-zinc-600 dark:bg-zinc-950/50 dark:text-zinc-300">
+            {ch.connection_message}
+          </p>
+        )}
+
+        <div className="mt-5 flex flex-wrap gap-2 border-t border-zinc-950/10 pt-4 dark:border-white/10">
+          <Button
+            plain
+            className="text-xs font-medium"
+            onClick={onVerify}
+            disabled={verifying}
+          >
+            {verifying ? 'Verifying…' : 'Verify'}
+          </Button>
+          <Button plain className="text-xs font-medium" onClick={onToggle}>
+            {ch.is_active ? 'Deactivate' : 'Activate'}
+          </Button>
+          <Button plain className="text-xs font-medium text-red-600 dark:text-red-400" onClick={onDelete}>
+            Delete
+          </Button>
+        </div>
+      </CardBody>
+    </Card>
+  )
+}
 
 function AccountsPageInner() {
   const router = useRouter()
@@ -46,6 +128,7 @@ function AccountsPageInner() {
   const [oauthLoading, setOauthLoading] = useState(false)
   const [verifyingKey, setVerifyingKey] = useState<string | null>(null)
   const getToken = useApiToken()
+  const getFreshToken = useFreshOrgToken()
 
   const { data: channels, loading, refetch } = useApiData<ChannelAccount[]>(
     (token) => api.channels.list(token),
@@ -98,7 +181,12 @@ function AccountsPageInner() {
   const handleFacebookPageOAuth = async () => {
     setOauthLoading(true)
     try {
-      const token = await getToken()
+      const token = await getFreshToken()
+      if (!token) {
+        notifyError('Select a workspace (organization) before connecting Facebook.')
+        setOauthLoading(false)
+        return
+      }
       const { authorization_url } = await api.oauth.facebookStart(token)
       window.location.assign(authorization_url)
     } catch (e) {
@@ -110,7 +198,12 @@ function AccountsPageInner() {
   const handleWhatsAppOAuth = async () => {
     setOauthLoading(true)
     try {
-      const token = await getToken()
+      const token = await getFreshToken()
+      if (!token) {
+        notifyError('Select a workspace (organization) before connecting WhatsApp.')
+        setOauthLoading(false)
+        return
+      }
       const { authorization_url } = await api.oauth.whatsappStart(token)
       window.location.assign(authorization_url)
     } catch (e) {
@@ -122,7 +215,12 @@ function AccountsPageInner() {
   const handleInstagramOAuth = async () => {
     setOauthLoading(true)
     try {
-      const token = await getToken()
+      const token = await getFreshToken()
+      if (!token) {
+        notifyError('Select a workspace (organization) before connecting Instagram.')
+        setOauthLoading(false)
+        return
+      }
       const { authorization_url } = await api.oauth.instagramStart(token)
       window.location.assign(authorization_url)
     } catch (e) {
@@ -215,12 +313,6 @@ function AccountsPageInner() {
     }
   }
 
-  const statusColor = (status: string) => {
-    if (status === 'verified') return 'lime'
-    if (status === 'error') return 'red'
-    return 'amber'
-  }
-
   return (
     <>
       <div className="flex flex-wrap items-end justify-between gap-4">
@@ -237,14 +329,15 @@ function AccountsPageInner() {
 
       <Divider className="mt-6" />
 
-      <div className="mt-6 rounded-xl border border-zinc-950/10 bg-zinc-50/70 p-4 dark:border-white/10 dark:bg-zinc-900/40">
+      <Card className="mt-6 bg-zinc-50/50 dark:bg-zinc-900/60">
+        <CardBody>
         <h3 className="text-sm font-semibold text-zinc-900 dark:text-white">Setup guide before connecting</h3>
         <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-300">
           Complete Meta configuration first, then use <strong>Connect Facebook Page</strong>,{' '}
           <strong>Connect Instagram</strong>, or manual entry. After saving the webhook in Meta, click{' '}
           <strong>Verify</strong> on each account if needed.
         </p>
-        <div className="mt-3 space-y-2 text-xs text-zinc-700 dark:text-zinc-300">
+        <div className="mt-4 space-y-2 text-xs text-zinc-700 dark:text-zinc-300">
           <details>
             <summary className="cursor-pointer font-medium">WhatsApp Cloud API</summary>
             <div className="mt-1 space-y-1">
@@ -274,78 +367,41 @@ function AccountsPageInner() {
             </div>
           </details>
         </div>
-      </div>
+        </CardBody>
+      </Card>
 
-      <div className="mt-6">
+      <div className="mt-8">
         {loading ? (
-          <div className="h-48 animate-pulse rounded-lg bg-zinc-100 dark:bg-zinc-800" />
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div
+                key={i}
+                className="h-56 animate-pulse rounded-xl border border-zinc-950/10 bg-zinc-100 dark:border-white/10 dark:bg-zinc-800"
+              />
+            ))}
+          </div>
         ) : channels && channels.length > 0 ? (
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableHeader>Channel</TableHeader>
-                <TableHeader>Account ID</TableHeader>
-                <TableHeader>Label</TableHeader>
-                <TableHeader>Connection</TableHeader>
-                <TableHeader>Status</TableHeader>
-                <TableHeader>Verified</TableHeader>
-                <TableHeader>Actions</TableHeader>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {channels.map((ch) => (
-                <TableRow key={`${ch.channel}-${ch.account_id}`}>
-                  <TableCell>
-                    <Badge color={channelColor(ch.channel)}>{ch.channel}</Badge>
-                  </TableCell>
-                  <TableCell className="font-mono text-xs">{ch.account_id}</TableCell>
-                  <TableCell className="font-medium">{ch.label}</TableCell>
-                  <TableCell>
-                    <div className="space-y-1">
-                      <Badge color={statusColor(ch.connection_status)}>
-                        {ch.connection_status === 'verified'
-                          ? 'Connected'
-                          : ch.connection_status === 'error'
-                            ? 'Error'
-                            : 'Pending'}
-                      </Badge>
-                      {ch.connection_message && (
-                        <p className="max-w-xs text-xs text-zinc-500 dark:text-zinc-400">
-                          {ch.connection_message}
-                        </p>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge color={ch.is_active ? 'lime' : 'zinc'}>
-                      {ch.is_active ? 'Active' : 'Inactive'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{ch.last_verified_at ? formatDate(ch.last_verified_at) : 'Never'}</TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        plain
-                        className="text-xs"
-                        onClick={() => handleVerify(ch)}
-                        disabled={verifyingKey === `${ch.channel}-${ch.account_id}`}
-                      >
-                        {verifyingKey === `${ch.channel}-${ch.account_id}` ? 'Verifying...' : 'Verify'}
-                      </Button>
-                      <Button plain className="text-xs" onClick={() => handleToggle(ch)}>
-                        {ch.is_active ? 'Deactivate' : 'Activate'}
-                      </Button>
-                      <Button plain className="text-xs text-red-600" onClick={() => handleDelete(ch)}>
-                        Delete
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {channels.map((ch) => (
+              <ChannelAccountCard
+                key={`${ch.channel}-${ch.account_id}`}
+                ch={ch}
+                verifying={verifyingKey === `${ch.channel}-${ch.account_id}`}
+                onVerify={() => handleVerify(ch)}
+                onToggle={() => handleToggle(ch)}
+                onDelete={() => handleDelete(ch)}
+              />
+            ))}
+          </div>
         ) : (
-          <Text className="py-8 text-center">No channel accounts connected yet</Text>
+          <Card>
+            <CardBody className="py-12 text-center">
+              <Text>No channel accounts connected yet</Text>
+              <p className="mx-auto mt-2 max-w-sm text-sm text-zinc-500 dark:text-zinc-400">
+                Add an account to connect WhatsApp, Facebook, Instagram, or web chat.
+              </p>
+            </CardBody>
+          </Card>
         )}
       </div>
 

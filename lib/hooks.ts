@@ -20,6 +20,23 @@ export function useApiToken() {
   return fetchToken
 }
 
+/**
+ * Use when starting OAuth (Facebook / Instagram / WhatsApp). Clerk can return a
+ * cached session JWT from a previous active org; skipCache forces a token that
+ * matches the current organizationId so the backend state JWT tenant_id aligns
+ * with the workspace the user sees after redirect.
+ */
+export function useFreshOrgToken() {
+  const { getToken, orgId } = useAuth()
+
+  return useCallback(async () => {
+    if (!orgId) {
+      return ''
+    }
+    return (await getToken({ organizationId: orgId, skipCache: true })) ?? ''
+  }, [getToken, orgId])
+}
+
 export function useApiData<T>(
   fetcher: (token: string) => Promise<T>,
   deps: unknown[] = [],
