@@ -11,6 +11,8 @@ export interface Tenant {
   service_areas: string[]
   service_area_zips: string[]
   supported_regions: string[]
+  /** When industry is field_service: subset of hvac | plumbing | electrical. Empty = all three. */
+  offered_trades?: string[]
   working_hours: Record<string, unknown>
   booking_buffers: Record<string, unknown>
   escalation_rules: Record<string, unknown>
@@ -58,6 +60,7 @@ export interface ChannelAccount {
   updated_at: string
 }
 
+/** Matches GET/PATCH /api/bookings (selected_slot = appointment start). */
 export interface Booking {
   id: string
   tenant_id: string
@@ -66,12 +69,13 @@ export interface Booking {
   customer_phone: string
   customer_address: string | null
   service_type: string
-  scheduled_start: string
-  scheduled_end: string | null
-  status: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'no_show'
+  selected_slot: string | null
   notes: string | null
   calendar_event_id: string | null
+  confirmation_url: string | null
   crm_job_id: string | null
+  crm_contact_id: string | null
+  status: 'confirmed' | 'cancelled' | 'rescheduled' | 'completed' | 'no_show' | string
   created_at: string
   updated_at: string
 }
@@ -80,16 +84,31 @@ export interface Conversation {
   id: string
   tenant_id: string
   channel: string
+  /** Same as channel_account_id from API */
   account_id: string
+  channel_account_id?: string
   customer_id: string
+  /** Resolved display title (API: WhatsApp prefers profile/phone; Messenger/IG prefers label then profile) */
   customer_name: string | null
+  /** WhatsApp / web profile-style name from webhook */
+  customer_display_name?: string | null
+  /** Messenger / Instagram name from Graph or webhook sender */
+  customer_label_name?: string | null
   customer_phone: string | null
+  /** Profile image from Meta / WhatsApp when available */
+  customer_avatar_url?: string | null
+  /** Page name, IG handle label, or WhatsApp number label from channel setup */
+  channel_account_label?: string | null
   intent: string | null
   status: 'active' | 'closed' | 'archived'
   current_node: string | null
   booking_id: string | null
   created_at: string
   updated_at: string
+  /** Latest message snippet for inbox list (from API) */
+  last_message_preview?: string | null
+  last_message_role?: string | null
+  last_message_at?: string | null
 }
 
 export interface Message {
@@ -106,5 +125,44 @@ export interface Credential {
   integration_type: string
   created_at: string
   updated_at: string
-  has_credentials: boolean
+  /** True when encrypted credentials exist in the store (API field: exists). */
+  exists: boolean
+}
+
+/** Per-tenant LLM prompt configuration. */
+export interface PromptConfig {
+  node_key: string
+  label: string
+  description: string
+  prompt_text: string
+  is_custom: boolean
+  updated_at: string | null
+}
+
+/** Knowledge base doc category (Pinecone doc_type). */
+export interface KnowledgeDocTypeInfo {
+  id: string
+  title: string
+  short: string
+  used_in: string
+  why_upload: string
+}
+
+export interface KnowledgeStatus {
+  rag_configured: boolean
+  index_name: string
+}
+
+export interface RagDocument {
+  id: string
+  doc_type: string
+  title: string
+  original_filename: string
+  chunk_count: number
+  created_at: string
+  updated_at: string
+}
+
+export interface RagDocumentIngestResult extends RagDocument {
+  message?: string
 }

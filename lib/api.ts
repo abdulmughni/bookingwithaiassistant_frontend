@@ -57,6 +57,35 @@ async function request<T>(
   return res.json()
 }
 
+async function requestFormData<T>(
+  path: string,
+  token: string,
+  formData: FormData,
+  method: 'POST' | 'PUT',
+): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method,
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+  })
+  if (!res.ok) {
+    const body = await res.text()
+    throw new ApiError(res.status, parseApiErrorMessage(body))
+  }
+  return res.json() as Promise<T>
+}
+
+async function requestDelete(token: string, path: string): Promise<void> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: 'DELETE',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  })
+  if (!res.ok) {
+    const body = await res.text()
+    throw new ApiError(res.status, parseApiErrorMessage(body))
+  }
+}
+
 export const api = {
   tenants: {
     me: (token: string) => request<import('./types').Tenant>('/api/tenants/me', { token }),
@@ -94,6 +123,8 @@ export const api = {
       const q = qs.toString()
       return request<import('./types').Booking[]>(`/api/bookings${q ? `?${q}` : ''}`, { token })
     },
+    create: (token: string, data: Record<string, unknown>) =>
+      request<import('./types').Booking>('/api/bookings', { token, method: 'POST', body: JSON.stringify(data) }),
     upcoming: (token: string) => request<import('./types').Booking[]>('/api/bookings/upcoming', { token }),
     get: (token: string, id: string) => request<import('./types').Booking>(`/api/bookings/${id}`, { token }),
     update: (token: string, id: string, data: Record<string, unknown>) =>
@@ -109,7 +140,10 @@ export const api = {
   },
 
   conversations: {
-    list: (token: string) => request<import('./types').Conversation[]>('/api/conversations', { token }),
+    list: (token: string, params?: { limit?: number }) => {
+      const n = params?.limit ?? 200
+      return request<import('./types').Conversation[]>(`/api/conversations?limit=${n}`, { token })
+    },
     active: (token: string) => request<import('./types').Conversation[]>('/api/conversations/active', { token }),
     get: (token: string, id: string) =>
       request<import('./types').Conversation & { messages: import('./types').Message[] }>(`/api/conversations/${id}`, { token }),
@@ -136,6 +170,51 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({}),
       }),
+    googleCalendarStart: (token: string) =>
+      request<{ authorization_url: string }>('/api/oauth/google/start', {
+        token,
+        method: 'POST',
+        body: JSON.stringify({}),
+      }),
+  },
+
+  knowledge: {
+    docTypes: (token: string) =>
+      request<import('./types').KnowledgeDocTypeInfo[]>('/api/knowledge/doc-types', { token }),
+    status: (token: string) =>
+      request<import('./types').KnowledgeStatus>('/api/knowledge/status', { token }),
+    listDocuments: (token: string) =>
+      request<import('./types').RagDocument[]>('/api/knowledge/documents', { token }),
+    uploadDocument: (token: string, formData: FormData) =>
+      requestFormData<import('./types').RagDocumentIngestResult>(
+        '/api/knowledge/documents',
+        token,
+        formData,
+        'POST',
+      ),
+    replaceDocument: (token: string, documentId: string, formData: FormData) =>
+      requestFormData<import('./types').RagDocumentIngestResult>(
+        `/api/knowledge/documents/${encodeURIComponent(documentId)}`,
+        token,
+        formData,
+        'PUT',
+      ),
+    deleteDocument: (token: string, documentId: string) =>
+      requestDelete(token, `/api/knowledge/documents/${encodeURIComponent(documentId)}`),
+  },
+
+  prompts: {
+    list: (token: string) => request<import('./types').PromptConfig[]>('/api/prompts', { token }),
+    update: (token: string, nodeKey: string, promptText: string) =>
+      request<import('./types').PromptConfig>(`/api/prompts/${nodeKey}`, {
+        token,
+        method: 'PUT',
+        body: JSON.stringify({ prompt_text: promptText }),
+      }),
+    reset: (token: string, nodeKey: string) =>
+      request<import('./types').PromptConfig>(`/api/prompts/${nodeKey}/reset`, { token, method: 'POST' }),
+    resetAll: (token: string) =>
+      request<{ reset_count: number; status: string }>('/api/prompts/reset-all', { token, method: 'POST' }),
   },
 
   credentials: {

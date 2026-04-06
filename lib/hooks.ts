@@ -1,7 +1,7 @@
 'use client'
 
 import { useAuth } from '@clerk/nextjs'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { ApiError } from '@/lib/api'
 
 export function useApiToken() {
@@ -21,7 +21,7 @@ export function useApiToken() {
 }
 
 /**
- * Use when starting OAuth (Facebook / Instagram / WhatsApp). Clerk can return a
+ * Use when starting OAuth (Facebook / Instagram / WhatsApp / Google Calendar). Clerk can return a
  * cached session JWT from a previous active org; skipCache forces a token that
  * matches the current organizationId so the backend state JWT tenant_id aligns
  * with the workspace the user sees after redirect.
@@ -45,13 +45,15 @@ export function useApiData<T>(
   const [data, setData] = useState<T | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const fetcherRef = useRef(fetcher)
+  fetcherRef.current = fetcher
 
   const refetch = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
       const token = await getToken()
-      const result = await fetcher(token)
+      const result = await fetcherRef.current(token)
       setData(result)
     } catch (err) {
       if (err instanceof ApiError) {
@@ -62,7 +64,6 @@ export function useApiData<T>(
     } finally {
       setLoading(false)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [getToken, ...deps])
 
   useEffect(() => {

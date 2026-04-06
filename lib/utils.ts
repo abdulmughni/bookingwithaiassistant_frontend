@@ -39,6 +39,8 @@ export function statusColor(
   switch (status) {
     case 'confirmed':
       return 'lime'
+    case 'rescheduled':
+      return 'sky'
     case 'pending':
       return 'amber'
     case 'completed':

@@ -91,11 +91,11 @@ export default function BookingsPage() {
             }}
           >
             <option value="">All statuses</option>
-            <option value="pending">Pending</option>
             <option value="confirmed">Confirmed</option>
+            <option value="rescheduled">Rescheduled</option>
             <option value="completed">Completed</option>
             <option value="cancelled">Cancelled</option>
-            <option value="no_show">No Show</option>
+            <option value="no_show">No show</option>
           </Select>
         </div>
         <div className="flex gap-2">
@@ -144,7 +144,9 @@ export default function BookingsPage() {
                   <TableCell>{booking.customer_phone}</TableCell>
                   <TableCell>{booking.service_type}</TableCell>
                   <TableCell>
-                    {formatDateTime(booking.scheduled_start)}
+                    {booking.selected_slot
+                      ? formatDateTime(booking.selected_slot)
+                      : '—'}
                   </TableCell>
                   <TableCell>
                     <Badge color={statusColor(booking.status)}>
@@ -153,7 +155,8 @@ export default function BookingsPage() {
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-2">
-                      {booking.status === 'confirmed' && (
+                      {(booking.status === 'confirmed' ||
+                        booking.status === 'rescheduled') && (
                         <>
                           <Button
                             plain
@@ -175,8 +178,8 @@ export default function BookingsPage() {
                           </Button>
                         </>
                       )}
-                      {(booking.status === 'pending' ||
-                        booking.status === 'confirmed') && (
+                      {(booking.status === 'confirmed' ||
+                        booking.status === 'rescheduled') && (
                         <Button
                           plain
                           className="text-xs text-red-600"

@@ -119,7 +119,9 @@ export default function DashboardPage() {
                   </TableCell>
                   <TableCell>{booking.service_type}</TableCell>
                   <TableCell>
-                    {formatDateTime(booking.scheduled_start)}
+                    {booking.selected_slot
+                      ? formatDateTime(booking.selected_slot)
+                      : '—'}
                   </TableCell>
                   <TableCell>
                     <Badge color={statusColor(booking.status)}>

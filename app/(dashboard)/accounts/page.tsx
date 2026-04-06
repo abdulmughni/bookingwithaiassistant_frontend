@@ -170,14 +170,6 @@ function AccountsPageInner() {
     router.replace('/accounts')
   }, [searchParams, router, refetch])
 
-  const webhookBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'
-  const webhookUrls = {
-    whatsapp: `${webhookBase}/webhooks/whatsapp`,
-    facebook: `${webhookBase}/webhooks/facebook`,
-    instagram: `${webhookBase}/webhooks/instagram`,
-    web: `${webhookBase}/webhooks/web`,
-  }
-
   const handleFacebookPageOAuth = async () => {
     setOauthLoading(true)
     try {
@@ -329,48 +321,7 @@ function AccountsPageInner() {
 
       <Divider className="mt-6" />
 
-      <Card className="mt-6 bg-zinc-50/50 dark:bg-zinc-900/60">
-        <CardBody>
-        <h3 className="text-sm font-semibold text-zinc-900 dark:text-white">Setup guide before connecting</h3>
-        <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-300">
-          Complete Meta configuration first, then use <strong>Connect Facebook Page</strong>,{' '}
-          <strong>Connect Instagram</strong>, or manual entry. After saving the webhook in Meta, click{' '}
-          <strong>Verify</strong> on each account if needed.
-        </p>
-        <div className="mt-4 space-y-2 text-xs text-zinc-700 dark:text-zinc-300">
-          <details>
-            <summary className="cursor-pointer font-medium">WhatsApp Cloud API</summary>
-            <div className="mt-1 space-y-1">
-              <p>1) Meta App → WhatsApp product → connect business phone.</p>
-              <p>2) Copy <strong>Phone Number ID</strong>.</p>
-              <p>3) Webhook URL: <code className="rounded bg-zinc-200/80 px-1 dark:bg-zinc-800">{webhookUrls.whatsapp}</code></p>
-              <p>4) Verify token = backend <code className="rounded bg-zinc-200/80 px-1 dark:bg-zinc-800">WHATSAPP_VERIFY_TOKEN</code></p>
-            </div>
-          </details>
-          <details>
-            <summary className="cursor-pointer font-medium">Facebook Messenger</summary>
-            <div className="mt-1 space-y-1">
-              <p>1) Messenger product → connect Page.</p>
-              <p>2) Webhook URL: <code className="rounded bg-zinc-200/80 px-1 dark:bg-zinc-800">{webhookUrls.facebook}</code></p>
-              <p>3) Verify token = <code className="rounded bg-zinc-200/80 px-1 dark:bg-zinc-800">FACEBOOK_VERIFY_TOKEN</code></p>
-              <p>4) Prefer <strong>Connect Facebook Page</strong> in Add account (OAuth).</p>
-            </div>
-          </details>
-          <details>
-            <summary className="cursor-pointer font-medium">Instagram &amp; Web</summary>
-            <div className="mt-1 space-y-1">
-              <p>1) Link an Instagram Business account to a Facebook Page in Meta Business Suite.</p>
-              <p>2) Instagram product → webhook URL: <code className="rounded bg-zinc-200/80 px-1 dark:bg-zinc-800">{webhookUrls.instagram}</code></p>
-              <p>3) Verify token = <code className="rounded bg-zinc-200/80 px-1 dark:bg-zinc-800">INSTAGRAM_VERIFY_TOKEN</code> or <code className="rounded bg-zinc-200/80 px-1 dark:bg-zinc-800">FACEBOOK_VERIFY_TOKEN</code></p>
-              <p>4) Prefer <strong>Connect Instagram</strong> in Add account (OAuth).</p>
-              <p>Web: <code className="rounded bg-zinc-200/80 px-1 dark:bg-zinc-800">{webhookUrls.web}</code></p>
-            </div>
-          </details>
-        </div>
-        </CardBody>
-      </Card>
-
-      <div className="mt-8">
+      <div className="mt-6">
         {loading ? (
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {Array.from({ length: 3 }).map((_, i) => (

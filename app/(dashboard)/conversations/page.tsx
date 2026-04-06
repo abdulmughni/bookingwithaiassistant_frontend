@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import clsx from 'clsx'
 import {
+  ArrowPathIcon,
   MagnifyingGlassIcon,
   PaperAirplaneIcon,
   PaperClipIcon,
@@ -11,12 +12,196 @@ import {
   PhoneIcon,
   VideoCameraIcon,
   UserCircleIcon,
-  ClockIcon,
-  Cog6ToothIcon,
 } from '@heroicons/react/24/outline'
+import {
+  ChatBubbleLeftRightIcon,
+  PhotoIcon,
+} from '@heroicons/react/24/solid'
 import { useApiData, useApiToken } from '@/lib/hooks'
 import { api } from '@/lib/api'
 import type { Conversation, Message } from '@/lib/types'
+
+type ChannelTab = 'all' | 'facebook' | 'instagram' | 'whatsapp'
+
+const CHANNEL_TABS: { id: ChannelTab; label: string }[] = [
+  { id: 'all', label: 'All messages' },
+  { id: 'facebook', label: 'Messenger' },
+  { id: 'instagram', label: 'Instagram' },
+  { id: 'whatsapp', label: 'WhatsApp' },
+]
+
+function channelTabLabel(channel: string): string {
+  if (channel === 'facebook') return 'Messenger'
+  if (channel === 'instagram') return 'Instagram'
+  if (channel === 'whatsapp') return 'WhatsApp'
+  return channel
+}
+
+/** WhatsApp `customer_id` is the wa_id (digits); show as a phone when API omits customer_phone. */
+function displayFromWhatsAppCustomerId(customerId: string): string | null {
+  const d = customerId.replace(/\D/g, '')
+  if (d.length < 10 || d.length > 15) return null
+  return `+${d}`
+}
+
+/**
+ * List + thread title using only fields present on the conversation API object.
+ * When name columns are null, we still show something human-readable (phone from wa_id, inbox label).
+ */
+function conversationDisplayName(c: Conversation): string {
+  // WhatsApp: profile name from webhook `contacts[].profile.name` is exposed as customer_display_name.
+  if (c.channel === 'whatsapp') {
+    const waProfile = c.customer_display_name?.trim()
+    if (waProfile) return waProfile
+    const waResolved = c.customer_name?.trim()
+    if (waResolved) return waResolved
+    const waPhone = c.customer_phone?.trim()
+    if (waPhone) return waPhone
+    const fromId = displayFromWhatsAppCustomerId(c.customer_id)
+    if (fromId) return fromId
+    return 'WhatsApp contact'
+  }
+
+  const resolved = c.customer_name?.trim()
+  if (resolved) return resolved
+  const labelName = c.customer_label_name?.trim()
+  if (labelName) return labelName
+  const display = c.customer_display_name?.trim()
+  if (display) return display
+  const phone = c.customer_phone?.trim()
+  if (phone) return phone
+
+  const inboxLabel = c.channel_account_label?.trim()
+  if (inboxLabel && (c.channel === 'facebook' || c.channel === 'instagram')) {
+    return inboxLabel
+  }
+
+  const idDigits = c.customer_id.replace(/\D/g, '')
+  if (
+    (c.channel === 'facebook' || c.channel === 'instagram') &&
+    idDigits.length >= 8
+  ) {
+    return `${channelTabLabel(c.channel)} ····${idDigits.slice(-4)}`
+  }
+
+  if (c.channel === 'facebook') return 'Messenger contact'
+  if (c.channel === 'instagram') return 'Instagram contact'
+  return 'Guest'
+}
+
+function nameForAvatarFallback(c: Conversation): string | null {
+  if (c.channel === 'whatsapp') {
+    const profile = c.customer_display_name?.trim()
+    if (profile) return profile
+  }
+  const title = conversationDisplayName(c)
+  const placeholders = new Set([
+    'Guest',
+    'Messenger contact',
+    'Instagram contact',
+    'WhatsApp contact',
+  ])
+  if (placeholders.has(title)) return null
+  if (/^(Messenger|Instagram) ····\d{4}$/.test(title)) return null
+  if (/^\+\d{10,16}$/.test(title)) return title.slice(-2)
+  return title
+}
+
+function listPreviewLine(c: Conversation): string {
+  const raw = c.last_message_preview?.trim()
+  if (raw) {
+    const max = 80
+    const snippet = raw.length > max ? `${raw.slice(0, max)}…` : raw
+    const role = c.last_message_role
+    if (role === 'assistant' || role === 'tool') return `You: ${snippet}`
+    return snippet
+  }
+  if (c.channel_account_label) return `Chat on ${c.channel_account_label}`
+  return `New thread · ${channelTabLabel(c.channel)}`
+}
+
+function listTimeIso(c: Conversation): string {
+  return c.last_message_at || c.updated_at
+}
+
+function ConversationAvatar({
+  imageUrl,
+  nameFallback,
+  idFallback,
+  seed,
+  sizeClass = 'size-14',
+  children,
+}: {
+  imageUrl?: string | null
+  nameFallback?: string | null
+  idFallback: string
+  seed: string
+  sizeClass?: string
+  children?: React.ReactNode
+}) {
+  const [broken, setBroken] = useState(false)
+  const showImg = Boolean(imageUrl) && !broken
+  return (
+    <div className={clsx('relative shrink-0', sizeClass)}>
+      <div className="relative size-full overflow-hidden rounded-full shadow-sm ring-1 ring-black/5 dark:ring-white/10">
+        {showImg ? (
+          // eslint-disable-next-line @next/next/no-img-element -- Meta CDN URLs
+          <img
+            src={imageUrl as string}
+            alt=""
+            className="size-full object-cover"
+            onError={() => setBroken(true)}
+          />
+        ) : (
+          <div
+            className="flex size-full items-center justify-center text-sm font-bold text-white"
+            style={{ background: avatarGradient(seed) }}
+          >
+            {initials(nameFallback, idFallback)}
+          </div>
+        )}
+      </div>
+      {children}
+    </div>
+  )
+}
+
+function ChannelBadgeOverlay({ channel }: { channel: string }) {
+  const common =
+    'pointer-events-none absolute bottom-0 right-0 flex size-[22px] translate-x-0.5 translate-y-0.5 items-center justify-center rounded-full border-[2.5px] border-white text-white shadow-sm dark:border-zinc-900'
+  if (channel === 'facebook') {
+    return (
+      <span className={clsx(common, 'bg-[#0084FF]')} title="Messenger">
+        <ChatBubbleLeftRightIcon className="size-3" aria-hidden />
+      </span>
+    )
+  }
+  if (channel === 'instagram') {
+    return (
+      <span
+        className={clsx(
+          common,
+          'bg-linear-to-br from-[#f58529] via-[#dd2a7b] to-[#8134af]',
+        )}
+        title="Instagram"
+      >
+        <PhotoIcon className="size-3" aria-hidden />
+      </span>
+    )
+  }
+  if (channel === 'whatsapp') {
+    return (
+      <span className={clsx(common, 'bg-[#25D366]')} title="WhatsApp">
+        <span className="text-[10px] font-bold leading-none">W</span>
+      </span>
+    )
+  }
+  return (
+    <span className={clsx(common, 'bg-zinc-500')} title={channel}>
+      <ChatBubbleLeftRightIcon className="size-3 opacity-90" aria-hidden />
+    </span>
+  )
+}
 
 function initials(name: string | null | undefined, fallback: string) {
   const s = (name || fallback).trim()
@@ -41,7 +226,7 @@ function formatListTime(iso: string) {
   const mins = Math.floor(diffMs / 60000)
   if (d.toDateString() === now.toDateString()) {
     if (mins < 1) return 'now'
-    if (mins < 60) return `${mins} min`
+    if (mins < 60) return `${mins}m`
     return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
   }
   const yday = new Date(now)
@@ -49,7 +234,7 @@ function formatListTime(iso: string) {
   if (d.toDateString() === yday.toDateString()) {
     return 'Yesterday'
   }
-  return d.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit' })
+  return d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' })
 }
 
 function formatBubbleTime(iso: string) {
@@ -79,12 +264,14 @@ function dayLabel(d: Date) {
 
 function MessageBubble({
   message,
-  customerLabel,
-  assistantLabel,
+  customerName,
+  customerAvatarUrl,
+  customerSeed,
 }: {
   message: Message
-  customerLabel: string
-  assistantLabel: string
+  customerName: string
+  customerAvatarUrl?: string | null
+  customerSeed: string
 }) {
   const isCustomer = message.role === 'user'
   const isSystem = message.role === 'system'
@@ -92,102 +279,97 @@ function MessageBubble({
   if (isSystem) {
     return (
       <div className="flex justify-center py-1">
-        <span className="rounded-full bg-zinc-200/80 px-3 py-1 text-center text-[11px] text-zinc-600 dark:bg-zinc-700/80 dark:text-zinc-300">
+        <span className="rounded-full bg-zinc-200/90 px-3 py-1 text-center text-[11px] text-zinc-600 dark:bg-zinc-700/90 dark:text-zinc-300">
           {message.content}
         </span>
       </div>
     )
   }
 
+  const isOutgoing = !isCustomer
+
   return (
     <div
       className={clsx(
-        'group flex gap-2',
+        'group flex gap-2 py-0.5',
         isCustomer ? 'justify-start' : 'justify-end',
       )}
     >
       {isCustomer && (
-        <div
-          className="mt-1 size-8 shrink-0 rounded-full text-center text-[10px] font-bold leading-8 text-white shadow-sm"
-          style={{ background: avatarGradient(customerLabel) }}
-        >
-          {initials(customerLabel, 'C')}
+        <div className="mt-auto shrink-0 pb-1">
+          <div className="size-7 overflow-hidden rounded-full ring-1 ring-black/5 dark:ring-white/10">
+            {customerAvatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={customerAvatarUrl}
+                alt=""
+                className="size-full object-cover"
+              />
+            ) : (
+              <div
+                className="flex size-full items-center justify-center text-[9px] font-bold text-white"
+                style={{ background: avatarGradient(customerSeed) }}
+              >
+                {initials(customerName, 'C')}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
-      <div className={clsx('max-w-[min(100%,28rem)]', isCustomer ? 'order-0' : 'flex flex-row-reverse items-end gap-2')}>
-        <div className="flex items-start gap-1">
-          {!isCustomer && (
-            <button
-              type="button"
-              className="mt-2 rounded p-0.5 text-zinc-400 opacity-0 transition group-hover:opacity-100 hover:bg-zinc-200/80 dark:hover:bg-zinc-600/50"
-              aria-label="Message options"
-            >
-              <EllipsisVerticalIcon className="size-4" />
-            </button>
-          )}
-
+      <div
+        className={clsx(
+          'max-w-[min(100%,26rem)]',
+          isOutgoing && 'flex flex-row-reverse items-end gap-2',
+        )}
+      >
+        <div className="flex items-end gap-1">
           <div
             className={clsx(
-              'relative px-4 py-2.5 text-sm shadow-sm',
+              'relative px-3 py-2 text-[15px] leading-snug shadow-sm',
               isCustomer
-                ? 'rounded-2xl rounded-bl-md bg-linear-to-br from-violet-600 to-indigo-600 text-white'
-                : 'rounded-2xl rounded-br-md bg-slate-200/90 text-slate-800 dark:bg-zinc-700 dark:text-zinc-100',
+                ? 'rounded-[18px] rounded-bl-md bg-[#e4e6eb] text-zinc-900 dark:bg-zinc-700 dark:text-zinc-100'
+                : 'rounded-[18px] rounded-br-md bg-[#0084ff] text-white',
             )}
           >
-            <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
+            <p className="whitespace-pre-wrap">{message.content}</p>
             <p
               className={clsx(
-                'mt-1.5 flex items-center gap-1 text-[10px]',
-                isCustomer ? 'text-violet-200' : 'text-slate-500 dark:text-zinc-400',
+                'mt-1 text-[11px]',
+                isCustomer ? 'text-zinc-500 dark:text-zinc-400' : 'text-white/80',
               )}
             >
-              <ClockIcon className="size-3 shrink-0 opacity-80" aria-hidden />
               {formatBubbleTime(message.created_at)}
             </p>
           </div>
 
-          {isCustomer && (
-            <button
-              type="button"
-              className="mt-2 rounded p-0.5 text-zinc-400 opacity-0 transition group-hover:opacity-100 hover:bg-zinc-200/80 dark:hover:bg-zinc-600/50"
-              aria-label="Message options"
-            >
-              <EllipsisVerticalIcon className="size-4" />
-            </button>
+          {isOutgoing && (
+            <div className="mb-1 size-7 shrink-0 overflow-hidden rounded-full ring-2 ring-white dark:ring-zinc-900">
+              <div
+                className="flex size-full items-center justify-center text-[9px] font-bold text-white"
+                style={{ background: 'linear-gradient(135deg, #0084ff, #0066cc)' }}
+              >
+                AI
+              </div>
+            </div>
           )}
         </div>
-
-        <p
-          className={clsx(
-            'mt-1 px-1 text-[11px] text-zinc-500 dark:text-zinc-400',
-            isCustomer ? 'text-left' : 'text-right',
-          )}
-        >
-          {isCustomer ? customerLabel : assistantLabel}
-        </p>
       </div>
-
-      {!isCustomer && (
-        <div
-          className="mt-1 size-8 shrink-0 rounded-full text-center text-[10px] font-bold leading-8 text-white shadow-sm ring-2 ring-white dark:ring-zinc-900"
-          style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
-        >
-          AI
-        </div>
-      )}
     </div>
   )
 }
 
 function MessagesWithDividers({
   messages,
-  customerLabel,
+  customerName,
+  customerAvatarUrl,
+  customerSeed,
 }: {
   messages: Message[]
-  customerLabel: string
+  customerName: string
+  customerAvatarUrl?: string | null
+  customerSeed: string
 }) {
-  const assistantLabel = 'Assistant'
   type Block = { type: 'divider'; label: string } | { type: 'msg'; message: Message }
   const blocks: Block[] = []
 
@@ -205,17 +387,16 @@ function MessagesWithDividers({
     <>
       {blocks.map((b, i) =>
         b.type === 'divider' ? (
-          <div key={`d-${i}`} className="flex justify-center py-4">
-            <span className="rounded-full bg-zinc-200/90 px-4 py-1 text-xs font-medium text-zinc-600 shadow-sm dark:bg-zinc-700/90 dark:text-zinc-300">
-              {b.label}
-            </span>
+          <div key={`d-${i}`} className="flex justify-center py-3">
+            <span className="text-xs font-medium text-zinc-400">{b.label}</span>
           </div>
         ) : (
           <MessageBubble
             key={b.message.id}
             message={b.message}
-            customerLabel={customerLabel}
-            assistantLabel={assistantLabel}
+            customerName={customerName}
+            customerAvatarUrl={customerAvatarUrl}
+            customerSeed={customerSeed}
           />
         ),
       )}
@@ -223,39 +404,60 @@ function MessagesWithDividers({
   )
 }
 
-const channelBadgeStyles: Record<string, string> = {
-  whatsapp: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
-  facebook: 'bg-sky-500/15 text-sky-700 dark:text-sky-300',
-  instagram: 'bg-fuchsia-500/15 text-fuchsia-700 dark:text-fuchsia-300',
-  web: 'bg-zinc-500/15 text-zinc-700 dark:text-zinc-300',
-}
-
 export default function ConversationsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [query, setQuery] = useState('')
+  const [channelTab, setChannelTab] = useState<ChannelTab>('all')
   const [messages, setMessages] = useState<Message[]>([])
   const [messagesLoading, setMessagesLoading] = useState(false)
   const getToken = useApiToken()
 
-  const { data: conversations, loading } = useApiData<Conversation[]>(
-    (token) => api.conversations.list(token),
+  const { data: conversations, loading, refetch } = useApiData<Conversation[]>(
+    (token) => api.conversations.list(token, { limit: 200 }),
   )
 
-  const filtered = useMemo(() => {
+  const tabCounts = useMemo(() => {
+    const list = conversations ?? []
+    return {
+      all: list.length,
+      facebook: list.filter((c) => c.channel === 'facebook').length,
+      instagram: list.filter((c) => c.channel === 'instagram').length,
+      whatsapp: list.filter((c) => c.channel === 'whatsapp').length,
+    }
+  }, [conversations])
+
+  const searchFiltered = useMemo(() => {
     if (!conversations) return []
     const q = query.trim().toLowerCase()
     if (!q) return conversations
     return conversations.filter((c) => {
       const name = (c.customer_name || '').toLowerCase()
+      const disp = (c.customer_display_name || '').toLowerCase()
+      const lbl = (c.customer_label_name || '').toLowerCase()
       const phone = (c.customer_phone || '').toLowerCase()
-      const id = c.customer_id.toLowerCase()
       const intent = (c.intent || '').toLowerCase()
-      return name.includes(q) || phone.includes(q) || id.includes(q) || intent.includes(q)
+      const accLabel = (c.channel_account_label || '').toLowerCase()
+      const preview = (c.last_message_preview || '').toLowerCase()
+      return (
+        name.includes(q) ||
+        disp.includes(q) ||
+        lbl.includes(q) ||
+        phone.includes(q) ||
+        intent.includes(q) ||
+        accLabel.includes(q) ||
+        preview.includes(q)
+      )
     })
   }, [conversations, query])
 
+  const filtered = useMemo(() => {
+    if (channelTab === 'all') return searchFiltered
+    return searchFiltered.filter((c) => c.channel === channelTab)
+  }, [searchFiltered, channelTab])
+
   const selected = conversations?.find((c) => c.id === selectedId)
-  const displayName = selected?.customer_name || selected?.customer_phone || selected?.customer_id || 'Conversation'
+  const displayName = selected ? conversationDisplayName(selected) : 'Conversation'
+  const customerThreadName = selected ? conversationDisplayName(selected) : 'Customer'
 
   const loadMessages = async (convId: string) => {
     setSelectedId(convId)
@@ -272,92 +474,124 @@ export default function ConversationsPage() {
   }
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-      <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden bg-zinc-50/80 dark:bg-zinc-950/50">
-        {/* Sidebar */}
-        <aside className="flex h-full min-h-0 w-full min-w-0 shrink-0 flex-col border-r border-zinc-200/80 bg-white dark:border-zinc-800 dark:bg-zinc-900/80 md:w-[min(100%,20rem)] lg:w-[min(100%,22rem)]">
-          <div className="border-b border-zinc-100 px-4 pb-3 pt-4 dark:border-zinc-800">
-            <h1 className="text-lg font-bold tracking-tight text-zinc-900 dark:text-white">Chats</h1>
-            <div className="relative mt-3">
-              <MagnifyingGlassIcon
-                className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400"
-                aria-hidden
-              />
-              <input
-                type="search"
-                placeholder="Search messages or users"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                className="w-full rounded-xl border-0 bg-zinc-100 py-2.5 pl-10 pr-3 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-violet-500/40 dark:bg-zinc-800 dark:text-white dark:placeholder:text-zinc-500"
-              />
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-white dark:bg-zinc-950">
+      {/* Channel tabs — Meta Business Suite style */}
+      <div className="shrink-0 border-b border-zinc-200 bg-white px-2 pt-2 dark:border-zinc-800 dark:bg-zinc-900">
+        <div className="flex min-h-11 items-stretch gap-1 overflow-x-auto pb-0 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {CHANNEL_TABS.map((tab) => {
+            const count = tabCounts[tab.id]
+            const active = channelTab === tab.id
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setChannelTab(tab.id)}
+                className={clsx(
+                  'shrink-0 rounded-t-lg px-4 py-2.5 text-sm font-semibold transition-colors',
+                  active
+                    ? 'bg-sky-50 text-sky-800 dark:bg-sky-950/60 dark:text-sky-200'
+                    : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800',
+                )}
+              >
+                {tab.label}
+                <span
+                  className={clsx(
+                    'ml-1.5 tabular-nums text-xs font-medium opacity-80',
+                    active ? 'text-sky-700 dark:text-sky-300' : 'text-zinc-400',
+                  )}
+                >
+                  {count}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden bg-zinc-100/80 dark:bg-zinc-950">
+        {/* Sidebar inbox */}
+        <aside className="flex h-full min-h-0 w-full min-w-0 shrink-0 flex-col border-r border-zinc-200/90 bg-white dark:border-zinc-800 dark:bg-zinc-900 md:w-[min(100%,22rem)] lg:w-[min(100%,24rem)]">
+          <div className="border-b border-zinc-100 px-3 pb-3 pt-3 dark:border-zinc-800">
+            <div className="flex gap-2">
+              <div className="relative min-w-0 flex-1">
+                <MagnifyingGlassIcon
+                  className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400"
+                  aria-hidden
+                />
+                <input
+                  type="search"
+                  placeholder="Search conversations"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  className="w-full rounded-full border border-zinc-200 bg-zinc-50 py-2 pl-10 pr-3 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-400/25 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => void refetch()}
+                disabled={loading}
+                className="flex size-10 shrink-0 items-center justify-center rounded-full border border-zinc-200 bg-zinc-50 text-zinc-600 transition hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                aria-label="Refresh conversation list"
+                title="Refresh list"
+              >
+                <ArrowPathIcon className={clsx('size-5', loading && 'animate-spin')} />
+              </button>
             </div>
           </div>
 
-          <div className="px-4 pt-3">
-            <h2 className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">Recent</h2>
-          </div>
-
-          <div className="mt-1 flex-1 overflow-y-auto px-2 pb-3">
+          <div className="flex-1 overflow-y-auto">
             {loading ? (
-              <div className="space-y-2 p-2">
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="h-18 animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-800"
-                  />
+              <div className="space-y-2 p-3">
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <div key={i} className="h-16 animate-pulse rounded-lg bg-zinc-100 dark:bg-zinc-800" />
                 ))}
               </div>
             ) : filtered.length > 0 ? (
-              <ul className="space-y-0.5">
+              <ul className="py-1">
                 {filtered.map((conv) => {
                   const active = selectedId === conv.id
-                  const title = conv.customer_name || conv.customer_phone || conv.customer_id
-                  const preview = conv.intent || conv.channel || 'Conversation'
-                  const badgeClass = channelBadgeStyles[conv.channel] || channelBadgeStyles.web
+                  const title = conversationDisplayName(conv)
+                  const preview = listPreviewLine(conv)
+                  const tIso = listTimeIso(conv)
                   return (
                     <li key={conv.id}>
                       <button
                         type="button"
                         onClick={() => loadMessages(conv.id)}
                         className={clsx(
-                          'flex w-full items-start gap-3 rounded-xl px-2 py-2.5 text-left transition-colors',
+                          'relative flex w-full items-start gap-3 px-3 py-2.5 text-left transition-colors',
                           active
-                            ? 'bg-violet-100/90 dark:bg-violet-950/50'
-                            : 'hover:bg-zinc-100 dark:hover:bg-zinc-800/80',
+                            ? 'bg-zinc-100 dark:bg-zinc-800/90'
+                            : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/50',
                         )}
                       >
-                        <div className="relative shrink-0">
-                          <div
-                            className="flex size-11 items-center justify-center rounded-full text-xs font-bold text-white shadow-md"
-                            style={{ background: avatarGradient(conv.id) }}
-                          >
-                            {initials(conv.customer_name, conv.customer_id)}
-                          </div>
-                          {conv.status === 'active' && (
-                            <span
-                              className="absolute bottom-0 right-0 size-2.5 rounded-full border-2 border-white bg-emerald-500 dark:border-zinc-900"
-                              title="Active"
-                            />
-                          )}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-start justify-between gap-2">
-                            <span className="truncate font-semibold text-zinc-900 dark:text-white">{title}</span>
-                            <span className="shrink-0 text-[11px] text-zinc-400 dark:text-zinc-500">
-                              {formatListTime(conv.updated_at)}
+                        {active && (
+                          <span
+                            className="absolute right-0 top-0 h-full w-1 bg-[#0084ff]"
+                            aria-hidden
+                          />
+                        )}
+                        <ConversationAvatar
+                          imageUrl={conv.customer_avatar_url}
+                          nameFallback={nameForAvatarFallback(conv)}
+                          idFallback="?"
+                          seed={conv.id}
+                          sizeClass="size-14"
+                        >
+                          <ChannelBadgeOverlay channel={conv.channel} />
+                        </ConversationAvatar>
+                        <div className="min-w-0 flex-1 pt-0.5">
+                          <div className="flex items-baseline justify-between gap-2">
+                            <span className="truncate font-semibold text-zinc-900 dark:text-white">
+                              {title}
+                            </span>
+                            <span className="shrink-0 text-xs text-zinc-400 dark:text-zinc-500">
+                              {formatListTime(tIso)}
                             </span>
                           </div>
-                          <div className="mt-0.5 flex items-center justify-between gap-2">
-                            <span className="truncate text-xs text-zinc-500 dark:text-zinc-400">{preview}</span>
-                            <span
-                              className={clsx(
-                                'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium capitalize',
-                                badgeClass,
-                              )}
-                            >
-                              {conv.channel}
-                            </span>
-                          </div>
+                          <p className="mt-0.5 truncate text-[13px] text-zinc-500 dark:text-zinc-400">
+                            {preview}
+                          </p>
                         </div>
                       </button>
                     </li>
@@ -365,34 +599,46 @@ export default function ConversationsPage() {
                 })}
               </ul>
             ) : (
-              <p className="px-3 py-10 text-center text-sm text-zinc-500 dark:text-zinc-400">
-                {query ? 'No matching conversations' : 'No conversations yet'}
+              <p className="px-4 py-12 text-center text-sm text-zinc-500 dark:text-zinc-400">
+                {query || channelTab !== 'all'
+                  ? 'No matching conversations'
+                  : 'No conversations yet'}
               </p>
             )}
           </div>
         </aside>
 
-        {/* Main thread — column: fixed header + scrollable messages + fixed composer */}
-        <section className="flex min-h-0 min-w-0 flex-1 flex-col bg-zinc-50/30 dark:bg-zinc-950/30">
+        {/* Thread */}
+        <section className="flex min-h-0 min-w-0 flex-1 flex-col bg-white dark:bg-zinc-900">
           {selectedId && selected ? (
             <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-              <header className="z-10 flex shrink-0 items-center justify-between gap-3 border-b border-zinc-200/80 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900">
+              <header className="z-10 flex shrink-0 items-center justify-between gap-3 border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
                 <div className="flex min-w-0 items-center gap-3">
-                  <div className="relative shrink-0">
-                    <div
-                      className="flex size-10 items-center justify-center rounded-full text-xs font-bold text-white shadow"
-                      style={{ background: avatarGradient(selected.id) }}
-                    >
-                      {initials(selected.customer_name, selected.customer_id)}
-                    </div>
-                    {selected.status === 'active' && (
-                      <span className="absolute bottom-0 right-0 size-2.5 rounded-full border-2 border-white bg-emerald-500 dark:border-zinc-900" />
-                    )}
-                  </div>
+                  <ConversationAvatar
+                    imageUrl={selected.customer_avatar_url}
+                    nameFallback={nameForAvatarFallback(selected)}
+                    idFallback="?"
+                    seed={selected.id}
+                    sizeClass="size-11"
+                  >
+                    <ChannelBadgeOverlay channel={selected.channel} />
+                  </ConversationAvatar>
                   <div className="min-w-0">
-                    <p className="truncate font-semibold text-zinc-900 dark:text-white">{displayName}</p>
-                    <p className="truncate text-xs text-zinc-500 dark:text-zinc-400 capitalize">
-                      {selected.channel} · {selected.status}
+                    <p className="truncate text-lg font-bold text-zinc-900 dark:text-white">
+                      {displayName}
+                    </p>
+                    <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">
+                      {[selected.customer_phone, selected.channel_account_label]
+                        .filter(Boolean)
+                        .join(' · ')}
+                      {selected.customer_phone || selected.channel_account_label ? ' · ' : ''}
+                      <span className="capitalize">{channelTabLabel(selected.channel)}</span>
+                      {selected.status === 'active' && (
+                        <>
+                          {' '}
+                          · <span className="text-emerald-600 dark:text-emerald-400">Active</span>
+                        </>
+                      )}
                     </p>
                   </div>
                 </div>
@@ -416,53 +662,55 @@ export default function ConversationsPage() {
               </header>
 
               <div
-                className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 py-4 md:px-8"
+                className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain bg-[#f0f2f5] px-3 py-4 dark:bg-zinc-950 md:px-6"
                 role="log"
                 aria-live="polite"
                 aria-relevant="additions"
               >
                 {messagesLoading ? (
-                  <div className="flex min-h-[12rem] items-center justify-center py-12">
+                  <div className="flex min-h-48 items-center justify-center py-12">
                     <div className="flex flex-col items-center gap-2">
-                      <div className="size-8 animate-spin rounded-full border-2 border-violet-500 border-t-transparent" />
+                      <div className="size-8 animate-spin rounded-full border-2 border-sky-500 border-t-transparent" />
                       <span className="text-sm text-zinc-500">Loading messages…</span>
                     </div>
                   </div>
                 ) : messages.length > 0 ? (
-                  <div className="space-y-1 pb-2">
+                  <div className="mx-auto max-w-3xl space-y-0.5 pb-2">
                     <MessagesWithDividers
                       messages={messages}
-                      customerLabel={selected.customer_name || 'Customer'}
+                      customerName={customerThreadName}
+                      customerAvatarUrl={selected.customer_avatar_url}
+                      customerSeed={selected.id}
                     />
                   </div>
                 ) : (
-                  <div className="flex min-h-[12rem] items-center justify-center py-12 text-sm text-zinc-500">
+                  <div className="flex min-h-48 items-center justify-center py-12 text-sm text-zinc-500">
                     No messages in this conversation
                   </div>
                 )}
               </div>
 
-              <footer className="shrink-0 border-t border-zinc-200/80 bg-white px-3 py-3 dark:border-zinc-800 dark:bg-zinc-900">
-                <div className="flex items-end gap-2">
-                  <div className="flex min-w-0 flex-1 items-end gap-2 rounded-2xl bg-zinc-100/90 px-3 py-2 dark:bg-zinc-800/90">
+              <footer className="shrink-0 border-t border-zinc-200 bg-white px-3 py-3 dark:border-zinc-800 dark:bg-zinc-900">
+                <div className="mx-auto flex max-w-3xl items-end gap-2">
+                  <div className="flex min-w-0 flex-1 items-end gap-2 rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1.5 dark:border-zinc-700 dark:bg-zinc-800">
                     <input
                       type="text"
                       readOnly
-                      placeholder="Enter Message…"
-                      className="min-h-11 min-w-0 flex-1 border-0 bg-transparent py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-0 dark:text-white"
+                      placeholder="Aa"
+                      className="min-h-10 min-w-0 flex-1 border-0 bg-transparent py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-0 dark:text-white"
                       aria-label="Message input (read-only)"
                     />
                     <div className="flex shrink-0 items-center gap-0.5 pb-1">
                       <button
                         type="button"
-                        className="rounded-lg p-2 text-zinc-500 transition hover:bg-zinc-200/80 hover:text-zinc-700 dark:hover:bg-zinc-700 dark:hover:text-zinc-200"
+                        className="rounded-full p-2 text-zinc-500 transition hover:bg-zinc-200/80 dark:hover:bg-zinc-700"
                         aria-label="Emoji"
                       >
                         <FaceSmileIcon className="size-5" />
                       </button>
                       <button
                         type="button"
-                        className="rounded-lg p-2 text-zinc-500 transition hover:bg-zinc-200/80 hover:text-zinc-700 dark:hover:bg-zinc-700 dark:hover:text-zinc-200"
+                        className="rounded-full p-2 text-zinc-500 transition hover:bg-zinc-200/80 dark:hover:bg-zinc-700"
                         aria-label="Attach file"
                       >
                         <PaperClipIcon className="size-5" />
@@ -470,36 +718,30 @@ export default function ConversationsPage() {
                       <button
                         type="button"
                         disabled
-                        className="ml-0.5 flex size-10 items-center justify-center rounded-full bg-linear-to-br from-violet-600 to-indigo-600 text-white shadow-md shadow-violet-500/20 opacity-50"
+                        className="ml-1 flex size-9 items-center justify-center rounded-full bg-[#0084ff] text-white opacity-50 shadow-sm"
                         aria-label="Send (coming soon)"
                       >
-                        <PaperAirplaneIcon className="size-5 -rotate-45" />
+                        <PaperAirplaneIcon className="size-4 -rotate-45" />
                       </button>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    className="mb-0.5 flex size-11 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-violet-600 to-indigo-600 text-white shadow-md shadow-violet-500/20 transition hover:from-violet-500 hover:to-indigo-500"
-                    aria-label="Settings"
-                  >
-                    <Cog6ToothIcon className="size-5" />
-                  </button>
                 </div>
               </footer>
             </div>
           ) : (
-            <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
+            <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 bg-[#f0f2f5] p-8 text-center dark:bg-zinc-950">
               <div
-                className="flex size-16 items-center justify-center rounded-2xl bg-linear-to-br from-violet-100 to-indigo-100 text-violet-600 dark:from-violet-950 dark:to-indigo-950 dark:text-violet-300"
+                className="flex size-16 items-center justify-center rounded-full bg-white text-sky-500 shadow-sm dark:bg-zinc-800"
                 aria-hidden
               >
-                <MagnifyingGlassIcon className="size-8 opacity-80" />
+                <ChatBubbleLeftRightIcon className="size-8" />
               </div>
               <p className="max-w-sm text-sm font-medium text-zinc-600 dark:text-zinc-300">
-                Select a conversation to view messages
+                Select a conversation
               </p>
               <p className="max-w-xs text-xs text-zinc-400 dark:text-zinc-500">
-                Choose a chat from the list on the left to see the full thread.
+                Choose a chat from the inbox. Filter by Messenger, Instagram, or WhatsApp using the
+                tabs above.
               </p>
             </div>
           )}
@@ -519,7 +761,7 @@ function IconHeaderBtn({
   return (
     <button
       type="button"
-      className="rounded-lg p-2 transition hover:bg-zinc-100 hover:text-zinc-800 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+      className="rounded-full p-2 transition hover:bg-zinc-100 hover:text-zinc-800 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
       aria-label={label}
     >
       {children}
