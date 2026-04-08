@@ -384,8 +384,9 @@ export function DocumentsTab() {
       <div>
         <Subheading>Knowledge by category</Subheading>
         <Text className="mt-1 max-w-2xl text-sm text-zinc-500">
-          One workspace per type. Upload the file that matches the category — the assistant only searches pricing docs
-          when answering price questions, technical docs when troubleshooting, and so on.
+          One active file per category. Uploading again replaces the previous file for that category in Postgres and
+          Pinecone. The assistant searches pricing docs for price questions, technical docs when troubleshooting, and so
+          on.
         </Text>
       </div>
 
@@ -491,7 +492,10 @@ export function DocumentsTab() {
 
                   <Field>
                     <Label className="text-zinc-800 dark:text-zinc-200">File</Label>
-                    <Description>PDF, DOCX, PPTX, HTML, or TXT — max ~25 MB.</Description>
+                    <Description>
+                      PDF, DOCX, PPTX, HTML, or TXT — max ~25 MB. PDFs use fast text extraction by default (same as
+                      typical rate cards); heavy layout/OCR via Docling is optional on the server.
+                    </Description>
                     <div data-slot="control" className="mt-2">
                       <label
                         htmlFor={fileInputId}
@@ -551,7 +555,7 @@ export function DocumentsTab() {
                     ) : (
                       <>
                         <CloudArrowUpIcon className="mr-2 h-4 w-4" />
-                        Upload to Pinecone
+                        {list.length > 0 ? 'Replace file in Pinecone' : 'Upload to Pinecone'}
                       </>
                     )}
                   </Button>
@@ -560,7 +564,7 @@ export function DocumentsTab() {
                 {list.length > 0 && (
                   <div className="mt-8 border-t border-zinc-200/80 pt-6 dark:border-zinc-700/60">
                     <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                      Uploaded in this category ({list.length})
+                      Current file for this category
                     </p>
                     <ul className="mt-3 space-y-2">
                       {list.map((doc) => (
