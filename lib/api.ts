@@ -217,6 +217,57 @@ export const api = {
       request<{ reset_count: number; status: string }>('/api/prompts/reset-all', { token, method: 'POST' }),
   },
 
+  calls: {
+    list: (token: string, params?: { limit?: number; offset?: number }) => {
+      const qs = new URLSearchParams()
+      if (params?.limit) qs.set('limit', String(params.limit))
+      if (params?.offset) qs.set('offset', String(params.offset))
+      const q = qs.toString()
+      return request<import('./types').CallLogSummary[]>(`/api/calls${q ? `?${q}` : ''}`, { token })
+    },
+    get: (token: string, id: string) =>
+      request<import('./types').CallLogDetail>(`/api/calls/${encodeURIComponent(id)}`, { token }),
+    remove: (token: string, id: string) =>
+      requestDelete(token, `/api/calls/${encodeURIComponent(id)}`),
+  },
+
+  voice: {
+    get: (token: string) => request<import('./types').VoiceConfig>('/api/voice', { token }),
+    update: (token: string, data: Partial<import('./types').VoiceSettings>) =>
+      request<import('./types').VoiceConfig>('/api/voice', {
+        token,
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+    setCredentials: (token: string, apiKey: string) =>
+      request<import('./types').VoiceConfig>('/api/voice/credentials', {
+        token,
+        method: 'POST',
+        body: JSON.stringify({ api_key: apiKey }),
+      }),
+    deleteCredentials: (token: string) =>
+      request<import('./types').VoiceConfig>('/api/voice/credentials', {
+        token,
+        method: 'DELETE',
+      }),
+    sync: (token: string) =>
+      request<import('./types').VoiceSyncResponse>('/api/voice/sync', { token, method: 'POST' }),
+    deleteAssistant: (token: string) =>
+      request<import('./types').VoiceConfig>('/api/voice/assistant', { token, method: 'DELETE' }),
+    listPhoneNumbers: (token: string) =>
+      request<import('./types').VoicePhoneNumber[]>('/api/voice/phone-numbers', { token }),
+    attachPhoneNumber: (token: string, phoneId: string) =>
+      request<import('./types').VoiceConfig>(
+        `/api/voice/phone-numbers/${encodeURIComponent(phoneId)}/attach`,
+        { token, method: 'POST' },
+      ),
+    detachPhoneNumber: (token: string, phoneId: string) =>
+      request<import('./types').VoiceConfig>(
+        `/api/voice/phone-numbers/${encodeURIComponent(phoneId)}/detach`,
+        { token, method: 'POST' },
+      ),
+  },
+
   credentials: {
     list: (token: string) => request<import('./types').Credential[]>('/api/credentials', { token }),
     store: (token: string, data: { ref: string; integration_type: string; credentials: Record<string, unknown> }) =>

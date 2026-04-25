@@ -55,6 +55,7 @@ function TenantConfigTab({
   const [serviceAreas, setServiceAreas] = useState<string[]>([])
   const [serviceAreaZips, setServiceAreaZips] = useState<string[]>([])
   const [supportedRegions, setSupportedRegions] = useState<string[]>([])
+  const [paymentMethods, setPaymentMethods] = useState<string[]>([])
 
   const [workingHours, setWorkingHours] = useState<Record<string, unknown>>({})
   const [minBookingMinutes, setMinBookingMinutes] = useState('60')
@@ -120,6 +121,7 @@ function TenantConfigTab({
     setServiceAreas([...(tenant.service_areas || [])])
     setServiceAreaZips([...(tenant.service_area_zips || [])])
     setSupportedRegions([...(tenant.supported_regions || [])])
+    setPaymentMethods([...(tenant.payment_methods || [])])
     setWorkingHours({ ...(tenant.working_hours || {}) })
     const bb = tenant.booking_buffers || {}
     setMinBookingMinutes(String((bb as { minimum_minutes?: number }).minimum_minutes ?? 60))
@@ -185,6 +187,7 @@ function TenantConfigTab({
         service_areas: serviceAreas,
         service_area_zips: serviceAreaZips,
         supported_regions: supportedRegions,
+        payment_methods: paymentMethods,
         working_hours: workingHours as Record<string, unknown>,
         booking_buffers: { minimum_minutes: minM, slot_duration_minutes: slotM },
         escalation_rules: { stuck_turns: stuck, low_confidence: lowConf },
@@ -300,6 +303,7 @@ function TenantConfigTab({
           <Field><TagInput label="Service areas (cities/regions)" value={serviceAreas} onChange={setServiceAreas} placeholder="Austin" /></Field>
           <Field><TagInput label="Service area ZIP codes" value={serviceAreaZips} onChange={setServiceAreaZips} placeholder="78701" /></Field>
           <Field><TagInput label="Supported regions" description="e.g. country or region codes." value={supportedRegions} onChange={setSupportedRegions} placeholder="usa" /></Field>
+          <Field><TagInput label="Accepted payment methods" description="Shown to customers when they ask 'how can I pay?'. Press comma or Enter to add each method." value={paymentMethods} onChange={setPaymentMethods} placeholder="Cash, Bank transfer, Zelle" /></Field>
         </FieldGroup>
       </section>
 

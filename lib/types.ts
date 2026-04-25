@@ -24,6 +24,8 @@ export interface Tenant {
   prices: Record<string, unknown>
   emergency_surcharge: string
   overtime_surcharge: string
+  /** Accepted payment methods (e.g. "Cash", "Bank transfer"). */
+  payment_methods: string[]
   technical_playbooks: unknown[]
   intent_keywords: Record<string, unknown>
   tone_keywords: Record<string, unknown>
@@ -165,4 +167,70 @@ export interface RagDocument {
 
 export interface RagDocumentIngestResult extends RagDocument {
   message?: string
+}
+
+/** Compact call record for the call list view (GET /api/calls). */
+export interface CallLogSummary {
+  id: string
+  vapi_call_id: string
+  direction: 'inbound' | 'outbound' | 'web' | string
+  status: string
+  ended_reason: string | null
+  phone_number: string
+  assistant_id: string
+  duration_seconds: number | null
+  cost: number | null
+  has_recording: boolean
+  has_transcript: boolean
+  started_at: string | null
+  ended_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+/** Full call record (GET /api/calls/{id}). */
+export interface CallLogDetail extends CallLogSummary {
+  recording_url: string | null
+  transcript: string | null
+  summary: string | null
+  metadata: Record<string, unknown>
+}
+
+/** Editable voice settings stored locally in tenants.voice_settings. */
+export interface VoiceSettings {
+  system_prompt: string
+  first_message: string
+  model_provider: string
+  model_name: string
+  voice: Record<string, unknown>
+  transcriber: Record<string, unknown>
+  end_call_phrases: string[]
+}
+
+/** GET /api/voice — full voice config + connection status. API key never returned. */
+export interface VoiceConfig {
+  enabled: boolean
+  has_api_key: boolean
+  assistant_id: string
+  phone_number_id: string
+  webhook_url: string
+  has_webhook_secret: boolean
+  last_synced_at: string | null
+  settings: VoiceSettings
+  defaults: { system_prompt: string; first_message: string }
+}
+
+export interface VoicePhoneNumber {
+  id: string
+  number: string
+  name: string
+  provider: string
+  assistant_id: string | null
+}
+
+export interface VoiceSyncResponse {
+  assistant_id: string
+  webhook_url: string
+  last_synced_at: string
+  message: string
 }
