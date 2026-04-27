@@ -24,6 +24,7 @@ import { ApiError, api } from '@/lib/api'
 import { notifyError, notifySuccess } from '@/lib/notify'
 import { formatDate } from '@/lib/utils'
 import type { Credential, Tenant } from '@/lib/types'
+import { IanaTimezoneField } from '@/components/iana-timezone-field'
 
 type ConnectStep = 'pick' | 'google-calendar'
 
@@ -273,13 +274,15 @@ function IntegrationsPageInner() {
       }
 
       const slotM = parseInt(gcalSlotMinutes, 10)
+      const tz = gcalTimezone.trim() || 'America/New_York'
       await api.tenants.update(token, {
         calendar_type: 'google',
         calendar_credential_ref: ref,
         calendar_settings: {
           ...(tenant.calendar_settings || {}),
           calendar_id: calId,
-          timezone: gcalTimezone.trim() || 'UTC',
+          timezone: tz,
+          timeZone: tz,
           slot_duration_minutes: Number.isFinite(slotM) && slotM > 0 ? slotM : 60,
         },
       })
@@ -540,14 +543,15 @@ function IntegrationsPageInner() {
                 />
               </Field>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <Field>
-                  <Label>Timezone (IANA)</Label>
-                  <Input
+                <div className="sm:col-span-2">
+                  <IanaTimezoneField
+                    id="gcal-timezone"
                     value={gcalTimezone}
-                    onChange={(e) => setGcalTimezone(e.target.value)}
-                    placeholder="America/New_York"
+                    onChange={setGcalTimezone}
+                    label="Timezone (IANA)"
+                    description="Must match your business hours and the Google Calendar used for appointments. Same value is stored under Settings → Scheduling."
                   />
-                </Field>
+                </div>
                 <Field>
                   <Label>Event duration (minutes)</Label>
                   <Input

@@ -17,6 +17,7 @@ import { ApiError, api } from '@/lib/api'
 import { notifyError, notifySuccess } from '@/lib/notify'
 import type { Credential, PromptConfig, Tenant } from '@/lib/types'
 import { DocumentsTab } from './documents-tab'
+import { IanaTimezoneField } from '@/components/iana-timezone-field'
 
 /** DB uses google | calcom | none — normalize legacy UI value. */
 function normalizeCalendarType(v: string) {
@@ -65,6 +66,8 @@ function TenantConfigTab({
 
   const [calendarType, setCalendarType] = useState('none')
   const [crmType, setCrmType] = useState('none')
+  /** IANA zone for booking + DB + Google Calendar (tenants.calendar_settings.timezone). */
+  const [businessTimezone, setBusinessTimezone] = useState('America/New_York')
 
   const [confidenceThreshold, setConfidenceThreshold] = useState('0.75')
   const [maxTurns, setMaxTurns] = useState('12')
@@ -140,6 +143,14 @@ function TenantConfigTab({
 
     setConfidenceThreshold(String(tenant.confidence_threshold ?? 0.75))
     setMaxTurns(String(tenant.max_turns ?? 12))
+
+    const cs = tenant.calendar_settings || {}
+    const tzRaw =
+      (typeof cs.timezone === 'string' && cs.timezone.trim()) ||
+      (typeof (cs as { timeZone?: string }).timeZone === 'string' &&
+        (cs as { timeZone: string }).timeZone.trim()) ||
+      'America/New_York'
+    setBusinessTimezone(tzRaw)
   }, [tenant, calendarSelectOptions, crmSelectOptions])
 
   const handleSave = async () => {
@@ -176,6 +187,7 @@ function TenantConfigTab({
             })()
           : []
 
+      const tz = businessTimezone.trim() || 'America/New_York'
       await api.tenants.update(token, {
         name: name.trim(),
         industry_type: industryType.trim(),
@@ -195,6 +207,11 @@ function TenantConfigTab({
         crm_type: crmType || 'none',
         confidence_threshold: ct,
         max_turns: mt,
+        calendar_settings: {
+          ...(tenant.calendar_settings || {}),
+          timezone: tz,
+          timeZone: tz,
+        },
       })
       notifySuccess('Settings saved')
       setSaved(true)
@@ -312,6 +329,13 @@ function TenantConfigTab({
       <section>
         <Subheading>Scheduling</Subheading>
         <FieldGroup className="mt-4">
+          <IanaTimezoneField
+            value={businessTimezone}
+            onChange={setBusinessTimezone}
+            id="settings-business-timezone"
+            label="Business timezone (IANA)"
+            description="Applies to working hours, slot search, how booking times are stored in the database (as UTC with correct local meaning), and Google Calendar events. Choose a city or paste any valid IANA name."
+          />
           <Field><WorkingHoursEditor value={workingHours} onChange={setWorkingHours} /></Field>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field><Label>Minimum booking lead time (minutes)</Label><Input type="number" min={0} value={minBookingMinutes} onChange={(e) => setMinBookingMinutes(e.target.value)} /></Field>
