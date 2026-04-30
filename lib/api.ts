@@ -149,6 +149,36 @@ export const api = {
       request<import('./types').Conversation & { messages: import('./types').Message[] }>(`/api/conversations/${id}`, { token }),
     messages: (token: string, id: string) =>
       request<import('./types').Message[]>(`/api/conversations/${id}/messages`, { token }),
+    listPaged: (
+      token: string,
+      params?: { limit?: number; offset?: number; channel?: string; q?: string },
+    ) => {
+      const qs = new URLSearchParams()
+      if (params?.limit) qs.set('limit', String(params.limit))
+      if (params?.offset) qs.set('offset', String(params.offset))
+      if (params?.channel) qs.set('channel', params.channel)
+      if (params?.q) qs.set('q', params.q)
+      const q = qs.toString()
+      return request<import('./types').ConversationsPage>(
+        `/api/conversations/paged${q ? `?${q}` : ''}`,
+        { token },
+      )
+    },
+    messagesPaged: (
+      token: string,
+      id: string,
+      params?: { limit?: number; offset?: number; order?: 'asc' | 'desc' },
+    ) => {
+      const qs = new URLSearchParams()
+      if (params?.limit) qs.set('limit', String(params.limit))
+      if (params?.offset) qs.set('offset', String(params.offset))
+      if (params?.order) qs.set('order', params.order)
+      const q = qs.toString()
+      return request<import('./types').MessagesPage>(
+        `/api/conversations/${id}/messages/paged${q ? `?${q}` : ''}`,
+        { token },
+      )
+    },
   },
 
   oauth: {

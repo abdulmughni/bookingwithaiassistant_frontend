@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import clsx from 'clsx'
 import {
   ArrowPathIcon,
@@ -17,7 +17,8 @@ import {
   ChatBubbleLeftRightIcon,
   PhotoIcon,
 } from '@heroicons/react/24/solid'
-import { useApiData, useApiToken } from '@/lib/hooks'
+import { useVirtualizer } from '@tanstack/react-virtual'
+import { useApiToken } from '@/lib/hooks'
 import { api } from '@/lib/api'
 import type { Conversation, Message } from '@/lib/types'
 
@@ -405,72 +406,178 @@ function MessagesWithDividers({
 }
 
 export default function ConversationsPage() {
+  const CONVERSATIONS_PAGE_SIZE = 60
+  const MESSAGES_PAGE_SIZE = 80
+
+  const getToken = useApiToken()
+  const [conversations, setConversations] = useState<Conversation[]>([])
+  const [conversationsLoading, setConversationsLoading] = useState(true)
+  const [conversationsLoadingMore, setConversationsLoadingMore] = useState(false)
+  const [conversationsHasMore, setConversationsHasMore] = useState(true)
+  const [conversationsOffset, setConversationsOffset] = useState(0)
+
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [query, setQuery] = useState('')
+  const [debouncedQuery, setDebouncedQuery] = useState('')
   const [channelTab, setChannelTab] = useState<ChannelTab>('all')
   const [messages, setMessages] = useState<Message[]>([])
   const [messagesLoading, setMessagesLoading] = useState(false)
-  const getToken = useApiToken()
+  const [messagesLoadingMore, setMessagesLoadingMore] = useState(false)
+  const [messagesHasMore, setMessagesHasMore] = useState(false)
+  const [messagesOffset, setMessagesOffset] = useState(0)
 
-  const { data: conversations, loading, refetch } = useApiData<Conversation[]>(
-    (token) => api.conversations.list(token, { limit: 200 }),
+  const listScrollRef = useRef<HTMLDivElement | null>(null)
+  const threadScrollRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(query.trim()), 320)
+    return () => clearTimeout(t)
+  }, [query])
+
+  const fetchConversations = useCallback(
+    async (opts?: { reset?: boolean }) => {
+      const reset = Boolean(opts?.reset)
+      if (reset) {
+        setConversationsLoading(true)
+        setConversationsLoadingMore(false)
+      } else {
+        setConversationsLoadingMore(true)
+      }
+      try {
+        const token = await getToken()
+        const offset = reset ? 0 : conversationsOffset
+        const page = await api.conversations.listPaged(token, {
+          limit: CONVERSATIONS_PAGE_SIZE,
+          offset,
+          channel: channelTab === 'all' ? undefined : channelTab,
+          q: debouncedQuery || undefined,
+        })
+        setConversations((prev) => {
+          if (reset) return page.items
+          const existing = new Set(prev.map((c) => c.id))
+          const merged = [...prev]
+          for (const item of page.items) {
+            if (!existing.has(item.id)) merged.push(item)
+          }
+          return merged
+        })
+        setConversationsHasMore(page.has_more)
+        setConversationsOffset(page.next_offset ?? offset + page.items.length)
+      } finally {
+        setConversationsLoading(false)
+        setConversationsLoadingMore(false)
+      }
+    },
+    [channelTab, conversationsOffset, debouncedQuery, getToken],
   )
 
-  const tabCounts = useMemo(() => {
-    const list = conversations ?? []
-    return {
-      all: list.length,
-      facebook: list.filter((c) => c.channel === 'facebook').length,
-      instagram: list.filter((c) => c.channel === 'instagram').length,
-      whatsapp: list.filter((c) => c.channel === 'whatsapp').length,
+  useEffect(() => {
+    setConversations([])
+    setConversationsOffset(0)
+    setConversationsHasMore(true)
+    void fetchConversations({ reset: true })
+  }, [channelTab, debouncedQuery, fetchConversations])
+
+  const filtered = conversations
+
+  const listVirtualizer = useVirtualizer({
+    count: filtered.length,
+    getScrollElement: () => listScrollRef.current,
+    estimateSize: () => 84,
+    overscan: 10,
+  })
+  const virtualRows = listVirtualizer.getVirtualItems()
+
+  useEffect(() => {
+    const last = virtualRows[virtualRows.length - 1]
+    if (!last) return
+    if (!conversationsHasMore || conversationsLoading || conversationsLoadingMore) return
+    if (last.index >= Math.max(0, filtered.length - 10)) {
+      void fetchConversations()
     }
-  }, [conversations])
+  }, [
+    virtualRows,
+    filtered.length,
+    conversationsHasMore,
+    conversationsLoading,
+    conversationsLoadingMore,
+    fetchConversations,
+  ])
 
-  const searchFiltered = useMemo(() => {
-    if (!conversations) return []
-    const q = query.trim().toLowerCase()
-    if (!q) return conversations
-    return conversations.filter((c) => {
-      const name = (c.customer_name || '').toLowerCase()
-      const disp = (c.customer_display_name || '').toLowerCase()
-      const lbl = (c.customer_label_name || '').toLowerCase()
-      const phone = (c.customer_phone || '').toLowerCase()
-      const intent = (c.intent || '').toLowerCase()
-      const accLabel = (c.channel_account_label || '').toLowerCase()
-      const preview = (c.last_message_preview || '').toLowerCase()
-      return (
-        name.includes(q) ||
-        disp.includes(q) ||
-        lbl.includes(q) ||
-        phone.includes(q) ||
-        intent.includes(q) ||
-        accLabel.includes(q) ||
-        preview.includes(q)
-      )
-    })
-  }, [conversations, query])
-
-  const filtered = useMemo(() => {
-    if (channelTab === 'all') return searchFiltered
-    return searchFiltered.filter((c) => c.channel === channelTab)
-  }, [searchFiltered, channelTab])
-
-  const selected = conversations?.find((c) => c.id === selectedId)
+  const selected = conversations.find((c) => c.id === selectedId)
   const displayName = selected ? conversationDisplayName(selected) : 'Conversation'
   const customerThreadName = selected ? conversationDisplayName(selected) : 'Customer'
 
   const loadMessages = async (convId: string) => {
     setSelectedId(convId)
     setMessagesLoading(true)
+    setMessages([])
+    setMessagesOffset(0)
+    setMessagesHasMore(false)
     try {
       const token = await getToken()
-      const msgs = await api.conversations.messages(token, convId)
-      setMessages(msgs)
+      const page = await api.conversations.messagesPaged(token, convId, {
+        limit: MESSAGES_PAGE_SIZE,
+        offset: 0,
+        order: 'desc',
+      })
+      // API returns newest-first for lazy paging; UI renders oldest->newest.
+      setMessages([...page.items].reverse())
+      setMessagesOffset(page.next_offset ?? page.items.length)
+      setMessagesHasMore(page.has_more)
     } catch {
       setMessages([])
     } finally {
       setMessagesLoading(false)
+      // After initial load, snap to bottom like messaging apps.
+      setTimeout(() => {
+        const box = threadScrollRef.current
+        if (box) box.scrollTop = box.scrollHeight
+      }, 0)
     }
+  }
+
+  const loadOlderMessages = useCallback(async () => {
+    if (!selectedId || messagesLoading || messagesLoadingMore || !messagesHasMore) return
+    const box = threadScrollRef.current
+    const oldHeight = box?.scrollHeight ?? 0
+    setMessagesLoadingMore(true)
+    try {
+      const token = await getToken()
+      const page = await api.conversations.messagesPaged(token, selectedId, {
+        limit: MESSAGES_PAGE_SIZE,
+        offset: messagesOffset,
+        order: 'desc',
+      })
+      const olderChunk = [...page.items].reverse()
+      setMessages((prev) => [...olderChunk, ...prev])
+      setMessagesOffset(page.next_offset ?? messagesOffset + page.items.length)
+      setMessagesHasMore(page.has_more)
+
+      // Preserve viewport anchor after prepending older messages.
+      setTimeout(() => {
+        const cur = threadScrollRef.current
+        if (!cur) return
+        const newHeight = cur.scrollHeight
+        cur.scrollTop = newHeight - oldHeight + cur.scrollTop
+      }, 0)
+    } finally {
+      setMessagesLoadingMore(false)
+    }
+  }, [
+    getToken,
+    messagesHasMore,
+    messagesLoading,
+    messagesLoadingMore,
+    messagesOffset,
+    selectedId,
+  ])
+
+  const refreshList = async () => {
+    setConversationsOffset(0)
+    setConversationsHasMore(true)
+    await fetchConversations({ reset: true })
+    if (selectedId) void loadMessages(selectedId)
   }
 
   return (
@@ -479,7 +586,6 @@ export default function ConversationsPage() {
       <div className="shrink-0 border-b border-zinc-200 bg-white px-2 pt-2 dark:border-zinc-800 dark:bg-zinc-900">
         <div className="flex min-h-11 items-stretch gap-1 overflow-x-auto pb-0 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {CHANNEL_TABS.map((tab) => {
-            const count = tabCounts[tab.id]
             const active = channelTab === tab.id
             return (
               <button
@@ -494,14 +600,6 @@ export default function ConversationsPage() {
                 )}
               >
                 {tab.label}
-                <span
-                  className={clsx(
-                    'ml-1.5 tabular-nums text-xs font-medium opacity-80',
-                    active ? 'text-sky-700 dark:text-sky-300' : 'text-zinc-400',
-                  )}
-                >
-                  {count}
-                </span>
               </button>
             )
           })}
@@ -528,76 +626,98 @@ export default function ConversationsPage() {
               </div>
               <button
                 type="button"
-                onClick={() => void refetch()}
-                disabled={loading}
+                onClick={() => void refreshList()}
+                disabled={conversationsLoading}
                 className="flex size-10 shrink-0 items-center justify-center rounded-full border border-zinc-200 bg-zinc-50 text-zinc-600 transition hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
                 aria-label="Refresh conversation list"
                 title="Refresh list"
               >
-                <ArrowPathIcon className={clsx('size-5', loading && 'animate-spin')} />
+                <ArrowPathIcon className={clsx('size-5', conversationsLoading && 'animate-spin')} />
               </button>
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto">
-            {loading ? (
+          <div ref={listScrollRef} className="flex-1 overflow-y-auto">
+            {conversationsLoading ? (
               <div className="space-y-2 p-3">
                 {Array.from({ length: 8 }).map((_, i) => (
                   <div key={i} className="h-16 animate-pulse rounded-lg bg-zinc-100 dark:bg-zinc-800" />
                 ))}
               </div>
             ) : filtered.length > 0 ? (
-              <ul className="py-1">
-                {filtered.map((conv) => {
-                  const active = selectedId === conv.id
-                  const title = conversationDisplayName(conv)
-                  const preview = listPreviewLine(conv)
-                  const tIso = listTimeIso(conv)
-                  return (
-                    <li key={conv.id}>
-                      <button
-                        type="button"
-                        onClick={() => loadMessages(conv.id)}
-                        className={clsx(
-                          'relative flex w-full items-start gap-3 px-3 py-2.5 text-left transition-colors',
-                          active
-                            ? 'bg-zinc-100 dark:bg-zinc-800/90'
-                            : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/50',
-                        )}
+              <>
+                <div
+                  className="relative py-1"
+                  style={{ height: `${listVirtualizer.getTotalSize()}px` }}
+                >
+                  {virtualRows.map((vr) => {
+                    const conv = filtered[vr.index]
+                    if (!conv) return null
+                    const active = selectedId === conv.id
+                    const title = conversationDisplayName(conv)
+                    const preview = listPreviewLine(conv)
+                    const tIso = listTimeIso(conv)
+                    return (
+                      <div
+                        key={conv.id}
+                        className="absolute left-0 top-0 w-full"
+                        style={{ transform: `translateY(${vr.start}px)` }}
                       >
-                        {active && (
-                          <span
-                            className="absolute right-0 top-0 h-full w-1 bg-[#0084ff]"
-                            aria-hidden
-                          />
-                        )}
-                        <ConversationAvatar
-                          imageUrl={conv.customer_avatar_url}
-                          nameFallback={nameForAvatarFallback(conv)}
-                          idFallback="?"
-                          seed={conv.id}
-                          sizeClass="size-14"
+                        <button
+                          type="button"
+                          onClick={() => loadMessages(conv.id)}
+                          className={clsx(
+                            'relative flex w-full items-start gap-3 px-3 py-2.5 text-left transition-colors',
+                            active
+                              ? 'bg-zinc-100 dark:bg-zinc-800/90'
+                              : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/50',
+                          )}
                         >
-                          <ChannelBadgeOverlay channel={conv.channel} />
-                        </ConversationAvatar>
-                        <div className="min-w-0 flex-1 pt-0.5">
-                          <div className="flex items-baseline justify-between gap-2">
-                            <span className="truncate font-semibold text-zinc-900 dark:text-white">
-                              {title}
-                            </span>
-                            <span className="shrink-0 text-xs text-zinc-400 dark:text-zinc-500">
-                              {formatListTime(tIso)}
-                            </span>
+                          {active && (
+                            <span
+                              className="absolute right-0 top-0 h-full w-1 bg-[#0084ff]"
+                              aria-hidden
+                            />
+                          )}
+                          <ConversationAvatar
+                            imageUrl={conv.customer_avatar_url}
+                            nameFallback={nameForAvatarFallback(conv)}
+                            idFallback="?"
+                            seed={conv.id}
+                            sizeClass="size-14"
+                          >
+                            <ChannelBadgeOverlay channel={conv.channel} />
+                          </ConversationAvatar>
+                          <div className="min-w-0 flex-1 pt-0.5">
+                            <div className="flex items-baseline justify-between gap-2">
+                              <span className="truncate font-semibold text-zinc-900 dark:text-white">
+                                {title}
+                              </span>
+                              <span className="shrink-0 text-xs text-zinc-400 dark:text-zinc-500">
+                                {formatListTime(tIso)}
+                              </span>
+                            </div>
+                            <p className="mt-0.5 truncate text-[13px] text-zinc-500 dark:text-zinc-400">
+                              {preview}
+                            </p>
                           </div>
-                          <p className="mt-0.5 truncate text-[13px] text-zinc-500 dark:text-zinc-400">
-                            {preview}
-                          </p>
-                        </div>
-                      </button>
-                    </li>
-                  )
-                })}
-              </ul>
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+                <div className="px-3 py-3">
+                  {conversationsLoadingMore ? (
+                    <div className="h-9 animate-pulse rounded-md bg-zinc-100 dark:bg-zinc-800" />
+                  ) : conversationsHasMore ? (
+                    <p className="text-center text-xs text-zinc-400 dark:text-zinc-500">
+                      Loading as you scroll…
+                    </p>
+                  ) : (
+                    <p className="text-center text-xs text-zinc-400 dark:text-zinc-500">End of list</p>
+                  )}
+                </div>
+              </>
             ) : (
               <p className="px-4 py-12 text-center text-sm text-zinc-500 dark:text-zinc-400">
                 {query || channelTab !== 'all'
@@ -662,11 +782,33 @@ export default function ConversationsPage() {
               </header>
 
               <div
+                ref={threadScrollRef}
                 className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain bg-[#f0f2f5] px-3 py-4 dark:bg-zinc-950 md:px-6"
                 role="log"
                 aria-live="polite"
                 aria-relevant="additions"
+                onScroll={(e) => {
+                  const el = e.currentTarget
+                  if (el.scrollTop < 72) void loadOlderMessages()
+                }}
               >
+                {!messagesLoading && messagesHasMore && (
+                  <div className="mx-auto mb-3 max-w-3xl text-center">
+                    {messagesLoadingMore ? (
+                      <span className="rounded-full bg-zinc-200/90 px-3 py-1 text-[11px] text-zinc-600 dark:bg-zinc-700/90 dark:text-zinc-300">
+                        Loading older messages…
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => void loadOlderMessages()}
+                        className="rounded-full bg-zinc-200/90 px-3 py-1 text-[11px] text-zinc-600 transition hover:bg-zinc-300 dark:bg-zinc-700/90 dark:text-zinc-300 dark:hover:bg-zinc-600"
+                      >
+                        Load older messages
+                      </button>
+                    )}
+                  </div>
+                )}
                 {messagesLoading ? (
                   <div className="flex min-h-48 items-center justify-center py-12">
                     <div className="flex flex-col items-center gap-2">

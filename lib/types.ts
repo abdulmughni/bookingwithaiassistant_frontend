@@ -122,6 +122,24 @@ export interface Message {
   created_at: string
 }
 
+export interface ConversationsPage {
+  items: Conversation[]
+  total: number
+  limit: number
+  offset: number
+  has_more: boolean
+  next_offset: number | null
+}
+
+export interface MessagesPage {
+  items: Message[]
+  total: number
+  limit: number
+  offset: number
+  has_more: boolean
+  next_offset: number | null
+}
+
 export interface Credential {
   ref: string
   integration_type: string

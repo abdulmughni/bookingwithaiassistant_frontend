@@ -57,7 +57,7 @@ function ChannelAccountCard({
   return (
     <Card
       className={clsx(
-        'flex flex-col border-l-4 pl-4 transition-shadow hover:shadow-md dark:hover:shadow-none dark:hover:ring-1 dark:hover:ring-white/10 sm:pl-5',
+        'flex flex-col border border-zinc-200 border-l-4 bg-white/95 pl-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg dark:border-zinc-700 dark:bg-zinc-900/90 dark:hover:border-zinc-600 sm:pl-5',
         accent,
       )}
     >
@@ -75,7 +75,6 @@ function ChannelAccountCard({
             <h3 className="mt-3 text-base font-semibold tracking-tight text-zinc-950 dark:text-white">
               {ch.label || 'Unnamed account'}
             </h3>
-            <p className="mt-1 font-mono text-xs text-zinc-500 dark:text-zinc-400">{ch.account_id}</p>
           </div>
           <div className="flex shrink-0 flex-col items-end gap-1 text-right">
             <Badge color={connectionBadgeColor(conn)}>
@@ -88,7 +87,7 @@ function ChannelAccountCard({
         </div>
 
         {ch.connection_message && (
-          <p className="mt-4 rounded-lg bg-zinc-50 px-3 py-2 text-xs leading-relaxed text-zinc-600 dark:bg-zinc-950/50 dark:text-zinc-300">
+          <p className="mt-4 rounded-lg bg-zinc-50 px-3 py-2 text-xs leading-relaxed text-zinc-600 dark:bg-zinc-800/60 dark:text-zinc-300">
             {ch.connection_message}
           </p>
         )}

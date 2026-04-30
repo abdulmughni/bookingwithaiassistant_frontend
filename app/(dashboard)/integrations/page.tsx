@@ -24,7 +24,6 @@ import { ApiError, api } from '@/lib/api'
 import { notifyError, notifySuccess } from '@/lib/notify'
 import { formatDate } from '@/lib/utils'
 import type { Credential, Tenant } from '@/lib/types'
-import { IanaTimezoneField } from '@/components/iana-timezone-field'
 
 type ConnectStep = 'pick' | 'google-calendar'
 
@@ -95,7 +94,7 @@ function IntegrationCard({
   return (
     <Card
       className={clsx(
-        'flex flex-col border-l-4 pl-4 transition-shadow hover:shadow-md dark:hover:shadow-none dark:hover:ring-1 dark:hover:ring-white/10 sm:pl-5',
+        'flex flex-col border border-zinc-200 border-l-4 bg-white/95 pl-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg dark:border-zinc-700 dark:bg-zinc-900/90 dark:hover:border-zinc-600 sm:pl-5',
         integrationAccent(cred.integration_type),
       )}
     >
@@ -114,10 +113,10 @@ function IntegrationCard({
               )}
             </div>
             <h3 className="mt-3 text-base font-semibold tracking-tight text-zinc-950 dark:text-white">
-              {cred.ref}
+              {integrationLabel(cred.integration_type)}
             </h3>
             {calId && (
-              <p className="mt-1 font-mono text-xs text-zinc-500 dark:text-zinc-400">
+              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
                 Calendar: {calId}
               </p>
             )}
@@ -127,7 +126,7 @@ function IntegrationCard({
           </span>
         </div>
 
-        <p className="mt-3 text-xs leading-relaxed text-zinc-600 dark:text-zinc-400">
+        <p className="mt-3 rounded-lg bg-zinc-50 px-3 py-2 text-xs leading-relaxed text-zinc-600 dark:bg-zinc-800/60 dark:text-zinc-300">
           {cred.integration_type === 'gcal' ? (
             <>
               Connect with Google (OAuth) or use a service account. OAuth uses your primary calendar by
@@ -161,7 +160,6 @@ function IntegrationsPageInner() {
   const [gcalSaving, setGcalSaving] = useState(false)
   const [gcalRef, setGcalRef] = useState('')
   const [gcalCalendarId, setGcalCalendarId] = useState('')
-  const [gcalTimezone, setGcalTimezone] = useState('America/New_York')
   const [gcalSlotMinutes, setGcalSlotMinutes] = useState('60')
   const [gcalServiceAccountJson, setGcalServiceAccountJson] = useState('')
   const [gcalOauthLoading, setGcalOauthLoading] = useState(false)
@@ -181,7 +179,6 @@ function IntegrationsPageInner() {
     setGcalRef((tenant.calendar_credential_ref || `${tenant.id}_gcal`).trim())
     const cs = tenant.calendar_settings || {}
     setGcalCalendarId(typeof cs.calendar_id === 'string' ? cs.calendar_id : '')
-    setGcalTimezone(typeof cs.timezone === 'string' ? cs.timezone : 'America/New_York')
     const slot = (cs as { slot_duration_minutes?: number }).slot_duration_minutes
     const bb = tenant.booking_buffers as { slot_duration_minutes?: number } | undefined
     setGcalSlotMinutes(
@@ -274,15 +271,12 @@ function IntegrationsPageInner() {
       }
 
       const slotM = parseInt(gcalSlotMinutes, 10)
-      const tz = gcalTimezone.trim() || 'America/New_York'
       await api.tenants.update(token, {
         calendar_type: 'google',
         calendar_credential_ref: ref,
         calendar_settings: {
           ...(tenant.calendar_settings || {}),
           calendar_id: calId,
-          timezone: tz,
-          timeZone: tz,
           slot_duration_minutes: Number.isFinite(slotM) && slotM > 0 ? slotM : 60,
         },
       })
@@ -543,15 +537,6 @@ function IntegrationsPageInner() {
                 />
               </Field>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div className="sm:col-span-2">
-                  <IanaTimezoneField
-                    id="gcal-timezone"
-                    value={gcalTimezone}
-                    onChange={setGcalTimezone}
-                    label="Timezone (IANA)"
-                    description="Must match your business hours and the Google Calendar used for appointments. Same value is stored under Settings → Scheduling."
-                  />
-                </div>
                 <Field>
                   <Label>Event duration (minutes)</Label>
                   <Input
@@ -566,7 +551,7 @@ function IntegrationsPageInner() {
                 <Label>Service account JSON key</Label>
                 <Description>
                   Required for the service-account path. Leave empty if you connected with Google sign-in or
-                  to update only calendar ID / timezone when credentials already exist.
+                  to update only calendar ID when credentials already exist.
                 </Description>
                 <Textarea
                   rows={8}

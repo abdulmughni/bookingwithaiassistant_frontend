@@ -7,14 +7,7 @@ import { Badge } from '@/components/badge'
 import { Input } from '@/components/input'
 import { Select } from '@/components/select'
 import { Divider } from '@/components/divider'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/table'
+import { Card, CardBody } from '@/components/card'
 import { useApiData, useApiToken } from '@/lib/hooks'
 import { ApiError, api } from '@/lib/api'
 import { notifyError, notifyInfo, notifySuccess } from '@/lib/notify'
@@ -72,6 +65,7 @@ export default function BookingsPage() {
   }
 
   const displayBookings = searchResults ?? bookings ?? []
+  const prettyStatus = (s: string) => s.replace('_', ' ')
 
   return (
     <>
@@ -122,80 +116,67 @@ export default function BookingsPage() {
 
       <div className="mt-6">
         {loading ? (
-          <div className="h-48 animate-pulse rounded-lg bg-zinc-100 dark:bg-zinc-800" />
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div
+                key={i}
+                className="h-52 animate-pulse rounded-xl border border-zinc-200 bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800"
+              />
+            ))}
+          </div>
         ) : displayBookings.length > 0 ? (
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableHeader>Customer</TableHeader>
-                <TableHeader>Phone</TableHeader>
-                <TableHeader>Service</TableHeader>
-                <TableHeader>Scheduled</TableHeader>
-                <TableHeader>Status</TableHeader>
-                <TableHeader>Actions</TableHeader>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {displayBookings.map((booking) => (
-                <TableRow key={booking.id}>
-                  <TableCell className="font-medium">
-                    {booking.customer_name}
-                  </TableCell>
-                  <TableCell>{booking.customer_phone}</TableCell>
-                  <TableCell>{booking.service_type}</TableCell>
-                  <TableCell>
-                    {booking.selected_slot
-                      ? formatDateTime(booking.selected_slot)
-                      : '—'}
-                  </TableCell>
-                  <TableCell>
-                    <Badge color={statusColor(booking.status)}>
-                      {booking.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex gap-2">
-                      {(booking.status === 'confirmed' ||
-                        booking.status === 'rescheduled') && (
-                        <>
-                          <Button
-                            plain
-                            className="text-xs"
-                            onClick={() =>
-                              handleAction(booking.id, 'complete')
-                            }
-                          >
-                            Complete
-                          </Button>
-                          <Button
-                            plain
-                            className="text-xs"
-                            onClick={() =>
-                              handleAction(booking.id, 'no-show')
-                            }
-                          >
-                            No-show
-                          </Button>
-                        </>
-                      )}
-                      {(booking.status === 'confirmed' ||
-                        booking.status === 'rescheduled') && (
-                        <Button
-                          plain
-                          className="text-xs text-red-600"
-                          onClick={() =>
-                            handleAction(booking.id, 'cancel')
-                          }
-                        >
-                          Cancel
-                        </Button>
-                      )}
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {displayBookings.map((booking) => (
+              <Card
+                key={booking.id}
+                className="border border-zinc-200 shadow-sm transition hover:shadow-md dark:border-zinc-700 dark:hover:border-zinc-600"
+              >
+                <CardBody className="space-y-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-base font-semibold text-zinc-950 dark:text-white">
+                        {booking.customer_name}
+                      </p>
+                      <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">
+                        {booking.customer_phone}
+                      </p>
                     </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                    <Badge color={statusColor(booking.status)}>
+                      {prettyStatus(booking.status)}
+                    </Badge>
+                  </div>
+
+                  <div className="rounded-lg bg-zinc-50 p-3 text-sm dark:bg-zinc-800/70">
+                    <p className="text-zinc-700 dark:text-zinc-300">
+                      <span className="font-medium">Service:</span> {booking.service_type}
+                    </p>
+                    <p className="mt-1 text-zinc-700 dark:text-zinc-300">
+                      <span className="font-medium">Scheduled:</span>{' '}
+                      {booking.selected_slot ? formatDateTime(booking.selected_slot) : '—'}
+                    </p>
+                  </div>
+
+                  {(booking.status === 'confirmed' || booking.status === 'rescheduled') && (
+                    <div className="flex flex-wrap gap-2">
+                      <Button plain className="text-xs" onClick={() => handleAction(booking.id, 'complete')}>
+                        Complete
+                      </Button>
+                      <Button plain className="text-xs" onClick={() => handleAction(booking.id, 'no-show')}>
+                        No-show
+                      </Button>
+                      <Button
+                        plain
+                        className="text-xs text-red-600 dark:text-red-400"
+                        onClick={() => handleAction(booking.id, 'cancel')}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  )}
+                </CardBody>
+              </Card>
+            ))}
+          </div>
         ) : (
           <p className="py-8 text-center text-sm text-zinc-500 dark:text-zinc-400">
             {searchResults ? 'No bookings found for this phone number' : 'No bookings yet'}
