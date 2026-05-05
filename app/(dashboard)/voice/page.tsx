@@ -5,6 +5,7 @@ import {
   ArrowPathIcon,
   ArrowUturnLeftIcon,
   ArrowUturnRightIcon,
+  BoltIcon,
   CheckCircleIcon,
   CloudArrowUpIcon,
   ExclamationTriangleIcon,
@@ -12,6 +13,7 @@ import {
   PhoneIcon,
   SparklesIcon,
   TrashIcon,
+  WrenchScrewdriverIcon,
 } from '@heroicons/react/20/solid'
 import { Heading, Subheading } from '@/components/heading'
 import { Button } from '@/components/button'
@@ -34,7 +36,13 @@ import { useApiData, useApiToken } from '@/lib/hooks'
 import { ApiError, api } from '@/lib/api'
 import { notifyError, notifySuccess } from '@/lib/notify'
 import { formatDateTime } from '@/lib/utils'
-import type { VoiceConfig, VoicePhoneNumber, VoiceSettings } from '@/lib/types'
+import type {
+  VoiceConfig,
+  VoicePhoneNumber,
+  VoiceSettings,
+  VoiceTool,
+  VoiceToolsResponse,
+} from '@/lib/types'
 
 type FormState = Pick<
   VoiceSettings,
@@ -158,12 +166,47 @@ export default function VoicePage() {
     canUndo,
     canRedo,
   } = useHistoryState<FormState>(null)
-  const [apiKey, setApiKey] = useState('')
-  const [savingKey, setSavingKey] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [phones, setPhones] = useState<VoicePhoneNumber[] | null>(null)
   const [phonesLoading, setPhonesLoading] = useState(false)
   const [pendingPhoneId, setPendingPhoneId] = useState<string | null>(null)
+
+  // Tools panel — populated once the API key is configured. Refetched after
+  // every successful Save & sync so newly-bound tool ids are reflected
+  // without forcing the user to reload.
+  const [tools, setTools] = useState<VoiceTool[] | null>(null)
+  const [toolsLoading, setToolsLoading] = useState(false)
+  const [toolsBoundCount, setToolsBoundCount] = useState(0)
+
+  const loadTools = useCallback(async () => {
+    setToolsLoading(true)
+    try {
+      const token = await getToken()
+      const res: VoiceToolsResponse = await api.voice.listTools(token)
+      setTools(res.items)
+      setToolsBoundCount(res.bound_count)
+    } catch (e) {
+      // The page is still useful without tools — surface the error but don't
+      // crash the layout.
+      notifyError(e instanceof ApiError ? e.message : 'Failed to load tools')
+    } finally {
+      setToolsLoading(false)
+    }
+  }, [getToken])
+
+  // Auto-load tools once the platform is configured. Re-runs whenever the
+  // assistant id changes (e.g. just-created or just-deleted) so the bound
+  // badges stay accurate without relying on the user pressing Refresh.
+  useEffect(() => {
+    const ready = config?.platform_configured ?? config?.has_api_key
+    if (ready) {
+      void loadTools()
+    } else {
+      setTools(null)
+      setToolsBoundCount(0)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config?.platform_configured, config?.has_api_key, config?.assistant_id])
 
   useEffect(() => {
     if (config && !form) {
@@ -171,15 +214,15 @@ export default function VoicePage() {
     }
   }, [config, form, resetForm])
 
-  // Reload form whenever sync/credentials change the underlying config. This
-  // is an external source of truth, so we wipe the undo history — the user
+  // Reload form whenever sync changes the underlying config. This is an
+  // external source of truth, so we wipe the undo history — the user
   // starts fresh after a successful save/sync.
   useEffect(() => {
     if (config) resetForm(settingsToForm(config.settings, config.defaults))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     config?.assistant_id,
-    config?.has_api_key,
+    config?.platform_configured,
     config?.last_synced_at,
     config?.settings.voice,
   ])
@@ -218,46 +261,19 @@ export default function VoicePage() {
     setForm({ ...form, first_message: config.defaults.first_message }, { force: true })
   }
 
+  // `platform_configured` is the modern flag; older backend builds only
+  // expose `has_api_key` (legacy alias). Treat either as "voice is on".
+  const platformReady = Boolean(
+    (config as VoiceConfig | null)?.platform_configured ?? config?.has_api_key,
+  )
+
   const status: { color: 'lime' | 'amber' | 'zinc' | 'red'; label: string } = useMemo(() => {
     if (!config) return { color: 'zinc', label: 'Loading' }
-    if (!config.has_api_key) return { color: 'zinc', label: 'Not connected' }
-    if (!config.assistant_id) return { color: 'amber', label: 'Key saved — sync needed' }
-    if (!config.phone_number_id) return { color: 'amber', label: 'Assistant ready — bind a phone' }
+    if (!platformReady) return { color: 'red', label: 'Voice disabled' }
+    if (!config.assistant_id) return { color: 'amber', label: 'Sync needed' }
+    if (!config.phone_number_id) return { color: 'amber', label: 'Bind a phone' }
     return { color: 'lime', label: 'Live' }
-  }, [config])
-
-  const saveKey = async () => {
-    if (!apiKey.trim()) {
-      notifyError('Paste your Vapi API key first.')
-      return
-    }
-    setSavingKey(true)
-    try {
-      const token = await getToken()
-      await api.voice.setCredentials(token, apiKey.trim())
-      notifySuccess('Vapi API key saved (encrypted).')
-      setApiKey('')
-      setPhones(null)
-      refetch()
-    } catch (e) {
-      notifyError(e instanceof ApiError ? e.message : 'Failed to save API key')
-    } finally {
-      setSavingKey(false)
-    }
-  }
-
-  const removeKey = async () => {
-    if (!confirm('Disconnect Vapi? The assistant id will be cleared locally.')) return
-    try {
-      const token = await getToken()
-      await api.voice.deleteCredentials(token)
-      notifySuccess('Vapi disconnected.')
-      setPhones(null)
-      refetch()
-    } catch (e) {
-      notifyError(e instanceof ApiError ? e.message : 'Disconnect failed')
-    }
-  }
+  }, [config, platformReady])
 
   const saveAndSync = async () => {
     if (!form) return
@@ -266,8 +282,25 @@ export default function VoicePage() {
       const token = await getToken()
       await api.voice.update(token, formToPatch(form))
       const res = await api.voice.sync(token)
-      notifySuccess(res.message)
+
+      // Build a human-friendly toast that summarises both the assistant
+      // sync and the tool registry changes — the user immediately sees
+      // whether anything was created/updated on this run.
+      const created = res.tools_created.length
+      const updated = res.tools_updated.length
+      const failed = res.tools_failed.length
+      const parts: string[] = [res.message]
+      if (created) parts.push(`${created} tool${created === 1 ? '' : 's'} created`)
+      if (updated) parts.push(`${updated} updated`)
+      if (failed) parts.push(`${failed} failed`)
+      notifySuccess(parts.join(' · '))
+
+      if (failed) {
+        notifyError(`Tool sync errors: ${res.tools_failed.join(', ')}`)
+      }
+
       refetch()
+      void loadTools()
     } catch (e) {
       notifyError(e instanceof ApiError ? e.message : 'Save & sync failed')
     } finally {
@@ -357,12 +390,32 @@ export default function VoicePage() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <Heading>Voice setup</Heading>
-          <Text className="mt-1">Connect Vapi, customize your assistant, and bind a phone number.</Text>
+          <Text className="mt-1">
+            Customize your AI voice assistant and bind a phone number — voice infrastructure is
+            managed by us, no API key required.
+          </Text>
         </div>
         <Badge color={status.color}>{status.label}</Badge>
       </div>
 
       <Divider className="mt-6" />
+
+      {/* Platform-not-configured banner: shown only when the deployment hasn't
+          set VAPI_PLATFORM_API_KEY. Customers can't fix this themselves —
+          it's purely a heads-up so the empty UI below makes sense. */}
+      {!platformReady && (
+        <div className="mt-6 flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 dark:border-amber-800/60 dark:bg-amber-900/20">
+          <ExclamationTriangleIcon className="size-5 shrink-0 text-amber-600 dark:text-amber-400" />
+          <div className="min-w-0 text-sm text-amber-900 dark:text-amber-200">
+            <p className="font-semibold">Voice features are not yet enabled on this deployment.</p>
+            <p className="mt-1">
+              The platform admin needs to configure the Vapi master account before assistants can
+              be created. Once that&apos;s set up, this page lights up automatically — no action
+              required from your side.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Connection summary */}
       <div className="mt-6 grid gap-4 lg:grid-cols-3">
@@ -371,12 +424,14 @@ export default function VoicePage() {
             <div className="flex items-start gap-3">
               <KeyIcon className="size-5 text-sky-600" />
               <div className="min-w-0 flex-1">
-                <Subheading>API key</Subheading>
+                <Subheading>Voice platform</Subheading>
                 <Text className="mt-1 text-sm">
-                  {config.has_api_key ? 'Stored encrypted in your tenant.' : 'Not configured yet.'}
+                  {platformReady
+                    ? 'Managed by us — no key needed.'
+                    : 'Not yet enabled on this deployment.'}
                 </Text>
               </div>
-              {config.has_api_key ? (
+              {platformReady ? (
                 <CheckCircleIcon className="size-5 text-lime-600" />
               ) : (
                 <ExclamationTriangleIcon className="size-5 text-amber-500" />
@@ -436,42 +491,8 @@ export default function VoicePage() {
         </CardBody>
       </Card>
 
-      {/* API key form */}
-      <Card className="mt-6">
-        <CardBody>
-          <Subheading>Vapi API key</Subheading>
-          <Text className="mt-1 text-sm">
-            Find your Private API key in the Vapi dashboard → Org Settings → API Keys. The key is encrypted
-            with your tenant's encryption key before being stored.
-          </Text>
-          <FieldGroup className="mt-4">
-            <Field>
-              <Label>Private API key</Label>
-              <Input
-                type="password"
-                placeholder={config.has_api_key ? 'Replace existing key…' : 'sk_...'}
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-              />
-              <Description>Paste your Vapi private key. Never returned by our API once stored.</Description>
-            </Field>
-          </FieldGroup>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Button onClick={saveKey} disabled={savingKey || !apiKey.trim()}>
-              {config.has_api_key ? 'Replace key' : 'Save key'}
-            </Button>
-            {config.has_api_key && (
-              <Button outline onClick={removeKey}>
-                <TrashIcon data-slot="icon" />
-                Disconnect
-              </Button>
-            )}
-          </div>
-        </CardBody>
-      </Card>
-
-      {/* Settings form (only when key present) */}
-      {config.has_api_key && form && (
+      {/* Settings form (only when the platform is configured) */}
+      {platformReady && form && (
         <Card className="mt-6">
           <CardBody>
             <div className="flex flex-wrap items-end justify-between gap-3">
@@ -554,7 +575,7 @@ export default function VoicePage() {
                   onChange={(e) => setForm({ ...form, system_prompt: e.target.value })}
                 />
                 <Description>
-                  The assistant's persona and instructions. Tools (booking lookup, knowledge search,
+                  The assistant&apos;s persona and instructions. Tools (booking lookup, knowledge search,
                   create/cancel booking) are wired automatically — just describe how you want it to behave.
                   Tip: <kbd className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs dark:bg-zinc-800">Ctrl+Z</kbd>{' '}
                   undoes any change, including Reset to default.
@@ -618,9 +639,64 @@ export default function VoicePage() {
         </Card>
       )}
 
-      {/* Phone numbers (only when assistant exists) */}
-      {config.has_api_key && config.assistant_id && (
+      {/* Assistant tools — list every catalogue tool, with bound state */}
+      {platformReady && (
         <Card className="mt-6">
+          <CardBody>
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <WrenchScrewdriverIcon className="size-5 text-indigo-500" />
+                  <Subheading>Assistant tools</Subheading>
+                  {tools && (
+                    <Badge color={toolsBoundCount === tools.length ? 'lime' : 'amber'}>
+                      {toolsBoundCount}/{tools.length} bound
+                    </Badge>
+                  )}
+                </div>
+                <Text className="mt-1 text-sm">
+                  These are the capabilities your Vapi assistant can call into. Booking lookups,
+                  scheduling, knowledge-base searches — each one POSTs back to your tenant webhook,
+                  so live data stays in sync. Tools are created on Vapi during{' '}
+                  <em>Save &amp; sync</em>; subsequent syncs only PATCH when their definition changes.
+                </Text>
+              </div>
+              <Button outline onClick={loadTools} disabled={toolsLoading}>
+                <ArrowPathIcon
+                  data-slot="icon"
+                  className={toolsLoading ? 'animate-spin' : ''}
+                />
+                Refresh
+              </Button>
+            </div>
+
+            {toolsLoading && tools === null ? (
+              <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="h-24 animate-pulse rounded-lg bg-zinc-100 dark:bg-zinc-800"
+                  />
+                ))}
+              </div>
+            ) : tools && tools.length > 0 ? (
+              <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {tools.map((tool) => (
+                  <ToolCard key={tool.name} tool={tool} />
+                ))}
+              </div>
+            ) : (
+              <Text className="mt-4 text-sm text-zinc-500">
+                No tools available yet. Run <em>Save &amp; sync</em> above to provision them on Vapi.
+              </Text>
+            )}
+          </CardBody>
+        </Card>
+      )}
+
+      {/* Phone numbers (only when assistant exists) */}
+      {platformReady && config.assistant_id && (
+        <Card className="mt-6 mb-8">
           <CardBody>
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
@@ -701,5 +777,76 @@ export default function VoicePage() {
         </Card>
       )}
     </>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Tool card — one row in the Assistant tools grid
+// ---------------------------------------------------------------------------
+//
+// Visual rules:
+// - Bound tool   → indigo accent + checkmark + the (truncated) Vapi tool id
+//                  so customers can cross-reference it in the Vapi dashboard.
+// - Unbound tool → amber accent + "Will be created on next sync" hint.
+// - Async tools  → tiny lightning icon next to the name (none today, but
+//                  future fire-and-forget tools will be flagged for clarity).
+//
+// We deliberately render the **catalogue** description verbatim — the LLM
+// also sees that exact text, so showing it builds trust ("this is the
+// instruction the AI follows").
+
+function ToolCard({ tool }: { tool: VoiceTool }) {
+  return (
+    <div
+      className={
+        'group flex flex-col gap-3 rounded-xl border bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:bg-zinc-900 ' +
+        (tool.bound
+          ? 'border-zinc-200 dark:border-zinc-800'
+          : 'border-amber-200 dark:border-amber-800/60')
+      }
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <code className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+            {tool.name}
+          </code>
+          {tool.is_async && (
+            <BoltIcon
+              className="size-4 shrink-0 text-amber-500"
+              title="Async — assistant continues without waiting for the response"
+            />
+          )}
+        </div>
+        {tool.bound ? (
+          <Badge color="lime">
+            <CheckCircleIcon data-slot="icon" />
+            Bound
+          </Badge>
+        ) : (
+          <Badge color="amber">Pending sync</Badge>
+        )}
+      </div>
+
+      <p className="line-clamp-4 text-xs leading-relaxed text-zinc-600 dark:text-zinc-400">
+        {tool.description}
+      </p>
+
+      <div className="mt-auto flex flex-wrap items-center gap-2 text-[11px] text-zinc-500 dark:text-zinc-400">
+        <span className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-0.5 dark:bg-zinc-800">
+          <SparklesIcon className="size-3" />
+          “{tool.request_start}”
+        </span>
+        {tool.bound && tool.vapi_tool_id ? (
+          <code
+            className="truncate rounded bg-zinc-100 px-2 py-0.5 font-mono dark:bg-zinc-800"
+            title={tool.vapi_tool_id}
+          >
+            id: {tool.vapi_tool_id.slice(0, 10)}…
+          </code>
+        ) : (
+          <span className="italic">Will be created on next sync</span>
+        )}
+      </div>
+    </div>
   )
 }

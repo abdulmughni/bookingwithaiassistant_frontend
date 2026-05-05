@@ -214,6 +214,16 @@ export interface CallLogDetail extends CallLogSummary {
   metadata: Record<string, unknown>
 }
 
+/** Paged call list response from /api/calls/paged. */
+export interface CallLogsPage {
+  items: CallLogSummary[]
+  total: number
+  limit: number
+  offset: number
+  has_more: boolean
+  next_offset: number | null
+}
+
 /** Editable voice settings stored locally in tenants.voice_settings. */
 export interface VoiceSettings {
   system_prompt: string
@@ -228,6 +238,9 @@ export interface VoiceSettings {
 /** GET /api/voice — full voice config + connection status. API key never returned. */
 export interface VoiceConfig {
   enabled: boolean
+  /** Backend has VAPI_PLATFORM_API_KEY set — voice features are available. */
+  platform_configured: boolean
+  /** @deprecated alias for platform_configured (kept for legacy frontend builds). */
   has_api_key: boolean
   assistant_id: string
   phone_number_id: string
@@ -251,4 +264,33 @@ export interface VoiceSyncResponse {
   webhook_url: string
   last_synced_at: string
   message: string
+  tools_created: string[]
+  tools_updated: string[]
+  tools_skipped: string[]
+  tools_failed: string[]
+}
+
+/**
+ * One catalogue tool the Vapi assistant can call. The backend exposes these
+ * via `GET /api/voice/tools`; the Voice Setup page renders them so customers
+ * can see exactly which capabilities the assistant has been wired with.
+ *
+ * `bound = true` means the tool already exists on the tenant's Vapi account
+ * (i.e. it has been pushed via `POST /api/voice/sync`) and `vapi_tool_id`
+ * carries its registry id. `bound = false` rows still appear in the list —
+ * they describe the tool the next sync will create.
+ */
+export interface VoiceTool {
+  name: string
+  description: string
+  is_async: boolean
+  request_start: string
+  vapi_tool_id: string | null
+  bound: boolean
+}
+
+export interface VoiceToolsResponse {
+  items: VoiceTool[]
+  total: number
+  bound_count: number
 }

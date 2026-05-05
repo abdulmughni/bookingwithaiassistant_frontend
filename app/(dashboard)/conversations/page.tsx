@@ -414,7 +414,6 @@ export default function ConversationsPage() {
   const [conversationsLoading, setConversationsLoading] = useState(true)
   const [conversationsLoadingMore, setConversationsLoadingMore] = useState(false)
   const [conversationsHasMore, setConversationsHasMore] = useState(true)
-  const [conversationsOffset, setConversationsOffset] = useState(0)
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [query, setQuery] = useState('')
@@ -427,6 +426,10 @@ export default function ConversationsPage() {
   const [messagesOffset, setMessagesOffset] = useState(0)
 
   const listScrollRef = useRef<HTMLDivElement | null>(null)
+  const listSentinelRef = useRef<HTMLDivElement | null>(null)
+  /** Pagination cursor for "load more" — must NOT live in useCallback deps or every
+   *  successful page recreates the callback and retriggers the tab/search effect. */
+  const conversationsOffsetRef = useRef(0)
   const threadScrollRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -440,12 +443,13 @@ export default function ConversationsPage() {
       if (reset) {
         setConversationsLoading(true)
         setConversationsLoadingMore(false)
+        conversationsOffsetRef.current = 0
       } else {
         setConversationsLoadingMore(true)
       }
       try {
         const token = await getToken()
-        const offset = reset ? 0 : conversationsOffset
+        const offset = reset ? 0 : conversationsOffsetRef.current
         const page = await api.conversations.listPaged(token, {
           limit: CONVERSATIONS_PAGE_SIZE,
           offset,
@@ -462,18 +466,19 @@ export default function ConversationsPage() {
           return merged
         })
         setConversationsHasMore(page.has_more)
-        setConversationsOffset(page.next_offset ?? offset + page.items.length)
+        const nextOffset = page.next_offset ?? offset + page.items.length
+        conversationsOffsetRef.current = nextOffset
       } finally {
         setConversationsLoading(false)
         setConversationsLoadingMore(false)
       }
     },
-    [channelTab, conversationsOffset, debouncedQuery, getToken],
+    [channelTab, debouncedQuery, getToken],
   )
 
   useEffect(() => {
+    conversationsOffsetRef.current = 0
     setConversations([])
-    setConversationsOffset(0)
     setConversationsHasMore(true)
     void fetchConversations({ reset: true })
   }, [channelTab, debouncedQuery, fetchConversations])
@@ -488,20 +493,31 @@ export default function ConversationsPage() {
   })
   const virtualRows = listVirtualizer.getVirtualItems()
 
+  // Load older pages when the user scrolls the inbox near the bottom. We use
+  // IntersectionObserver instead of depending on virtualRows (new array every
+  // measure) which was firing the effect constantly and spamming the API.
   useEffect(() => {
-    const last = virtualRows[virtualRows.length - 1]
-    if (!last) return
-    if (!conversationsHasMore || conversationsLoading || conversationsLoadingMore) return
-    if (last.index >= Math.max(0, filtered.length - 10)) {
-      void fetchConversations()
-    }
+    const root = listScrollRef.current
+    const sentinel = listSentinelRef.current
+    if (!root || !sentinel) return
+
+    const obs = new IntersectionObserver(
+      (entries) => {
+        const hit = entries.some((e) => e.isIntersecting)
+        if (!hit) return
+        if (!conversationsHasMore || conversationsLoading || conversationsLoadingMore) return
+        void fetchConversations()
+      },
+      { root, rootMargin: '120px', threshold: 0 },
+    )
+    obs.observe(sentinel)
+    return () => obs.disconnect()
   }, [
-    virtualRows,
-    filtered.length,
     conversationsHasMore,
     conversationsLoading,
     conversationsLoadingMore,
     fetchConversations,
+    filtered.length,
   ])
 
   const selected = conversations.find((c) => c.id === selectedId)
@@ -574,7 +590,7 @@ export default function ConversationsPage() {
   ])
 
   const refreshList = async () => {
-    setConversationsOffset(0)
+    conversationsOffsetRef.current = 0
     setConversationsHasMore(true)
     await fetchConversations({ reset: true })
     if (selectedId) void loadMessages(selectedId)
@@ -717,6 +733,8 @@ export default function ConversationsPage() {
                     <p className="text-center text-xs text-zinc-400 dark:text-zinc-500">End of list</p>
                   )}
                 </div>
+                {/* Triggers one "load more" when scrolled into view — avoids virtualRows effect spam */}
+                <div ref={listSentinelRef} className="h-1 w-full shrink-0" aria-hidden />
               </>
             ) : (
               <p className="px-4 py-12 text-center text-sm text-zinc-500 dark:text-zinc-400">

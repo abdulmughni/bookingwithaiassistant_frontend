@@ -255,6 +255,28 @@ export const api = {
       const q = qs.toString()
       return request<import('./types').CallLogSummary[]>(`/api/calls${q ? `?${q}` : ''}`, { token })
     },
+    listPaged: (
+      token: string,
+      params: {
+        limit?: number
+        offset?: number
+        direction?: string
+        status?: string
+        q?: string
+      } = {},
+    ) => {
+      const qs = new URLSearchParams()
+      if (params.limit) qs.set('limit', String(params.limit))
+      if (params.offset) qs.set('offset', String(params.offset))
+      if (params.direction) qs.set('direction', params.direction)
+      if (params.status) qs.set('status', params.status)
+      if (params.q) qs.set('q', params.q)
+      const q = qs.toString()
+      return request<import('./types').CallLogsPage>(
+        `/api/calls/paged${q ? `?${q}` : ''}`,
+        { token },
+      )
+    },
     get: (token: string, id: string) =>
       request<import('./types').CallLogDetail>(`/api/calls/${encodeURIComponent(id)}`, { token }),
     remove: (token: string, id: string) =>
@@ -268,17 +290,6 @@ export const api = {
         token,
         method: 'PATCH',
         body: JSON.stringify(data),
-      }),
-    setCredentials: (token: string, apiKey: string) =>
-      request<import('./types').VoiceConfig>('/api/voice/credentials', {
-        token,
-        method: 'POST',
-        body: JSON.stringify({ api_key: apiKey }),
-      }),
-    deleteCredentials: (token: string) =>
-      request<import('./types').VoiceConfig>('/api/voice/credentials', {
-        token,
-        method: 'DELETE',
       }),
     sync: (token: string) =>
       request<import('./types').VoiceSyncResponse>('/api/voice/sync', { token, method: 'POST' }),
@@ -296,6 +307,8 @@ export const api = {
         `/api/voice/phone-numbers/${encodeURIComponent(phoneId)}/detach`,
         { token, method: 'POST' },
       ),
+    listTools: (token: string) =>
+      request<import('./types').VoiceToolsResponse>('/api/voice/tools', { token }),
   },
 
   credentials: {
