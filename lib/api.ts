@@ -263,6 +263,9 @@ export const api = {
         direction?: string
         status?: string
         q?: string
+        /** YYYY-MM-DD — inclusive; filters by call day (started_at, else created_at). */
+        started_from?: string
+        started_to?: string
       } = {},
     ) => {
       const qs = new URLSearchParams()
@@ -271,6 +274,8 @@ export const api = {
       if (params.direction) qs.set('direction', params.direction)
       if (params.status) qs.set('status', params.status)
       if (params.q) qs.set('q', params.q)
+      if (params.started_from) qs.set('started_from', params.started_from)
+      if (params.started_to) qs.set('started_to', params.started_to)
       const q = qs.toString()
       return request<import('./types').CallLogsPage>(
         `/api/calls/paged${q ? `?${q}` : ''}`,

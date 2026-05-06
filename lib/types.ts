@@ -67,6 +67,8 @@ export interface Booking {
   id: string
   tenant_id: string
   conversation_id: string | null
+  source_channel: 'whatsapp' | 'facebook' | 'instagram' | 'web' | 'call' | 'api' | string
+  source_contact: string | null
   customer_name: string
   customer_phone: string
   customer_address: string | null
@@ -195,6 +197,7 @@ export interface CallLogSummary {
   status: string
   ended_reason: string | null
   phone_number: string
+  caller_name: string
   assistant_id: string
   duration_seconds: number | null
   cost: number | null
