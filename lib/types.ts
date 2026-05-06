@@ -115,6 +115,18 @@ export interface Conversation {
   last_message_at?: string | null
 }
 
+/** Photo / voice / etc. persisted from Messenger or Instagram inbound media. */
+export interface MessageAttachment {
+  id: string
+  kind: 'image' | 'audio' | 'video' | 'document' | string
+  mime_type: string | null
+  duration_seconds: number | null
+  ai_caption: string | null
+  ai_transcript: string | null
+  /** Short-lived signed URL from Cloudinary (authenticated assets). */
+  delivery_url: string | null
+}
+
 export interface Message {
   id: string
   conversation_id: string
@@ -122,6 +134,7 @@ export interface Message {
   content: string
   channel_message_id: string | null
   created_at: string
+  attachments?: MessageAttachment[]
 }
 
 export interface ConversationsPage {

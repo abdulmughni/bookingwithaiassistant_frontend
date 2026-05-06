@@ -20,7 +20,7 @@ import {
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useApiToken } from '@/lib/hooks'
 import { api } from '@/lib/api'
-import type { Conversation, Message } from '@/lib/types'
+import type { Conversation, Message, MessageAttachment } from '@/lib/types'
 
 type ChannelTab = 'all' | 'facebook' | 'instagram' | 'whatsapp'
 
@@ -246,6 +246,102 @@ function formatBubbleTime(iso: string) {
   })
 }
 
+/** When we persisted Messenger/IG photos, ``content`` duplicates captions; prefer the typed line. */
+function bubbleTextForDisplay(message: Message): string {
+  const raw = message.content.trim()
+  const hasInlineMedia = (message.attachments ?? []).some((a) => Boolean(a.delivery_url))
+  if (!hasInlineMedia || message.role !== 'user') return raw
+
+  const marker = /\n*\[Customer's text]\s*\n/i
+  const match = raw.match(marker)
+  if (match && match.index !== undefined) {
+    const after = raw.slice(match.index + match[0].length).trim()
+    if (after.length > 0) return after
+  }
+  // Photo/audio-only turn: synthesized body is attachment captions — hide when cards render them.
+  if (/^\[Attachment\b/i.test(raw)) {
+    return ''
+  }
+  return raw
+}
+
+function MessageAttachmentsStack({
+  attachments,
+  alignOutgoing,
+}: {
+  attachments: MessageAttachment[]
+  alignOutgoing: boolean
+}) {
+  const playable = attachments.filter((a) => Boolean(a.delivery_url))
+  if (playable.length === 0) return null
+
+  return (
+    <div
+      className={clsx(
+        'mb-2 flex flex-col gap-2',
+        alignOutgoing ? 'items-end' : 'items-start',
+      )}
+    >
+      {playable.map((a) => (
+        <div key={a.id} className="max-w-full">
+          {a.kind === 'image' && (
+            <div className="overflow-hidden rounded-2xl ring-1 ring-black/10 dark:ring-white/15">
+              <a href={a.delivery_url!} target="_blank" rel="noopener noreferrer">
+                {/* eslint-disable-next-line @next/next/no-img-element -- Cloudinary signed URL */}
+                <img
+                  src={a.delivery_url!}
+                  alt=""
+                  className="max-h-72 w-auto max-w-[min(100%,18rem)] object-cover sm:max-w-[20rem]"
+                  loading="lazy"
+                />
+              </a>
+              {a.ai_caption ? (
+                <p className="border-t border-black/5 bg-black/[0.03] px-2 py-1.5 text-[11px] leading-snug text-zinc-600 dark:border-white/10 dark:bg-white/[0.06] dark:text-zinc-300">
+                  {a.ai_caption}
+                </p>
+              ) : null}
+            </div>
+          )}
+
+          {a.kind === 'audio' && (
+            <div
+              className={clsx(
+                'min-w-[12rem] max-w-[min(100%,20rem)] rounded-2xl px-3 py-2 ring-1 ring-black/10 dark:ring-white/15',
+                alignOutgoing ? 'bg-[#0084ff]/15 dark:bg-sky-900/40' : 'bg-black/[0.06] dark:bg-white/[0.08]',
+              )}
+            >
+              <audio
+                controls
+                src={a.delivery_url!}
+                className="h-9 w-full max-w-full"
+                preload="metadata"
+              >
+                Your browser does not support audio.
+              </audio>
+              {a.ai_transcript ? (
+                <p className="mt-2 whitespace-pre-wrap text-[11px] leading-snug text-zinc-600 dark:text-zinc-300">
+                  {a.ai_transcript}
+                </p>
+              ) : null}
+            </div>
+          )}
+
+          {a.kind !== 'image' && a.kind !== 'audio' && (
+            <a
+              href={a.delivery_url!}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 rounded-xl bg-black/[0.06] px-3 py-2 text-xs font-medium text-zinc-700 underline-offset-2 hover:underline dark:bg-white/[0.08] dark:text-zinc-200"
+            >
+              Open attachment ({a.kind})
+            </a>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function isSameDay(a: Date, b: Date) {
   return a.toDateString() === b.toDateString()
 }
@@ -268,14 +364,22 @@ function MessageBubble({
   customerName,
   customerAvatarUrl,
   customerSeed,
+  channel,
 }: {
   message: Message
   customerName: string
   customerAvatarUrl?: string | null
   customerSeed: string
+  channel: string
 }) {
   const isCustomer = message.role === 'user'
   const isSystem = message.role === 'system'
+  const metaAttachments = message.attachments ?? []
+  const showMessengerMedia =
+    isCustomer &&
+    (channel === 'facebook' || channel === 'instagram') &&
+    metaAttachments.some((a) => Boolean(a.delivery_url))
+  const bubbleBody = bubbleTextForDisplay(message)
 
   if (isSystem) {
     return (
@@ -333,7 +437,13 @@ function MessageBubble({
                 : 'rounded-[18px] rounded-br-md bg-[#0084ff] text-white',
             )}
           >
-            <p className="whitespace-pre-wrap">{message.content}</p>
+            {showMessengerMedia ? (
+              <MessageAttachmentsStack
+                attachments={metaAttachments}
+                alignOutgoing={isOutgoing}
+              />
+            ) : null}
+            <p className="whitespace-pre-wrap">{bubbleBody}</p>
             <p
               className={clsx(
                 'mt-1 text-[11px]',
@@ -365,11 +475,13 @@ function MessagesWithDividers({
   customerName,
   customerAvatarUrl,
   customerSeed,
+  channel,
 }: {
   messages: Message[]
   customerName: string
   customerAvatarUrl?: string | null
   customerSeed: string
+  channel: string
 }) {
   type Block = { type: 'divider'; label: string } | { type: 'msg'; message: Message }
   const blocks: Block[] = []
@@ -398,6 +510,7 @@ function MessagesWithDividers({
             customerName={customerName}
             customerAvatarUrl={customerAvatarUrl}
             customerSeed={customerSeed}
+            channel={channel}
           />
         ),
       )}
@@ -841,6 +954,7 @@ export default function ConversationsPage() {
                       customerName={customerThreadName}
                       customerAvatarUrl={selected.customer_avatar_url}
                       customerSeed={selected.id}
+                      channel={selected.channel}
                     />
                   </div>
                 ) : (
