@@ -244,11 +244,30 @@ export interface CallLogsPage {
 export interface VoiceSettings {
   system_prompt: string
   first_message: string
+  /** assistant-speaks-first | assistant-speaks-first-with-model-generated-message | assistant-waits-for-user */
+  first_message_mode?: string
   model_provider: string
   model_name: string
   voice: Record<string, unknown>
+  /** Deepgram config: { provider, model, language, smartFormat, keyterm[], keywords[], endpointing? } */
   transcriber: Record<string, unknown>
   end_call_phrases: string[]
+  /** See https://docs.vapi.ai/customization/voice-pipeline-configuration */
+  start_speaking_plan?: Record<string, unknown>
+  stop_speaking_plan?: Record<string, unknown>
+  silence_timeout_seconds?: number | null
+  max_duration_seconds?: number | null
+  /** "off" | "office" | URL to a custom mp3/wav. */
+  background_sound?: string
+  recording_enabled?: boolean | null
+  voicemail_message?: string
+  end_call_message?: string
+  /**
+   * Krisp smart denoising → Vapi ``backgroundSpeechDenoisingPlan``.
+   * https://docs.vapi.ai/documentation/assistants/conversation-behavior/background-speech-denoising
+   * Shape: ``{ smartDenoisingPlan: { enabled: boolean } }``
+   */
+  background_speech_denoising_plan?: Record<string, unknown>
 }
 
 /** GET /api/voice — full voice config + connection status. API key never returned. */

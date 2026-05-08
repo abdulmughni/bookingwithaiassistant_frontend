@@ -1,27 +1,44 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Tab } from '@headlessui/react'
+import clsx from 'clsx'
 import {
+  AdjustmentsHorizontalIcon,
   ArrowPathIcon,
   ArrowUturnLeftIcon,
   ArrowUturnRightIcon,
   BoltIcon,
+  ChatBubbleLeftRightIcon,
   CheckCircleIcon,
+  CheckIcon,
+  ClipboardDocumentIcon,
+  ClockIcon,
   CloudArrowUpIcon,
+  CpuChipIcon,
   ExclamationTriangleIcon,
-  KeyIcon,
+  LanguageIcon,
+  LinkIcon,
+  MicrophoneIcon,
+  MusicalNoteIcon,
   PhoneIcon,
+  ServerStackIcon,
+  ShieldCheckIcon,
+  SignalIcon,
   SparklesIcon,
+  SpeakerWaveIcon,
+  TagIcon,
   TrashIcon,
   WrenchScrewdriverIcon,
 } from '@heroicons/react/20/solid'
 import { Heading, Subheading } from '@/components/heading'
 import { Button } from '@/components/button'
 import { Badge } from '@/components/badge'
-import { Divider } from '@/components/divider'
 import { Text } from '@/components/text'
 import { Input } from '@/components/input'
 import { Textarea } from '@/components/textarea'
+import { Select } from '@/components/select'
+import { Switch } from '@/components/switch'
 import { Card, CardBody } from '@/components/card'
 import { Field, FieldGroup, Label, Description } from '@/components/fieldset'
 import {
@@ -44,38 +61,260 @@ import type {
   VoiceToolsResponse,
 } from '@/lib/types'
 
+// ---------------------------------------------------------------------------
+// Form state — flat shape that mirrors what the inputs render.
+// ---------------------------------------------------------------------------
+//
+// We split nested Vapi objects (transcriber, startSpeakingPlan, …) into
+// flat string/boolean fields here so each <Input>/<Select> binds to a
+// single string. `formToPatch` reassembles them into the nested API shape
+// at save time.
+
 type FormState = Pick<
   VoiceSettings,
   'system_prompt' | 'first_message' | 'model_provider' | 'model_name'
 > & {
+  // Channel basics
+  first_message_mode: string
   voice_provider: string
   voice_id: string
   end_call_phrases: string
+
+  // Voice tuning (ElevenLabs / 11labs): stability, similarity, style, speed.
+  voice_stability: string
+  voice_similarity_boost: string
+  voice_style: string
+  voice_speed: string
+
+  // Transcriber (Deepgram)
+  transcriber_provider: string
+  transcriber_model: string
+  transcriber_language: string
+  transcriber_smart_format: boolean
+  transcriber_numerals: boolean   // "nine seven two" → "972"
+  transcriber_keywords: string    // newline / comma separated
+  transcriber_keyterm: string     // newline / comma separated
+  transcriber_endpointing: string // ms; "" = default
+
+  // Single dashboard toggle that drives Vapi's ``backgroundSpeechDenoisingPlan``
+  // for smart (Krisp) denoising, fourier denoising, and fourier media detection
+  // — see _build_denoising_plan in the backend.
+  denoise_smart_enabled: boolean
+
+  // Speaking timing
+  start_smart_provider: string         // livekit | vapi | krisp | deepgram-flux | "" (off)
+  start_wait_seconds: string
+  stop_num_words: string
+  stop_voice_seconds: string
+  stop_backoff_seconds: string
+
+  // Call shape
+  silence_timeout_seconds: string
+  max_duration_seconds: string
+  background_sound: string
+  recording_enabled: boolean
+  voicemail_message: string
+  end_call_message: string
+}
+
+const DEFAULT_FALLBACKS = {
+  transcriber_provider: 'deepgram',
+  transcriber_model: 'nova-3',
+  transcriber_language: 'en',
+  voice_provider: 'vapi',
+  voice_id: 'Elliot',
+  start_smart_provider: 'livekit',
+  start_wait_seconds: '0.4',
+  stop_num_words: '0',
+  stop_voice_seconds: '0.2',
+  stop_backoff_seconds: '1.0',
+  silence_timeout_seconds: '30',
+  max_duration_seconds: '1800',
+  background_sound: 'off',
+} as const
+
+function listToLines(value: unknown): string {
+  if (!Array.isArray(value)) return ''
+  return value
+    .map((v) => (typeof v === 'string' ? v : String(v ?? '')))
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .join('\n')
+}
+
+function linesToList(value: string): string[] {
+  return value
+    .split(/[\n,]+/)
+    .map((s) => s.trim())
+    .filter(Boolean)
 }
 
 function settingsToForm(s: VoiceSettings, defaults: VoiceConfig['defaults']): FormState {
+  const transcriber = (s.transcriber || {}) as Record<string, unknown>
+  const voice = (s.voice || {}) as Record<string, unknown>
+  const startPlan = (s.start_speaking_plan || {}) as Record<string, unknown>
+  const stopPlan = (s.stop_speaking_plan || {}) as Record<string, unknown>
+  const smart = (startPlan.smartEndpointingPlan || {}) as Record<string, unknown>
+  const denoisePlan = (s.background_speech_denoising_plan || {}) as Record<string, unknown>
+  const smartDenoise =
+    (denoisePlan.smartDenoisingPlan as Record<string, unknown> | undefined) || {}
+  const stringOrEmpty = (v: unknown) =>
+    v === undefined || v === null || v === '' ? '' : String(v)
+
   return {
     system_prompt: s.system_prompt || defaults.system_prompt,
     first_message: s.first_message || defaults.first_message,
+    first_message_mode: s.first_message_mode || 'assistant-speaks-first',
     model_provider: s.model_provider || 'openai',
     model_name: s.model_name || 'gpt-4o-mini',
-    voice_provider: String((s.voice as { provider?: unknown })?.provider ?? '11labs'),
-    voice_id: String((s.voice as { voiceId?: unknown })?.voiceId ?? 'rachel'),
+    voice_provider: String(voice.provider ?? DEFAULT_FALLBACKS.voice_provider),
+    voice_id: String(voice.voiceId ?? DEFAULT_FALLBACKS.voice_id),
     end_call_phrases: (s.end_call_phrases || []).join(', '),
+
+    voice_stability: stringOrEmpty(voice.stability),
+    voice_similarity_boost: stringOrEmpty(voice.similarityBoost),
+    voice_style: stringOrEmpty(voice.style),
+    voice_speed: stringOrEmpty(voice.speed),
+
+    transcriber_provider: String(transcriber.provider ?? DEFAULT_FALLBACKS.transcriber_provider),
+    transcriber_model: String(transcriber.model ?? DEFAULT_FALLBACKS.transcriber_model),
+    transcriber_language: String(transcriber.language ?? DEFAULT_FALLBACKS.transcriber_language),
+    transcriber_smart_format:
+      typeof transcriber.smartFormat === 'boolean' ? transcriber.smartFormat : true,
+    transcriber_numerals:
+      typeof transcriber.numerals === 'boolean' ? transcriber.numerals : true,
+    transcriber_keywords: listToLines(transcriber.keywords),
+    transcriber_keyterm: listToLines(transcriber.keyterm),
+    transcriber_endpointing:
+      transcriber.endpointing !== undefined && transcriber.endpointing !== null
+        ? String(transcriber.endpointing)
+        : '',
+
+    start_smart_provider: String(smart.provider ?? DEFAULT_FALLBACKS.start_smart_provider),
+    start_wait_seconds:
+      startPlan.waitSeconds !== undefined
+        ? String(startPlan.waitSeconds)
+        : DEFAULT_FALLBACKS.start_wait_seconds,
+    stop_num_words:
+      stopPlan.numWords !== undefined
+        ? String(stopPlan.numWords)
+        : DEFAULT_FALLBACKS.stop_num_words,
+    stop_voice_seconds:
+      stopPlan.voiceSeconds !== undefined
+        ? String(stopPlan.voiceSeconds)
+        : DEFAULT_FALLBACKS.stop_voice_seconds,
+    stop_backoff_seconds:
+      stopPlan.backoffSeconds !== undefined
+        ? String(stopPlan.backoffSeconds)
+        : DEFAULT_FALLBACKS.stop_backoff_seconds,
+
+    silence_timeout_seconds:
+      s.silence_timeout_seconds !== undefined && s.silence_timeout_seconds !== null
+        ? String(s.silence_timeout_seconds)
+        : DEFAULT_FALLBACKS.silence_timeout_seconds,
+    max_duration_seconds:
+      s.max_duration_seconds !== undefined && s.max_duration_seconds !== null
+        ? String(s.max_duration_seconds)
+        : DEFAULT_FALLBACKS.max_duration_seconds,
+    background_sound: s.background_sound || DEFAULT_FALLBACKS.background_sound,
+    recording_enabled: s.recording_enabled !== false,
+    voicemail_message: s.voicemail_message || '',
+    end_call_message: s.end_call_message || '',
+
+    denoise_smart_enabled:
+      typeof smartDenoise.enabled === 'boolean'
+        ? (smartDenoise.enabled as boolean)
+        : true,
   }
 }
 
+function parseNumberOr(value: string, fallback: number | null): number | null {
+  const trimmed = value.trim()
+  if (!trimmed) return fallback
+  const n = Number(trimmed)
+  return Number.isFinite(n) ? n : fallback
+}
+
 function formToPatch(f: FormState): Partial<VoiceSettings> {
+  // Build the transcriber. We always send what the user picked — the
+  // backend additionally sanitises (drops `keywords` on nova-3/flux,
+  // strips invalid keyword tokens) before pushing to Vapi.
+  const transcriber: Record<string, unknown> = {
+    provider: f.transcriber_provider || 'deepgram',
+    model: f.transcriber_model || 'nova-3',
+    language: f.transcriber_language || 'en',
+    smartFormat: f.transcriber_smart_format,
+    numerals: f.transcriber_numerals,
+  }
+  const kws = linesToList(f.transcriber_keywords)
+  if (kws.length) transcriber.keywords = kws
+  const kts = linesToList(f.transcriber_keyterm)
+  if (kts.length) transcriber.keyterm = kts
+  const ep = parseNumberOr(f.transcriber_endpointing, null)
+  if (ep !== null) transcriber.endpointing = ep
+
+  // Speaking plans
+  const startPlan: Record<string, unknown> = {}
+  if (f.start_smart_provider) {
+    const smart: Record<string, unknown> = { provider: f.start_smart_provider }
+    if (f.start_smart_provider === 'livekit') {
+      smart.waitFunction = '2000 / (1 + exp(-10 * (x - 0.5)))'
+    }
+    startPlan.smartEndpointingPlan = smart
+  }
+  const wait = parseNumberOr(f.start_wait_seconds, null)
+  if (wait !== null) startPlan.waitSeconds = wait
+
+  const stopPlan: Record<string, unknown> = {}
+  const numWords = parseNumberOr(f.stop_num_words, null)
+  if (numWords !== null) stopPlan.numWords = numWords
+  const voiceSec = parseNumberOr(f.stop_voice_seconds, null)
+  if (voiceSec !== null) stopPlan.voiceSeconds = voiceSec
+  const backoff = parseNumberOr(f.stop_backoff_seconds, null)
+  if (backoff !== null) stopPlan.backoffSeconds = backoff
+
+  // Krisp smart denoising — always persist enabled true/false so Vapi PATCH
+  // receives ``smartDenoisingPlan.enabled: false`` when the user turns it off.
+  // (Omitting the whole plan left the previous assistant value unchanged.)
+  const background_speech_denoising_plan = {
+    smartDenoisingPlan: { enabled: f.denoise_smart_enabled },
+  }
+
+  // Build voice object (ElevenLabs-style tuning when sliders are set).
+  const voice: Record<string, unknown> = {
+    provider: f.voice_provider,
+    voiceId: f.voice_id,
+  }
+  const stab = parseNumberOr(f.voice_stability, null)
+  if (stab !== null) voice.stability = stab
+  const sim = parseNumberOr(f.voice_similarity_boost, null)
+  if (sim !== null) voice.similarityBoost = sim
+  const style = parseNumberOr(f.voice_style, null)
+  if (style !== null) voice.style = style
+  const speed = parseNumberOr(f.voice_speed, null)
+  if (speed !== null) voice.speed = speed
+
   return {
     system_prompt: f.system_prompt,
     first_message: f.first_message,
+    first_message_mode: f.first_message_mode,
     model_provider: f.model_provider,
     model_name: f.model_name,
-    voice: { provider: f.voice_provider, voiceId: f.voice_id },
+    voice,
+    transcriber,
     end_call_phrases: f.end_call_phrases
       .split(',')
       .map((s) => s.trim())
       .filter(Boolean),
+    start_speaking_plan: startPlan,
+    stop_speaking_plan: stopPlan,
+    silence_timeout_seconds: parseNumberOr(f.silence_timeout_seconds, null) ?? undefined,
+    max_duration_seconds: parseNumberOr(f.max_duration_seconds, null) ?? undefined,
+    background_sound: f.background_sound,
+    recording_enabled: f.recording_enabled,
+    voicemail_message: f.voicemail_message,
+    end_call_message: f.end_call_message,
+    background_speech_denoising_plan,
   }
 }
 
@@ -366,20 +605,42 @@ export default function VoicePage() {
   if (loading) {
     return (
       <>
-        <Heading>Voice setup</Heading>
-        <Divider className="mt-6" />
-        <div className="mt-6 h-48 animate-pulse rounded-lg bg-zinc-100 dark:bg-zinc-800" />
+        <Card className="relative overflow-hidden border-zinc-200/80 bg-linear-to-br from-sky-50 via-white to-violet-50/60 dark:border-white/10 dark:from-sky-950/30 dark:via-zinc-900 dark:to-violet-950/30">
+          <CardBody>
+            <div className="flex items-center gap-4">
+              <div className="size-12 animate-pulse rounded-2xl bg-zinc-200 dark:bg-zinc-700" />
+              <div className="flex-1 space-y-2">
+                <div className="h-5 w-48 animate-pulse rounded-md bg-zinc-200 dark:bg-zinc-700" />
+                <div className="h-3 w-72 animate-pulse rounded-md bg-zinc-200/70 dark:bg-zinc-700/60" />
+              </div>
+            </div>
+          </CardBody>
+        </Card>
+        <div className="mt-6 grid gap-3 sm:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div
+              key={i}
+              className="h-20 animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-800/60"
+            />
+          ))}
+        </div>
       </>
     )
   }
 
   if (error) {
     return (
-      <>
-        <Heading>Voice setup</Heading>
-        <Divider className="mt-6" />
-        <Text className="mt-6 text-red-600">{error}</Text>
-      </>
+      <Card>
+        <CardBody>
+          <div className="flex items-start gap-3">
+            <ExclamationTriangleIcon className="size-5 shrink-0 text-rose-500" />
+            <div>
+              <Subheading>Voice setup unavailable</Subheading>
+              <Text className="mt-1 text-sm text-rose-700 dark:text-rose-400">{error}</Text>
+            </div>
+          </div>
+        </CardBody>
+      </Card>
     )
   }
 
@@ -387,18 +648,132 @@ export default function VoicePage() {
 
   return (
     <>
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <Heading>Voice setup</Heading>
-          <Text className="mt-1">
-            Customize your AI voice assistant and bind a phone number — voice infrastructure is
-            managed by us, no API key required.
-          </Text>
-        </div>
-        <Badge color={status.color}>{status.label}</Badge>
-      </div>
+      {/* ───────── HERO ─────────────────────────────────────────────────
+          One glanceable header that carries: branding, status, primary
+          action, and the four most-asked-for facts (assistant id, last
+          sync, phone, webhook secret state). Replaces the older
+          three-card status strip, so the eye lands on a single coherent
+          surface instead of a row of disconnected boxes. */}
+      <Card className="relative overflow-hidden border-zinc-200/80 bg-linear-to-br from-sky-50 via-white to-violet-50/60 dark:border-white/10 dark:from-sky-950/30 dark:via-zinc-900 dark:to-violet-950/30">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-sky-200/40 blur-3xl dark:bg-sky-500/10"
+        />
+        <CardBody className="relative">
+          <div className="flex flex-wrap items-start justify-between gap-6">
+            <div className="flex min-w-0 items-start gap-4">
+              <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-linear-to-br from-sky-500 to-violet-500 text-white shadow-lg shadow-sky-500/20 ring-1 ring-white/40">
+                <MicrophoneIcon className="size-6" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-3">
+                  <Heading>Voice assistant</Heading>
+                  <StatusPill color={status.color} label={status.label} />
+                </div>
+                <Text className="mt-1 max-w-2xl">
+                  Customize your AI voice assistant and bind a phone number. Voice
+                  infrastructure is fully managed — no API keys required.
+                </Text>
+              </div>
+            </div>
 
-      <Divider className="mt-6" />
+            {platformReady && form && (
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="inline-flex rounded-lg border border-zinc-950/10 bg-white/70 p-0.5 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/5">
+                  <button
+                    type="button"
+                    onClick={undo}
+                    disabled={!canUndo}
+                    title="Undo (Ctrl+Z)"
+                    aria-label="Undo"
+                    className="inline-flex size-8 items-center justify-center rounded-md text-zinc-600 transition hover:bg-zinc-100 disabled:opacity-40 disabled:hover:bg-transparent dark:text-zinc-300 dark:hover:bg-white/10"
+                  >
+                    <ArrowUturnLeftIcon className="size-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={redo}
+                    disabled={!canRedo}
+                    title="Redo (Ctrl+Shift+Z)"
+                    aria-label="Redo"
+                    className="inline-flex size-8 items-center justify-center rounded-md text-zinc-600 transition hover:bg-zinc-100 disabled:opacity-40 disabled:hover:bg-transparent dark:text-zinc-300 dark:hover:bg-white/10"
+                  >
+                    <ArrowUturnRightIcon className="size-4" />
+                  </button>
+                </div>
+                <Button onClick={saveAndSync} disabled={syncing}>
+                  <CloudArrowUpIcon
+                    data-slot="icon"
+                    className={syncing ? 'animate-spin' : ''}
+                  />
+                  {syncing
+                    ? 'Syncing…'
+                    : config.assistant_id
+                    ? 'Save & sync'
+                    : 'Save & create assistant'}
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {/* Stats strip — three horizontal facts. Mobile collapses to a
+              column; from sm+ they sit on one line as cards. */}
+          <div className="mt-6 grid gap-3 sm:grid-cols-3">
+            <HeroStat
+              icon={<ServerStackIcon className="size-5 text-sky-600 dark:text-sky-400" />}
+              accent="sky"
+              label="Assistant"
+              value={
+                config.assistant_id ? (
+                  <code className="text-xs font-medium">{config.assistant_id}</code>
+                ) : (
+                  <span className="text-zinc-500">Not provisioned yet</span>
+                )
+              }
+              hint={
+                config.last_synced_at
+                  ? `Last synced ${formatDateTime(config.last_synced_at)}`
+                  : platformReady
+                  ? 'Click Save & sync to provision'
+                  : undefined
+              }
+            />
+            <HeroStat
+              icon={<PhoneIcon className="size-5 text-emerald-600 dark:text-emerald-400" />}
+              accent="emerald"
+              label="Phone number"
+              value={
+                config.phone_number_id ? (
+                  <code className="text-xs font-medium">{config.phone_number_id}</code>
+                ) : (
+                  <span className="text-zinc-500">Not bound</span>
+                )
+              }
+              hint={
+                config.phone_number_id
+                  ? 'Inbound calls reach this assistant'
+                  : 'Bind a number from the table below'
+              }
+            />
+            <HeroStat
+              icon={<ShieldCheckIcon className="size-5 text-violet-600 dark:text-violet-400" />}
+              accent="violet"
+              label="Webhook secret"
+              value={
+                config.has_webhook_secret ? (
+                  <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                    <CheckCircleIcon className="size-4" />
+                    Configured
+                  </span>
+                ) : (
+                  <span className="text-zinc-500 text-xs">Generated on next sync</span>
+                )
+              }
+              hint="Authenticates Vapi → backend webhooks"
+            />
+          </div>
+        </CardBody>
+      </Card>
 
       {/* Platform-not-configured banner: shown only when the deployment hasn't
           set VAPI_PLATFORM_API_KEY. Customers can't fix this themselves —
@@ -417,77 +792,27 @@ export default function VoicePage() {
         </div>
       )}
 
-      {/* Connection summary */}
-      <div className="mt-6 grid gap-4 lg:grid-cols-3">
-        <Card className="border-l-4 border-l-sky-500">
-          <CardBody>
-            <div className="flex items-start gap-3">
-              <KeyIcon className="size-5 text-sky-600" />
-              <div className="min-w-0 flex-1">
-                <Subheading>Voice platform</Subheading>
-                <Text className="mt-1 text-sm">
-                  {platformReady
-                    ? 'Managed by us — no key needed.'
-                    : 'Not yet enabled on this deployment.'}
-                </Text>
-              </div>
-              {platformReady ? (
-                <CheckCircleIcon className="size-5 text-lime-600" />
-              ) : (
-                <ExclamationTriangleIcon className="size-5 text-amber-500" />
-              )}
-            </div>
-          </CardBody>
-        </Card>
-
-        <Card className="border-l-4 border-l-violet-500">
-          <CardBody>
-            <div className="flex items-start gap-3">
-              <CloudArrowUpIcon className="size-5 text-violet-600" />
-              <div className="min-w-0 flex-1">
-                <Subheading>Assistant</Subheading>
-                <Text className="mt-1 break-all text-sm">
-                  {config.assistant_id || 'Not provisioned. Click Sync below.'}
-                </Text>
-                {config.last_synced_at && (
-                  <Text className="mt-1 text-xs text-zinc-500">
-                    Last synced {formatDateTime(config.last_synced_at)}
-                  </Text>
-                )}
-              </div>
-            </div>
-          </CardBody>
-        </Card>
-
-        <Card className="border-l-4 border-l-lime-500">
-          <CardBody>
-            <div className="flex items-start gap-3">
-              <PhoneIcon className="size-5 text-lime-600" />
-              <div className="min-w-0 flex-1">
-                <Subheading>Phone number</Subheading>
-                <Text className="mt-1 break-all text-sm">
-                  {config.phone_number_id || 'No phone bound yet.'}
-                </Text>
-              </div>
-            </div>
-          </CardBody>
-        </Card>
-      </div>
-
-      {/* Webhook URL */}
+      {/* ───────── WEBHOOK ──────────────────────────────────────────── */}
       <Card className="mt-6">
         <CardBody>
-          <Subheading>Webhook</Subheading>
-          <Text className="mt-1 text-sm">
-            Vapi will POST tool calls and call events to this URL. Sync registers it and a per-tenant
-            secret automatically.
-          </Text>
-          <code className="mt-3 block break-all rounded bg-zinc-100 p-3 text-xs dark:bg-zinc-800">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-violet-500/10 text-violet-600 ring-1 ring-violet-500/20 dark:text-violet-400">
+                <LinkIcon className="size-5" />
+              </div>
+              <div>
+                <Subheading>Webhook endpoint</Subheading>
+                <Text className="mt-1 text-sm">
+                  Vapi posts tool calls and call events to this URL. Sync registers it and a
+                  per-tenant secret automatically.
+                </Text>
+              </div>
+            </div>
+            <CopyButton text={config.webhook_url} />
+          </div>
+          <code className="mt-4 block break-all rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 font-mono text-xs text-zinc-800 dark:border-zinc-800 dark:bg-zinc-950/40 dark:text-zinc-200">
             {config.webhook_url}
           </code>
-          <Text className="mt-2 text-xs text-zinc-500">
-            Per-tenant secret: {config.has_webhook_secret ? 'configured' : 'will be generated on next sync'}
-          </Text>
         </CardBody>
       </Card>
 
@@ -495,201 +820,790 @@ export default function VoicePage() {
       {platformReady && form && (
         <Card className="mt-6">
           <CardBody>
-            <div className="flex flex-wrap items-end justify-between gap-3">
-              <div>
+            <div className="flex items-center gap-3">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-sky-500/10 text-sky-600 ring-1 ring-sky-500/20 dark:text-sky-400">
+                <SparklesIcon className="size-5" />
+              </div>
+              <div className="min-w-0">
                 <Subheading>Assistant configuration</Subheading>
                 <Text className="mt-1 text-sm">
-                  Edit and click the button to save changes and publish them to Vapi in one step.
+                  Edit any tab below — your changes publish to Vapi when you click{' '}
+                  <strong>Save &amp; sync</strong>.
                 </Text>
+              </div>
+            </div>
+
+            {/* --------------------------------------------------------
+                Tabbed configuration — mirrors Vapi's Model / Voice /
+                Transcriber / Tools / Advanced layout so customers who
+                cross-reference the Vapi dashboard find the same fields
+                under the same tabs.
+                -------------------------------------------------------- */}
+            <Tab.Group>
+              <Tab.List className="mt-6 inline-flex w-full gap-1 overflow-x-auto rounded-xl border border-zinc-200 bg-zinc-50 p-1 dark:border-zinc-800 dark:bg-zinc-900/60">
+                {[
+                  { label: 'Model', icon: CpuChipIcon },
+                  { label: 'Voice', icon: SpeakerWaveIcon },
+                  { label: 'Transcriber', icon: MicrophoneIcon },
+                  { label: 'Tools', icon: WrenchScrewdriverIcon },
+                  { label: 'Advanced', icon: AdjustmentsHorizontalIcon },
+                ].map(({ label, icon: Icon }) => (
+                  <Tab
+                    key={label}
+                    className={({ selected }) =>
+                      clsx(
+                        'inline-flex flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium outline-none transition-all',
+                        selected
+                          ? 'bg-white text-sky-700 shadow-sm ring-1 ring-zinc-950/5 dark:bg-zinc-800 dark:text-sky-300 dark:ring-white/10'
+                          : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100',
+                      )
+                    }
+                  >
+                    <Icon className="size-4" />
+                    {label}
+                  </Tab>
+                ))}
+              </Tab.List>
+
+              <Tab.Panels className="mt-6">
+                {/* ============== MODEL =============================== */}
+                <Tab.Panel className="space-y-5">
+                  <PanelSection
+                    icon={<ChatBubbleLeftRightIcon className="size-5" />}
+                    accent="sky"
+                    title="Greeting"
+                    subtitle="What the assistant says first, and how the call opens."
+                  >
+                    <FieldGroup>
+                      <Field>
+                        <div className="flex items-center justify-between">
+                          <Label>First message</Label>
+                          {form.first_message !== config.defaults.first_message && (
+                            <ResetButton onClick={resetFirstMessageToDefault} />
+                          )}
+                        </div>
+                        <Input
+                          value={form.first_message}
+                          onChange={(e) =>
+                            setForm({ ...form, first_message: e.target.value })
+                          }
+                        />
+                        <Description>
+                          Spoken when the call connects. Placeholders like{' '}
+                          <code>{'{{COMPANY_NAME}}'}</code> are filled in automatically from
+                          your tenant profile at sync time.
+                        </Description>
+                      </Field>
+
+                      <Field>
+                        <Label>First message mode</Label>
+                        <Select
+                          value={form.first_message_mode}
+                          onChange={(e) =>
+                            setForm({ ...form, first_message_mode: e.target.value })
+                          }
+                        >
+                          <option value="assistant-speaks-first">Assistant speaks first</option>
+                          <option value="assistant-speaks-first-with-model-generated-message">
+                            Assistant speaks first (LLM-generated)
+                          </option>
+                          <option value="assistant-waits-for-user">Wait for the user</option>
+                        </Select>
+                        <Description>
+                          LLM-generated lets the model open dynamically using the system prompt
+                          instead of the canned first message.
+                        </Description>
+                      </Field>
+                    </FieldGroup>
+                  </PanelSection>
+
+                  <PanelSection
+                    icon={<SparklesIcon className="size-5" />}
+                    accent="violet"
+                    title="Persona & instructions"
+                    subtitle="How the assistant should behave on calls. Tools are wired automatically."
+                    headerExtra={
+                      form.system_prompt !== config.defaults.system_prompt ? (
+                        <ResetButton onClick={resetPromptToDefault} />
+                      ) : null
+                    }
+                  >
+                    <Field>
+                      <Label className="sr-only">System prompt</Label>
+                      <Textarea
+                        rows={14}
+                        value={form.system_prompt}
+                        onChange={(e) =>
+                          setForm({ ...form, system_prompt: e.target.value })
+                        }
+                      />
+                      <Description>
+                        Tip:{' '}
+                        <kbd className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs dark:bg-zinc-800">
+                          Ctrl+Z
+                        </kbd>{' '}
+                        undoes any change, including <em>Reset to default</em>.
+                      </Description>
+                    </Field>
+                  </PanelSection>
+
+                  <PanelSection
+                    icon={<CpuChipIcon className="size-5" />}
+                    accent="emerald"
+                    title="Reasoning model"
+                    subtitle="Which LLM powers the conversation, and when to hang up."
+                  >
+                    <FieldGroup>
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <Field>
+                          <Label>Model provider</Label>
+                          <Select
+                            value={form.model_provider}
+                            onChange={(e) =>
+                              setForm({ ...form, model_provider: e.target.value })
+                            }
+                          >
+                            <option value="openai">openai</option>
+                            <option value="anthropic">anthropic</option>
+                            <option value="google">google</option>
+                            <option value="groq">groq</option>
+                            <option value="custom-llm">custom-llm</option>
+                          </Select>
+                        </Field>
+                        <Field>
+                          <Label>Model</Label>
+                          <Input
+                            value={form.model_name}
+                            onChange={(e) =>
+                              setForm({ ...form, model_name: e.target.value })
+                            }
+                          />
+                          <Description>
+                            e.g. <code>gpt-4o-mini</code>, <code>gpt-4o</code>,{' '}
+                            <code>claude-3-5-sonnet</code>.
+                          </Description>
+                        </Field>
+                      </div>
+
+                      <Field>
+                        <Label>End-call phrases</Label>
+                        <Input
+                          value={form.end_call_phrases}
+                          onChange={(e) =>
+                            setForm({ ...form, end_call_phrases: e.target.value })
+                          }
+                        />
+                        <Description>
+                          Comma-separated. Vapi will hang up when the assistant says any of
+                          these.
+                        </Description>
+                      </Field>
+                    </FieldGroup>
+                  </PanelSection>
+                </Tab.Panel>
+
+                {/* ============== VOICE =============================== */}
+                <Tab.Panel className="space-y-5">
+                  <PanelSection
+                    icon={<SpeakerWaveIcon className="size-5" />}
+                    accent="rose"
+                    title="Voice"
+                    subtitle="The TTS provider and voice that speaks to your callers."
+                  >
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <Field>
+                        <Label>Voice provider</Label>
+                        <Select
+                          value={form.voice_provider}
+                          onChange={(e) =>
+                            setForm({ ...form, voice_provider: e.target.value })
+                          }
+                        >
+                          <option value="vapi">vapi (built-in)</option>
+                          <option value="11labs">11labs (ElevenLabs)</option>
+                          <option value="playht">playht</option>
+                          <option value="openai">openai</option>
+                          <option value="cartesia">cartesia</option>
+                          <option value="azure">azure</option>
+                          <option value="deepgram">deepgram</option>
+                        </Select>
+                        <Description>
+                          The TTS provider that turns the assistant&apos;s text into audio.
+                        </Description>
+                      </Field>
+                      <Field>
+                        <Label>Voice id</Label>
+                        <Input
+                          value={form.voice_id}
+                          onChange={(e) =>
+                            setForm({ ...form, voice_id: e.target.value })
+                          }
+                        />
+                        <Description>
+                          Vapi voices: Elliot, Emma, Cole, Hana, Kai, Mia, Zoe, …
+                          (case-sensitive). For 11labs use the voice id (e.g.{' '}
+                          <code>rachel</code>) or the public name.
+                        </Description>
+                      </Field>
+                    </div>
+                  </PanelSection>
+
+                  <PanelSection
+                    icon={<AdjustmentsHorizontalIcon className="size-5" />}
+                    accent="indigo"
+                    title="Voice tuning"
+                    subtitle="ElevenLabs-style sliders for stability, similarity, style and speed."
+                    headerExtra={
+                      <a
+                        href="https://docs.vapi.ai/providers/voice/elevenlabs"
+                        target="_blank"
+                        rel="noopener"
+                        className="text-xs font-medium text-sky-600 underline-offset-2 hover:underline dark:text-sky-400"
+                      >
+                        ElevenLabs docs ↗
+                      </a>
+                    }
+                  >
+                    <Text className="text-xs text-zinc-500">
+                      Leave at default until you hear something you want to change.
+                    </Text>
+                    <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                      <SliderField
+                        label="Stability"
+                        value={form.voice_stability}
+                        onChange={(v) => setForm({ ...form, voice_stability: v })}
+                        min={0}
+                        max={1}
+                        step={0.05}
+                        placeholder="0.5"
+                        hint="Lower = more emotional range. Higher = more consistent."
+                      />
+                      <SliderField
+                        label="Similarity boost"
+                        value={form.voice_similarity_boost}
+                        onChange={(v) =>
+                          setForm({ ...form, voice_similarity_boost: v })
+                        }
+                        min={0}
+                        max={1}
+                        step={0.05}
+                        placeholder="0.75"
+                        hint="How closely to match the original speaker."
+                      />
+                      <SliderField
+                        label="Style"
+                        value={form.voice_style}
+                        onChange={(v) => setForm({ ...form, voice_style: v })}
+                        min={0}
+                        max={1}
+                        step={0.05}
+                        placeholder="0.0"
+                        hint="Amplify the speaker's stylistic traits."
+                      />
+                      <SliderField
+                        label="Speed"
+                        value={form.voice_speed}
+                        onChange={(v) => setForm({ ...form, voice_speed: v })}
+                        min={0.7}
+                        max={1.2}
+                        step={0.05}
+                        placeholder="1.0"
+                        hint="0.7–1.2 multiplier (1.0 = natural)."
+                      />
+                    </div>
+                  </PanelSection>
+
+                  <PanelSection
+                    icon={<MusicalNoteIcon className="size-5" />}
+                    accent="amber"
+                    title="Background sound"
+                    subtitle="Optional ambience so the AI feels less sterile on calls."
+                  >
+                    <Field>
+                      <Label className="sr-only">Background sound</Label>
+                      <Select
+                        value={form.background_sound}
+                        onChange={(e) =>
+                          setForm({ ...form, background_sound: e.target.value })
+                        }
+                      >
+                        <option value="off">Off (cleanest)</option>
+                        <option value="office">Office (small call-center)</option>
+                      </Select>
+                    </Field>
+                  </PanelSection>
+                </Tab.Panel>
+
+                {/* ============== TRANSCRIBER ========================= */}
+                <Tab.Panel className="space-y-5">
+                  <PanelSection
+                    icon={<MicrophoneIcon className="size-5" />}
+                    accent="sky"
+                    title="Provider & model"
+                    subtitle="Speech-to-text engine that captures what your callers say."
+                    headerExtra={
+                      <a
+                        href="https://docs.vapi.ai/customization/custom-keywords"
+                        target="_blank"
+                        rel="noopener"
+                        className="text-xs font-medium text-sky-600 underline-offset-2 hover:underline dark:text-sky-400"
+                      >
+                        Custom keywords ↗
+                      </a>
+                    }
+                  >
+                    <div className="grid gap-4 sm:grid-cols-3">
+                      <Field>
+                        <Label>Provider</Label>
+                        <Select
+                          value={form.transcriber_provider}
+                          onChange={(e) =>
+                            setForm({ ...form, transcriber_provider: e.target.value })
+                          }
+                        >
+                          <option value="deepgram">deepgram</option>
+                          <option value="assembly-ai">assembly-ai</option>
+                          <option value="azure">azure</option>
+                          <option value="openai">openai</option>
+                          <option value="gladia">gladia</option>
+                          <option value="talkscriber">talkscriber</option>
+                        </Select>
+                      </Field>
+                      <Field>
+                        <Label>Model</Label>
+                        <Select
+                          value={form.transcriber_model}
+                          onChange={(e) =>
+                            setForm({ ...form, transcriber_model: e.target.value })
+                          }
+                        >
+                          <option value="nova-3">nova-3 (recommended)</option>
+                          <option value="nova-3-general">nova-3-general</option>
+                          <option value="nova-3-medical">nova-3-medical</option>
+                          <option value="nova-2">nova-2</option>
+                          <option value="nova-2-general">nova-2-general</option>
+                          <option value="flux-general-en">flux-general-en (built-in EOT)</option>
+                          <option value="flux-general-multi">flux-general-multi</option>
+                        </Select>
+                        <Description>
+                          nova-3 is the latest, most accurate Deepgram model.{' '}
+                          <code>flux-*</code> ships with built-in end-of-turn detection — pair
+                          with no <em>smart endpointing</em>.
+                        </Description>
+                      </Field>
+                      <Field>
+                        <Label>Language</Label>
+                        <Select
+                          value={form.transcriber_language}
+                          onChange={(e) =>
+                            setForm({ ...form, transcriber_language: e.target.value })
+                          }
+                        >
+                          <option value="en">English (en)</option>
+                          <option value="es">Spanish (es)</option>
+                          <option value="fr">French (fr)</option>
+                          <option value="de">German (de)</option>
+                          <option value="it">Italian (it)</option>
+                          <option value="nl">Dutch (nl)</option>
+                          <option value="pt">Portuguese (pt)</option>
+                          <option value="ja">Japanese (ja)</option>
+                          <option value="hi">Hindi (hi)</option>
+                          <option value="ru">Russian (ru)</option>
+                        </Select>
+                      </Field>
+                    </div>
+                  </PanelSection>
+
+                  <PanelSection
+                    icon={<LanguageIcon className="size-5" />}
+                    accent="emerald"
+                    title="Output formatting"
+                    subtitle="How Deepgram cleans up the transcribed text before the LLM sees it."
+                  >
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <SwitchTile
+                        label="Smart formatting"
+                        description={
+                          <>
+                            Post-processing pass for emails, currencies, dates, and addresses
+                            (&ldquo;at gmail dot com&rdquo; → <code>@gmail.com</code>).
+                          </>
+                        }
+                        checked={form.transcriber_smart_format}
+                        onChange={(v) =>
+                          setForm({ ...form, transcriber_smart_format: v })
+                        }
+                      />
+                      <SwitchTile
+                        label="Numerals"
+                        description={
+                          <>
+                            Spoken digit sequences become numerals — &ldquo;nine seven two&rdquo;
+                            → <code>972</code>. Critical for phone numbers and times.
+                          </>
+                        }
+                        checked={form.transcriber_numerals}
+                        onChange={(v) =>
+                          setForm({ ...form, transcriber_numerals: v })
+                        }
+                      />
+                    </div>
+                  </PanelSection>
+
+                  <PanelSection
+                    icon={<TagIcon className="size-5" />}
+                    accent="violet"
+                    title="Vocabulary boost"
+                    subtitle="Help the model recognize your business words and customer phrases."
+                  >
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <Field>
+                        <Label>Keyterms (phrases)</Label>
+                        <Textarea
+                          rows={5}
+                          value={form.transcriber_keyterm}
+                          onChange={(e) =>
+                            setForm({ ...form, transcriber_keyterm: e.target.value })
+                          }
+                          placeholder="e.g. phone number, full name, email address"
+                        />
+                        <Description>
+                          One phrase per line (or commas). Boosts multi-word phrases such as{' '}
+                          <code>phone number</code>, <code>full name</code>,{' '}
+                          <code>email address</code>, <code>appointment</code>. Required
+                          vocabulary on <strong>nova-3</strong> and <strong>flux-*</strong>;
+                          works alongside keywords on nova-2.
+                        </Description>
+                      </Field>
+                      <Field>
+                        <Label>Keywords (single words, nova-2 only)</Label>
+                        <Textarea
+                          rows={5}
+                          value={form.transcriber_keywords}
+                          onChange={(e) =>
+                            setForm({ ...form, transcriber_keywords: e.target.value })
+                          }
+                          placeholder="e.g. YourCompanyName:30, FirstName:20, Phone:15"
+                        />
+                        <Description>
+                          One token per line — letters/digits only, optional integer boost (
+                          <code>:5</code>, <code>:-10</code>). Spaces are not allowed; use
+                          Keyterms instead. Auto-dropped on nova-3 / flux-* (Vapi rejects it
+                          there).
+                        </Description>
+                      </Field>
+                    </div>
+                  </PanelSection>
+
+                  <PanelSection
+                    icon={<ShieldCheckIcon className="size-5" />}
+                    accent="emerald"
+                    title="Audio quality"
+                    subtitle="Filter background noise and tune end-of-utterance detection."
+                  >
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <Field>
+                        <Label>Endpointing (ms)</Label>
+                        <Input
+                          type="number"
+                          value={form.transcriber_endpointing}
+                          onChange={(e) =>
+                            setForm({ ...form, transcriber_endpointing: e.target.value })
+                          }
+                          placeholder="default"
+                        />
+                        <Description>
+                          Silence (ms) before Deepgram closes the utterance. Lower = snappier;
+                          higher = fewer mid-thought interruptions. Blank = model default.
+                        </Description>
+                      </Field>
+                      <SwitchTile
+                        label="Background denoising"
+                        description={
+                          <>
+                            Filters keyboard typing, traffic, AC and background voices before
+                            speech is transcribed. Enables Krisp smart denoising and Vapi&apos;s
+                            Fourier media filter together.
+                          </>
+                        }
+                        checked={form.denoise_smart_enabled}
+                        onChange={(v) =>
+                          setForm({ ...form, denoise_smart_enabled: v })
+                        }
+                      />
+                    </div>
+                  </PanelSection>
+                </Tab.Panel>
+
+                {/* ============== TOOLS ============================== */}
+                <Tab.Panel>
+                  <PanelSection
+                    icon={<WrenchScrewdriverIcon className="size-5" />}
+                    accent="amber"
+                    title="Assistant tools"
+                    subtitle={
+                      <>
+                        Capabilities your assistant can call into. Each one POSTs back to your
+                        tenant webhook, so live data stays in sync.
+                      </>
+                    }
+                    headerExtra={
+                      <div className="flex items-center gap-2">
+                        {tools && (
+                          <Badge color={toolsBoundCount === tools.length ? 'lime' : 'amber'}>
+                            {toolsBoundCount}/{tools.length} bound
+                          </Badge>
+                        )}
+                        <Button outline onClick={loadTools} disabled={toolsLoading}>
+                          <ArrowPathIcon
+                            data-slot="icon"
+                            className={toolsLoading ? 'animate-spin' : ''}
+                          />
+                          Refresh
+                        </Button>
+                      </div>
+                    }
+                  >
+                    {toolsLoading && tools === null ? (
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        {Array.from({ length: 6 }).map((_, i) => (
+                          <div
+                            key={i}
+                            className="h-28 animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-800/50"
+                          />
+                        ))}
+                      </div>
+                    ) : tools && tools.length > 0 ? (
+                      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                        {tools.map((tool) => (
+                          <ToolCard key={tool.name} tool={tool} />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50/40 px-4 py-10 text-center text-sm text-zinc-500 dark:border-zinc-700 dark:bg-zinc-900/40">
+                        No tools available yet. Run <em>Save &amp; sync</em> at the top to
+                        provision them on Vapi.
+                      </div>
+                    )}
+                  </PanelSection>
+                </Tab.Panel>
+
+                {/* ============== ADVANCED =========================== */}
+                <Tab.Panel className="space-y-5">
+                  <PanelSection
+                    icon={<ClockIcon className="size-5" />}
+                    accent="indigo"
+                    title="Conversation timing"
+                    subtitle="When the assistant starts talking, and how it handles interruptions."
+                  >
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <Field>
+                        <Label>Smart endpointing</Label>
+                        <Select
+                          value={form.start_smart_provider}
+                          onChange={(e) =>
+                            setForm({ ...form, start_smart_provider: e.target.value })
+                          }
+                        >
+                          <option value="livekit">livekit (English, recommended)</option>
+                          <option value="vapi">vapi (non-English)</option>
+                          <option value="krisp">krisp (audio-based)</option>
+                          <option value="">Off — use transcriber EOT only</option>
+                        </Select>
+                        <Description>
+                          Detects when the customer finished speaking. Turn off when using
+                          <code> flux-*</code> or AssemblyAI (they have their own EOT).
+                        </Description>
+                      </Field>
+                      <Field>
+                        <Label>Wait before speaking (s)</Label>
+                        <Input
+                          type="number"
+                          step="0.1"
+                          min="0"
+                          max="5"
+                          value={form.start_wait_seconds}
+                          onChange={(e) =>
+                            setForm({ ...form, start_wait_seconds: e.target.value })
+                          }
+                        />
+                        <Description>
+                          0.4 standard, 0.6–0.8 healthcare/formal, 0.0–0.2 fast.
+                        </Description>
+                      </Field>
+                    </div>
+
+                    <div className="mt-4 grid gap-4 sm:grid-cols-3">
+                      <Field>
+                        <Label>Interruption: words</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          max="10"
+                          value={form.stop_num_words}
+                          onChange={(e) =>
+                            setForm({ ...form, stop_num_words: e.target.value })
+                          }
+                        />
+                        <Description>
+                          0 = VAD (fastest). 1–2 reduces noise triggers.
+                        </Description>
+                      </Field>
+                      <Field>
+                        <Label>Voice seconds</Label>
+                        <Input
+                          type="number"
+                          step="0.05"
+                          min="0"
+                          max="0.5"
+                          value={form.stop_voice_seconds}
+                          onChange={(e) =>
+                            setForm({ ...form, stop_voice_seconds: e.target.value })
+                          }
+                        />
+                        <Description>
+                          VAD threshold (only used when words = 0). 0.2 balanced.
+                        </Description>
+                      </Field>
+                      <Field>
+                        <Label>Backoff (s)</Label>
+                        <Input
+                          type="number"
+                          step="0.1"
+                          min="0"
+                          max="10"
+                          value={form.stop_backoff_seconds}
+                          onChange={(e) =>
+                            setForm({ ...form, stop_backoff_seconds: e.target.value })
+                          }
+                        />
+                        <Description>
+                          Quiet period after an interrupt before the AI can speak.
+                        </Description>
+                      </Field>
+                    </div>
+                  </PanelSection>
+
+                  <PanelSection
+                    icon={<SignalIcon className="size-5" />}
+                    accent="rose"
+                    title="Call behavior"
+                    subtitle="Duration limits and recording."
+                  >
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <Field>
+                        <Label>Silence timeout (s)</Label>
+                        <Input
+                          type="number"
+                          min="10"
+                          max="120"
+                          value={form.silence_timeout_seconds}
+                          onChange={(e) =>
+                            setForm({
+                              ...form,
+                              silence_timeout_seconds: e.target.value,
+                            })
+                          }
+                        />
+                        <Description>
+                          Hang up after this many seconds of total silence.
+                        </Description>
+                      </Field>
+                      <Field>
+                        <Label>Max duration (s)</Label>
+                        <Input
+                          type="number"
+                          min="60"
+                          max="14400"
+                          value={form.max_duration_seconds}
+                          onChange={(e) =>
+                            setForm({ ...form, max_duration_seconds: e.target.value })
+                          }
+                        />
+                        <Description>
+                          Hard call ceiling. Vapi default 600 (10 min); we default 1800.
+                        </Description>
+                      </Field>
+                    </div>
+
+                    <div className="mt-4">
+                      <SwitchTile
+                        label="Record calls"
+                        description="Stores audio with the call log for later review."
+                        checked={form.recording_enabled}
+                        onChange={(v) => setForm({ ...form, recording_enabled: v })}
+                      />
+                    </div>
+                  </PanelSection>
+
+                  <PanelSection
+                    icon={<ChatBubbleLeftRightIcon className="size-5" />}
+                    accent="amber"
+                    title="Messaging"
+                    subtitle="What the assistant says when ending the call or hitting voicemail."
+                  >
+                    <Field>
+                      <Label>Voicemail message</Label>
+                      <Input
+                        value={form.voicemail_message}
+                        onChange={(e) =>
+                          setForm({ ...form, voicemail_message: e.target.value })
+                        }
+                        placeholder="Hi, this is Acme Plumbing — please call us back…"
+                      />
+                      <Description>
+                        Spoken if the call lands in voicemail. Leave empty to hang up silently.
+                      </Description>
+                    </Field>
+
+                    <Field className="mt-4">
+                      <Label>End-call message</Label>
+                      <Input
+                        value={form.end_call_message}
+                        onChange={(e) =>
+                          setForm({ ...form, end_call_message: e.target.value })
+                        }
+                        placeholder="Thanks for calling — have a great day!"
+                      />
+                      <Description>
+                        Spoken right before the assistant hangs up.
+                      </Description>
+                    </Field>
+                  </PanelSection>
+                </Tab.Panel>
+              </Tab.Panels>
+            </Tab.Group>
+
+            {/* Bottom save bar — mirrors the hero action so users editing
+                the long Advanced tab don't have to scroll back to the top. */}
+            <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-zinc-200 pt-5 dark:border-zinc-800">
+              <div className="text-xs text-zinc-500">
+                Changes are saved locally as you type.{' '}
+                <kbd className="rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium dark:bg-zinc-800">
+                  Ctrl+Z
+                </kbd>{' '}
+                undoes any field. Click <strong>Save &amp; sync</strong> to publish to Vapi.
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  outline
-                  onClick={undo}
-                  disabled={!canUndo}
-                  title="Undo (Ctrl+Z)"
-                  aria-label="Undo"
-                >
-                  <ArrowUturnLeftIcon data-slot="icon" />
-                  Undo
-                </Button>
-                <Button
-                  outline
-                  onClick={redo}
-                  disabled={!canRedo}
-                  title="Redo (Ctrl+Shift+Z)"
-                  aria-label="Redo"
-                >
-                  <ArrowUturnRightIcon data-slot="icon" />
-                  Redo
-                </Button>
+                {config.assistant_id && (
+                  <Button outline onClick={deleteAssistant}>
+                    <TrashIcon data-slot="icon" />
+                    Delete on Vapi
+                  </Button>
+                )}
                 <Button onClick={saveAndSync} disabled={syncing}>
-                  <CloudArrowUpIcon data-slot="icon" className={syncing ? 'animate-spin' : ''} />
-                  {config.assistant_id ? 'Save & sync to Vapi' : 'Save & create assistant'}
+                  <CloudArrowUpIcon
+                    data-slot="icon"
+                    className={syncing ? 'animate-spin' : ''}
+                  />
+                  {syncing
+                    ? 'Syncing…'
+                    : config.assistant_id
+                    ? 'Save & sync'
+                    : 'Save & create assistant'}
                 </Button>
               </div>
             </div>
-
-            <FieldGroup className="mt-6">
-              <Field>
-                <div className="flex items-center justify-between">
-                  <Label>First message</Label>
-                  {form.first_message !== config.defaults.first_message && (
-                    <button
-                      type="button"
-                      onClick={resetFirstMessageToDefault}
-                      className="flex items-center gap-1 text-xs font-medium text-sky-600 hover:text-sky-700 dark:text-sky-400 dark:hover:text-sky-300"
-                    >
-                      <SparklesIcon className="size-3.5" />
-                      Reset to default
-                    </button>
-                  )}
-                </div>
-                <Input
-                  value={form.first_message}
-                  onChange={(e) => setForm({ ...form, first_message: e.target.value })}
-                />
-                <Description>
-                  Spoken when the call connects. Placeholders like <code>{'{{COMPANY_NAME}}'}</code> are
-                  filled in automatically from your tenant profile at sync time.
-                </Description>
-              </Field>
-
-              <Field>
-                <div className="flex items-center justify-between">
-                  <Label>System prompt</Label>
-                  {form.system_prompt !== config.defaults.system_prompt && (
-                    <button
-                      type="button"
-                      onClick={resetPromptToDefault}
-                      className="flex items-center gap-1 text-xs font-medium text-sky-600 hover:text-sky-700 dark:text-sky-400 dark:hover:text-sky-300"
-                    >
-                      <SparklesIcon className="size-3.5" />
-                      Reset to default
-                    </button>
-                  )}
-                </div>
-                <Textarea
-                  rows={14}
-                  value={form.system_prompt}
-                  onChange={(e) => setForm({ ...form, system_prompt: e.target.value })}
-                />
-                <Description>
-                  The assistant&apos;s persona and instructions. Tools (booking lookup, knowledge search,
-                  create/cancel booking) are wired automatically — just describe how you want it to behave.
-                  Tip: <kbd className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs dark:bg-zinc-800">Ctrl+Z</kbd>{' '}
-                  undoes any change, including Reset to default.
-                </Description>
-              </Field>
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field>
-                  <Label>Model provider</Label>
-                  <Input
-                    value={form.model_provider}
-                    onChange={(e) => setForm({ ...form, model_provider: e.target.value })}
-                  />
-                </Field>
-                <Field>
-                  <Label>Model</Label>
-                  <Input
-                    value={form.model_name}
-                    onChange={(e) => setForm({ ...form, model_name: e.target.value })}
-                  />
-                </Field>
-              </div>
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field>
-                  <Label>Voice provider</Label>
-                  <Input
-                    value={form.voice_provider}
-                    onChange={(e) => setForm({ ...form, voice_provider: e.target.value })}
-                  />
-                  <Description>e.g. 11labs, playht, openai</Description>
-                </Field>
-                <Field>
-                  <Label>Voice id</Label>
-                  <Input
-                    value={form.voice_id}
-                    onChange={(e) => setForm({ ...form, voice_id: e.target.value })}
-                  />
-                </Field>
-              </div>
-
-              <Field>
-                <Label>End-call phrases</Label>
-                <Input
-                  value={form.end_call_phrases}
-                  onChange={(e) => setForm({ ...form, end_call_phrases: e.target.value })}
-                />
-                <Description>Comma-separated. Vapi will hang up when the assistant says any of these.</Description>
-              </Field>
-            </FieldGroup>
-
-            {config.assistant_id && (
-              <div className="mt-6 border-t border-zinc-200 pt-4 dark:border-zinc-700">
-                <Button outline onClick={deleteAssistant}>
-                  <TrashIcon data-slot="icon" />
-                  Delete assistant on Vapi
-                </Button>
-              </div>
-            )}
-          </CardBody>
-        </Card>
-      )}
-
-      {/* Assistant tools — list every catalogue tool, with bound state */}
-      {platformReady && (
-        <Card className="mt-6">
-          <CardBody>
-            <div className="flex flex-wrap items-end justify-between gap-3">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <WrenchScrewdriverIcon className="size-5 text-indigo-500" />
-                  <Subheading>Assistant tools</Subheading>
-                  {tools && (
-                    <Badge color={toolsBoundCount === tools.length ? 'lime' : 'amber'}>
-                      {toolsBoundCount}/{tools.length} bound
-                    </Badge>
-                  )}
-                </div>
-                <Text className="mt-1 text-sm">
-                  These are the capabilities your Vapi assistant can call into. Booking lookups,
-                  scheduling, knowledge-base searches — each one POSTs back to your tenant webhook,
-                  so live data stays in sync. Tools are created on Vapi during{' '}
-                  <em>Save &amp; sync</em>; subsequent syncs only PATCH when their definition changes.
-                </Text>
-              </div>
-              <Button outline onClick={loadTools} disabled={toolsLoading}>
-                <ArrowPathIcon
-                  data-slot="icon"
-                  className={toolsLoading ? 'animate-spin' : ''}
-                />
-                Refresh
-              </Button>
-            </div>
-
-            {toolsLoading && tools === null ? (
-              <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="h-24 animate-pulse rounded-lg bg-zinc-100 dark:bg-zinc-800"
-                  />
-                ))}
-              </div>
-            ) : tools && tools.length > 0 ? (
-              <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                {tools.map((tool) => (
-                  <ToolCard key={tool.name} tool={tool} />
-                ))}
-              </div>
-            ) : (
-              <Text className="mt-4 text-sm text-zinc-500">
-                No tools available yet. Run <em>Save &amp; sync</em> above to provision them on Vapi.
-              </Text>
-            )}
           </CardBody>
         </Card>
       )}
@@ -698,85 +1612,449 @@ export default function VoicePage() {
       {platformReady && config.assistant_id && (
         <Card className="mt-6 mb-8">
           <CardBody>
-            <div className="flex flex-wrap items-end justify-between gap-3">
-              <div>
-                <Subheading>Phone numbers</Subheading>
-                <Text className="mt-1 text-sm">
-                  Bind a Vapi phone number to your assistant so inbound calls reach this tenant.
-                </Text>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 ring-1 ring-emerald-500/20 dark:text-emerald-400">
+                  <PhoneIcon className="size-5" />
+                </div>
+                <div className="min-w-0">
+                  <Subheading>Phone numbers</Subheading>
+                  <Text className="mt-1 text-sm">
+                    Bind a Vapi phone number to your assistant so inbound calls reach this
+                    tenant.
+                  </Text>
+                </div>
               </div>
               <Button outline onClick={loadPhones} disabled={phonesLoading}>
-                <ArrowPathIcon data-slot="icon" className={phonesLoading ? 'animate-spin' : ''} />
+                <ArrowPathIcon
+                  data-slot="icon"
+                  className={phonesLoading ? 'animate-spin' : ''}
+                />
                 {phones === null ? 'Load' : 'Refresh'}
               </Button>
             </div>
 
             {phones === null ? (
-              <Text className="mt-4 text-sm text-zinc-500">
+              <div className="mt-5 rounded-xl border border-dashed border-zinc-300 bg-zinc-50/40 px-4 py-10 text-center text-sm text-zinc-500 dark:border-zinc-700 dark:bg-zinc-900/40">
                 Click <em>Load</em> to fetch the phone numbers in your Vapi account.
-              </Text>
+              </div>
             ) : phones.length === 0 ? (
-              <Text className="mt-4 text-sm text-zinc-500">
-                No phone numbers found in this Vapi account. Provision one in the Vapi dashboard, then
-                refresh.
-              </Text>
+              <div className="mt-5 rounded-xl border border-dashed border-zinc-300 bg-zinc-50/40 px-4 py-10 text-center text-sm text-zinc-500 dark:border-zinc-700 dark:bg-zinc-900/40">
+                No phone numbers found in this Vapi account. Provision one in the Vapi dashboard,
+                then refresh.
+              </div>
             ) : (
-              <Table className="mt-4">
-                <TableHead>
-                  <TableRow>
-                    <TableHeader>Number</TableHeader>
-                    <TableHeader>Name</TableHeader>
-                    <TableHeader>Provider</TableHeader>
-                    <TableHeader>Bound assistant</TableHeader>
-                    <TableHeader className="text-right">Action</TableHeader>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {phones.map((p) => {
-                    const boundToUs = p.assistant_id === config.assistant_id
-                    const boundToOther = p.assistant_id && p.assistant_id !== config.assistant_id
-                    return (
-                      <TableRow key={p.id}>
-                        <TableCell className="font-medium">{p.number || '—'}</TableCell>
-                        <TableCell>{p.name || '—'}</TableCell>
-                        <TableCell>{p.provider || '—'}</TableCell>
-                        <TableCell className="text-xs">
-                          {boundToUs ? (
-                            <Badge color="lime">This assistant</Badge>
-                          ) : boundToOther ? (
-                            <span className="text-zinc-500">{p.assistant_id}</span>
-                          ) : (
-                            <span className="text-zinc-400">unbound</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {boundToUs ? (
-                            <Button
-                              outline
-                              onClick={() => detachPhone(p.id)}
-                              disabled={pendingPhoneId === p.id}
-                            >
-                              Detach
-                            </Button>
-                          ) : (
-                            <Button
-                              onClick={() => attachPhone(p.id)}
-                              disabled={pendingPhoneId === p.id}
-                            >
-                              Bind to this assistant
-                            </Button>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
+              <div className="mt-5 overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800">
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableHeader>Number</TableHeader>
+                      <TableHeader>Name</TableHeader>
+                      <TableHeader>Provider</TableHeader>
+                      <TableHeader>Bound assistant</TableHeader>
+                      <TableHeader className="text-right">Action</TableHeader>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {phones.map((p) => {
+                      const boundToUs = p.assistant_id === config.assistant_id
+                      const boundToOther =
+                        p.assistant_id && p.assistant_id !== config.assistant_id
+                      return (
+                        <TableRow key={p.id}>
+                          <TableCell className="font-medium tabular-nums">
+                            {p.number || '—'}
+                          </TableCell>
+                          <TableCell>{p.name || '—'}</TableCell>
+                          <TableCell>
+                            <span className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+                              {p.provider || '—'}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-xs">
+                            {boundToUs ? (
+                              <Badge color="lime">
+                                <CheckCircleIcon data-slot="icon" />
+                                This assistant
+                              </Badge>
+                            ) : boundToOther ? (
+                              <code className="text-xs text-zinc-500">{p.assistant_id}</code>
+                            ) : (
+                              <span className="text-zinc-400">unbound</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {boundToUs ? (
+                              <Button
+                                outline
+                                onClick={() => detachPhone(p.id)}
+                                disabled={pendingPhoneId === p.id}
+                              >
+                                Detach
+                              </Button>
+                            ) : (
+                              <Button
+                                onClick={() => attachPhone(p.id)}
+                                disabled={pendingPhoneId === p.id}
+                              >
+                                Bind
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
             )}
           </CardBody>
         </Card>
       )}
     </>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// StatusPill — animated dot + label, used in the hero
+// ---------------------------------------------------------------------------
+
+function StatusPill({
+  color,
+  label,
+}: {
+  color: 'lime' | 'amber' | 'zinc' | 'red'
+  label: string
+}) {
+  const tone: Record<typeof color, { ring: string; dot: string; text: string; bg: string }> = {
+    lime: {
+      ring: 'ring-emerald-500/30',
+      dot: 'bg-emerald-500',
+      text: 'text-emerald-700 dark:text-emerald-300',
+      bg: 'bg-emerald-50 dark:bg-emerald-950/40',
+    },
+    amber: {
+      ring: 'ring-amber-500/30',
+      dot: 'bg-amber-500',
+      text: 'text-amber-700 dark:text-amber-300',
+      bg: 'bg-amber-50 dark:bg-amber-950/40',
+    },
+    red: {
+      ring: 'ring-rose-500/30',
+      dot: 'bg-rose-500',
+      text: 'text-rose-700 dark:text-rose-300',
+      bg: 'bg-rose-50 dark:bg-rose-950/40',
+    },
+    zinc: {
+      ring: 'ring-zinc-400/30',
+      dot: 'bg-zinc-400',
+      text: 'text-zinc-700 dark:text-zinc-300',
+      bg: 'bg-zinc-100 dark:bg-zinc-800/60',
+    },
+  }
+  const t = tone[color]
+  return (
+    <span
+      className={clsx(
+        'inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-xs font-semibold ring-1',
+        t.bg,
+        t.ring,
+        t.text,
+      )}
+    >
+      <span className="relative flex size-2">
+        {color === 'lime' && (
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+        )}
+        <span className={clsx('relative inline-flex size-2 rounded-full', t.dot)} />
+      </span>
+      {label}
+    </span>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// HeroStat — one tile in the stats strip under the page title
+// ---------------------------------------------------------------------------
+
+const HERO_STAT_ACCENTS = {
+  sky: 'bg-sky-500/10 ring-sky-500/20',
+  emerald: 'bg-emerald-500/10 ring-emerald-500/20',
+  violet: 'bg-violet-500/10 ring-violet-500/20',
+} as const
+
+function HeroStat({
+  icon,
+  accent,
+  label,
+  value,
+  hint,
+}: {
+  icon: React.ReactNode
+  accent: keyof typeof HERO_STAT_ACCENTS
+  label: string
+  value: React.ReactNode
+  hint?: string
+}) {
+  return (
+    <div className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-white/60 p-3 backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/50">
+      <div
+        className={clsx(
+          'flex size-9 shrink-0 items-center justify-center rounded-lg ring-1',
+          HERO_STAT_ACCENTS[accent],
+        )}
+      >
+        {icon}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+          {label}
+        </p>
+        <div className="mt-0.5 break-all text-sm text-zinc-900 dark:text-zinc-100">
+          {value}
+        </div>
+        {hint && <p className="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400">{hint}</p>}
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// CopyButton — clipboard helper used by the webhook card
+// ---------------------------------------------------------------------------
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false)
+  const onCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch {
+      notifyError('Could not access clipboard.')
+    }
+  }
+  return (
+    <button
+      type="button"
+      onClick={onCopy}
+      className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 shadow-sm transition hover:border-zinc-300 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+    >
+      {copied ? (
+        <>
+          <CheckIcon className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+          Copied
+        </>
+      ) : (
+        <>
+          <ClipboardDocumentIcon className="size-3.5" />
+          Copy
+        </>
+      )}
+    </button>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// PanelSection — visually grouped sub-card inside a tab panel.
+// ---------------------------------------------------------------------------
+//
+// Each panel section has a tinted icon header, title, optional subtitle and
+// an optional right-aligned extra (links, badges, action buttons). The body
+// gets generous padding and a subtle top border so the eye separates the
+// header from the form content without a strong visual break.
+
+const PANEL_ACCENTS: Record<
+  string,
+  { iconBg: string; iconText: string; iconRing: string }
+> = {
+  sky: {
+    iconBg: 'bg-sky-500/10',
+    iconText: 'text-sky-600 dark:text-sky-400',
+    iconRing: 'ring-sky-500/20',
+  },
+  violet: {
+    iconBg: 'bg-violet-500/10',
+    iconText: 'text-violet-600 dark:text-violet-400',
+    iconRing: 'ring-violet-500/20',
+  },
+  emerald: {
+    iconBg: 'bg-emerald-500/10',
+    iconText: 'text-emerald-600 dark:text-emerald-400',
+    iconRing: 'ring-emerald-500/20',
+  },
+  rose: {
+    iconBg: 'bg-rose-500/10',
+    iconText: 'text-rose-600 dark:text-rose-400',
+    iconRing: 'ring-rose-500/20',
+  },
+  amber: {
+    iconBg: 'bg-amber-500/10',
+    iconText: 'text-amber-600 dark:text-amber-400',
+    iconRing: 'ring-amber-500/20',
+  },
+  indigo: {
+    iconBg: 'bg-indigo-500/10',
+    iconText: 'text-indigo-600 dark:text-indigo-400',
+    iconRing: 'ring-indigo-500/20',
+  },
+}
+
+function PanelSection({
+  icon,
+  accent = 'sky',
+  title,
+  subtitle,
+  headerExtra,
+  children,
+}: {
+  icon: React.ReactNode
+  accent?: keyof typeof PANEL_ACCENTS
+  title: string
+  subtitle?: React.ReactNode
+  headerExtra?: React.ReactNode
+  children: React.ReactNode
+}) {
+  const a = PANEL_ACCENTS[accent] ?? PANEL_ACCENTS.sky
+  return (
+    <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900/60">
+      <header className="flex flex-wrap items-start justify-between gap-3 border-b border-zinc-200 bg-zinc-50/80 px-5 py-4 dark:border-zinc-800 dark:bg-zinc-900/40">
+        <div className="flex min-w-0 items-start gap-3">
+          <div
+            className={clsx(
+              'flex size-9 shrink-0 items-center justify-center rounded-xl ring-1',
+              a.iconBg,
+              a.iconText,
+              a.iconRing,
+            )}
+          >
+            {icon}
+          </div>
+          <div className="min-w-0">
+            <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+              {title}
+            </h3>
+            {subtitle && (
+              <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">{subtitle}</p>
+            )}
+          </div>
+        </div>
+        {headerExtra && <div className="shrink-0">{headerExtra}</div>}
+      </header>
+      <div className="px-5 py-5">{children}</div>
+    </section>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// SwitchTile — boxed switch row (used for binary settings on the Transcriber
+// and Advanced tabs). Visually uniform with the rest of the panel cards.
+// ---------------------------------------------------------------------------
+
+function SwitchTile({
+  label,
+  description,
+  checked,
+  onChange,
+}: {
+  label: string
+  description: React.ReactNode
+  checked: boolean
+  onChange: (v: boolean) => void
+}) {
+  return (
+    <div
+      className={clsx(
+        'flex items-start gap-3 rounded-xl border p-4 transition-colors',
+        checked
+          ? 'border-emerald-300 bg-emerald-50/50 dark:border-emerald-800/60 dark:bg-emerald-950/20'
+          : 'border-zinc-200 bg-zinc-50/40 dark:border-zinc-800 dark:bg-zinc-900/40',
+      )}
+    >
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{label}</p>
+        <p className="mt-0.5 text-xs text-zinc-600 dark:text-zinc-400">{description}</p>
+      </div>
+      <Switch checked={checked} onChange={onChange} />
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// ResetButton — small "Reset to default" link used near textareas/inputs.
+// ---------------------------------------------------------------------------
+
+function ResetButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-sky-600 transition hover:bg-sky-50 hover:text-sky-700 dark:text-sky-400 dark:hover:bg-sky-950/40 dark:hover:text-sky-300"
+    >
+      <SparklesIcon className="size-3.5" />
+      Reset to default
+    </button>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// SliderField — labelled <input type=range> + numeric readout.
+// ---------------------------------------------------------------------------
+//
+// Empty value === "use provider default", so we render the slider at its
+// midpoint visually (via the `placeholder`) but keep the form value as ''.
+// The parent only writes the field onto the voice object when the user
+// actually moved the slider (parseNumberOr handles that contract).
+
+function SliderField({
+  label,
+  value,
+  onChange,
+  min,
+  max,
+  step,
+  placeholder,
+  hint,
+}: {
+  label: string
+  value: string
+  onChange: (v: string) => void
+  min: number
+  max: number
+  step: number
+  placeholder: string
+  hint?: string
+}) {
+  const numeric = value.trim() === '' ? Number(placeholder) : Number(value)
+  const safe = Number.isFinite(numeric) ? Math.min(Math.max(numeric, min), max) : Number(placeholder)
+  return (
+    <Field>
+      <div className="flex items-center justify-between">
+        <Label>{label}</Label>
+        <span className="text-xs tabular-nums text-zinc-500">
+          {value.trim() === '' ? `default · ${placeholder}` : Number(value).toFixed(2)}
+        </span>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={safe}
+        onChange={(e) => onChange(e.target.value)}
+        className="mt-2 h-2 w-full cursor-pointer appearance-none rounded-full bg-zinc-200 accent-sky-500 dark:bg-zinc-700"
+      />
+      {hint ? <Description>{hint}</Description> : null}
+      {value.trim() !== '' && (
+        <button
+          type="button"
+          onClick={() => onChange('')}
+          className="mt-1 text-xs font-medium text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+        >
+          Reset to default
+        </button>
+      )}
+    </Field>
   )
 }
 
