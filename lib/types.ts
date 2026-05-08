@@ -80,8 +80,40 @@ export interface Booking {
   crm_job_id: string | null
   crm_contact_id: string | null
   status: 'confirmed' | 'cancelled' | 'rescheduled' | 'completed' | 'no_show' | string
+  status_note: string | null
+  status_changed_at: string | null
+  chat_summary: string | null
   created_at: string
   updated_at: string
+}
+
+/** Lightweight message preview returned by the booking-details endpoint. */
+export interface BookingMessagePreview {
+  id: string
+  role: 'user' | 'assistant' | 'system' | 'tool' | string
+  content: string
+  created_at: string
+}
+
+/** Vapi call snapshot returned alongside booking details (when applicable). */
+export interface BookingCallPreview {
+  id: string
+  direction: string
+  status: string
+  duration_seconds: number | null
+  summary: string | null
+  transcript: string | null
+  recording_url: string | null
+  started_at: string | null
+  ended_at: string | null
+}
+
+/** Full payload returned by `GET /api/bookings/{id}/details`. */
+export interface BookingDetails extends Booking {
+  conversation_channel: string | null
+  conversation_intent: string | null
+  messages: BookingMessagePreview[]
+  call: BookingCallPreview | null
 }
 
 export interface Conversation {

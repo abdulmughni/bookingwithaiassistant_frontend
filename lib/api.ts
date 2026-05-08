@@ -127,14 +127,28 @@ export const api = {
       request<import('./types').Booking>('/api/bookings', { token, method: 'POST', body: JSON.stringify(data) }),
     upcoming: (token: string) => request<import('./types').Booking[]>('/api/bookings/upcoming', { token }),
     get: (token: string, id: string) => request<import('./types').Booking>(`/api/bookings/${id}`, { token }),
+    details: (token: string, id: string) =>
+      request<import('./types').BookingDetails>(`/api/bookings/${id}/details`, { token }),
     update: (token: string, id: string, data: Record<string, unknown>) =>
       request<import('./types').Booking>(`/api/bookings/${id}`, { token, method: 'PATCH', body: JSON.stringify(data) }),
-    cancel: (token: string, id: string) =>
-      request<import('./types').Booking>(`/api/bookings/${id}/cancel`, { token, method: 'POST' }),
-    complete: (token: string, id: string) =>
-      request<import('./types').Booking>(`/api/bookings/${id}/complete`, { token, method: 'POST' }),
-    noShow: (token: string, id: string) =>
-      request<import('./types').Booking>(`/api/bookings/${id}/no-show`, { token, method: 'POST' }),
+    cancel: (token: string, id: string, note?: string) =>
+      request<import('./types').Booking>(`/api/bookings/${id}/cancel`, {
+        token,
+        method: 'POST',
+        body: JSON.stringify({ note: note ?? null }),
+      }),
+    complete: (token: string, id: string, note?: string) =>
+      request<import('./types').Booking>(`/api/bookings/${id}/complete`, {
+        token,
+        method: 'POST',
+        body: JSON.stringify({ note: note ?? null }),
+      }),
+    noShow: (token: string, id: string, note?: string) =>
+      request<import('./types').Booking>(`/api/bookings/${id}/no-show`, {
+        token,
+        method: 'POST',
+        body: JSON.stringify({ note: note ?? null }),
+      }),
     searchByPhone: (token: string, phone: string) =>
       request<import('./types').Booking[]>(`/api/bookings/search/phone/${encodeURIComponent(phone)}`, { token }),
   },
