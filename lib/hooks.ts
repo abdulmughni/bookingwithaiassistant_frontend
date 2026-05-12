@@ -1,8 +1,8 @@
 'use client'
 
 import { useAuth } from '@clerk/nextjs'
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { ApiError } from '@/lib/api'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { ApiError, api } from '@/lib/api'
 
 export function useApiToken() {
   const { getToken, orgId } = useAuth()
@@ -72,3 +72,55 @@ export function useApiData<T>(
 
   return { data, loading, error, refetch }
 }
+
+/**
+ * IANA timezone of the current tenant. Falls back to the browser's tz while
+ * the tenant record is loading so dashboards never render bogus times.
+ *
+ * Cached on `window` for the session: every dashboard page hits this and we
+ * don't want N parallel ``/tenants/me`` calls. ``useApiData`` already handles
+ * Suspense-style transitions; this hook stays cheap on re-renders.
+ */
+const TENANT_TZ_GLOBAL_KEY = '__bookingwithai_tenant_tz__'
+
+export function useTenantTimezone(): string {
+  const getToken = useApiToken()
+  const browserTz = useMemo(
+    () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+    [],
+  )
+
+  type CacheCarrier = { [TENANT_TZ_GLOBAL_KEY]?: string }
+  const cached =
+    typeof window !== 'undefined'
+      ? (window as unknown as CacheCarrier)[TENANT_TZ_GLOBAL_KEY]
+      : undefined
+  const [tz, setTz] = useState<string>(cached || browserTz)
+
+  useEffect(() => {
+    if (cached) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const token = await getToken()
+        const tenant = await api.tenants.me(token)
+        if (cancelled) return
+        const value =
+          (typeof tenant.timezone === 'string' && tenant.timezone.trim()) ||
+          browserTz
+        if (typeof window !== 'undefined') {
+          ;(window as unknown as CacheCarrier)[TENANT_TZ_GLOBAL_KEY] = value
+        }
+        setTz(value)
+      } catch {
+        // Network/auth errors are non-fatal: callers fall back to browser tz.
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [getToken, browserTz, cached])
+
+  return tz
+}
+

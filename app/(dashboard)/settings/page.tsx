@@ -15,7 +15,7 @@ import { WorkingHoursEditor } from '@/components/working-hours-editor'
 import { useApiData, useApiToken } from '@/lib/hooks'
 import { ApiError, api } from '@/lib/api'
 import { notifyError, notifySuccess } from '@/lib/notify'
-import type { Credential, PromptConfig, Tenant } from '@/lib/types'
+import type { Credential, PromptConfig, Tenant, TimezoneChoice } from '@/lib/types'
 import { DocumentsTab } from './documents-tab'
 
 /** DB uses google | calcom | none — normalize legacy UI value. */
@@ -56,6 +56,9 @@ function TenantConfigTab({
   const [serviceAreaZips, setServiceAreaZips] = useState<string[]>([])
   const [supportedRegions, setSupportedRegions] = useState<string[]>([])
   const [paymentMethods, setPaymentMethods] = useState<string[]>([])
+
+  const [timezone, setTimezone] = useState<string>('UTC')
+  const [timezoneChoices, setTimezoneChoices] = useState<TimezoneChoice[]>([])
 
   const [workingHours, setWorkingHours] = useState<Record<string, unknown>>({})
   const [minBookingMinutes, setMinBookingMinutes] = useState('60')
@@ -122,6 +125,7 @@ function TenantConfigTab({
     setServiceAreaZips([...(tenant.service_area_zips || [])])
     setSupportedRegions([...(tenant.supported_regions || [])])
     setPaymentMethods([...(tenant.payment_methods || [])])
+    setTimezone(tenant.timezone || 'UTC')
     setWorkingHours({ ...(tenant.working_hours || {}) })
     const bb = tenant.booking_buffers || {}
     setMinBookingMinutes(String((bb as { minimum_minutes?: number }).minimum_minutes ?? 60))
@@ -142,6 +146,28 @@ function TenantConfigTab({
     setMaxTurns(String(tenant.max_turns ?? 12))
 
   }, [tenant, calendarSelectOptions, crmSelectOptions])
+
+  // Load the curated IANA list once. The dropdown is the only way to set the
+  // tenant timezone — values saved on the tenant are pure IANA strings.
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const token = await getToken()
+        const choices = await api.tenants.timezones(token)
+        if (!cancelled) setTimezoneChoices(choices)
+      } catch (e) {
+        if (!cancelled) {
+          notifyError(
+            e instanceof ApiError ? e.message : 'Could not load timezone list',
+          )
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [getToken])
 
   const handleSave = async () => {
     if (!name.trim()) { notifyError('Company name is required'); return }
@@ -189,6 +215,7 @@ function TenantConfigTab({
         service_area_zips: serviceAreaZips,
         supported_regions: supportedRegions,
         payment_methods: paymentMethods,
+        timezone: timezone.trim() || 'UTC',
         working_hours: workingHours as Record<string, unknown>,
         booking_buffers: { minimum_minutes: minM, slot_duration_minutes: slotM },
         escalation_rules: { stuck_turns: stuck, low_confidence: lowConf },
@@ -313,6 +340,31 @@ function TenantConfigTab({
       <section>
         <Subheading>Scheduling</Subheading>
         <FieldGroup className="mt-4">
+          <Field>
+            <Label>Timezone</Label>
+            <Description>
+              All booking times are stored in UTC and shown to you in this timezone. Pick the one your
+              dispatch team works in. Saved as an IANA name (e.g. <code>America/New_York</code>).
+            </Description>
+            <Select value={timezone} onChange={(e) => setTimezone(e.target.value)}>
+              {timezoneChoices.length === 0 && (
+                <option value={timezone || 'UTC'}>{timezone || 'UTC'}</option>
+              )}
+              {timezoneChoices.map((c) => (
+                <option key={c.value} value={c.value}>
+                  {c.label}
+                </option>
+              ))}
+              {/* Surface the stored value when it's outside the curated list (legacy rows). */}
+              {timezone &&
+                !timezoneChoices.some((c) => c.value === timezone) && (
+                  <option value={timezone}>{timezone}</option>
+                )}
+            </Select>
+            <Text className="mt-1 text-xs text-zinc-500">
+              Will be saved as <code>{timezone || 'UTC'}</code>.
+            </Text>
+          </Field>
           <Field><WorkingHoursEditor value={workingHours} onChange={setWorkingHours} /></Field>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field><Label>Minimum booking lead time (minutes)</Label><Input type="number" min={0} value={minBookingMinutes} onChange={(e) => setMinBookingMinutes(e.target.value)} /></Field>

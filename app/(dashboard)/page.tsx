@@ -12,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/table'
-import { useApiData } from '@/lib/hooks'
+import { useApiData, useTenantTimezone } from '@/lib/hooks'
 import { api } from '@/lib/api'
 import { formatDateTime, statusColor } from '@/lib/utils'
 import type { TenantStats, Booking } from '@/lib/types'
@@ -45,6 +45,7 @@ function StatCard({
 
 export default function DashboardPage() {
   const { user } = useUser()
+  const tenantTz = useTenantTimezone()
 
   const { data: stats, loading: statsLoading } = useApiData<TenantStats>(
     (token) => api.tenants.stats(token),
@@ -120,7 +121,7 @@ export default function DashboardPage() {
                   <TableCell>{booking.service_type}</TableCell>
                   <TableCell>
                     {booking.selected_slot
-                      ? formatDateTime(booking.selected_slot)
+                      ? formatDateTime(booking.selected_slot, tenantTz)
                       : '—'}
                   </TableCell>
                   <TableCell>

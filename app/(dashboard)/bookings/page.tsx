@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import {
-  ClockIcon,
   ExclamationTriangleIcon,
   SparklesIcon,
 } from '@heroicons/react/24/outline'
@@ -18,7 +17,8 @@ import {
   type BookingAction,
 } from '@/components/booking-status-dialog'
 import { BookingDetailsDialog } from '@/components/booking-details-dialog'
-import { useApiData, useApiToken } from '@/lib/hooks'
+import { SourceBadge } from '@/components/channel-icon'
+import { useApiData, useApiToken, useTenantTimezone } from '@/lib/hooks'
 import { api } from '@/lib/api'
 import { notifyError, notifySuccess } from '@/lib/notify'
 import { formatDateTime, statusColor } from '@/lib/utils'
@@ -33,22 +33,32 @@ interface SchedulingMeta {
 
 const ACTIVE_STATUSES = new Set(['confirmed', 'rescheduled'])
 
-/** Calendar date key (YYYY-MM-DD) in the operator's local timezone. */
-function localDayKey(d: Date): string {
-  const yyyy = d.getFullYear()
-  const mm = String(d.getMonth() + 1).padStart(2, '0')
-  const dd = String(d.getDate()).padStart(2, '0')
-  return `${yyyy}-${mm}-${dd}`
+/** Calendar date key (YYYY-MM-DD) in the requested IANA timezone — used so
+ *  "overdue / today / upcoming" reflect the tenant's clock regardless of where
+ *  the operator's browser is. ``timeZone`` is the tenant's IANA name. */
+function dayKeyInTz(d: Date, timeZone: string): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(d)
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? '00'
+  return `${get('year')}-${get('month')}-${get('day')}`
 }
 
-function getSchedulingMeta(booking: Booking, now: Date = new Date()): SchedulingMeta {
+function getSchedulingMeta(
+  booking: Booking,
+  timeZone: string,
+  now: Date = new Date(),
+): SchedulingMeta {
   const iso = booking.selected_slot
   if (!iso) return { state: 'unknown', dayKey: null }
   const slot = new Date(iso)
   if (Number.isNaN(slot.getTime())) return { state: 'unknown', dayKey: null }
 
-  const dayKey = localDayKey(slot)
-  const todayKey = localDayKey(now)
+  const dayKey = dayKeyInTz(slot, timeZone)
+  const todayKey = dayKeyInTz(now, timeZone)
 
   // Past/completed/cancelled bookings just render as "past" — we don't shout
   // about overdue when an operator already resolved the booking.
@@ -87,8 +97,18 @@ function ScheduleBadge({ meta }: { meta: SchedulingMeta }) {
   return null
 }
 
-function ScheduledLine({ booking, meta }: { booking: Booking; meta: SchedulingMeta }) {
-  const text = booking.selected_slot ? formatDateTime(booking.selected_slot) : '—'
+function ScheduledLine({
+  booking,
+  meta,
+  timeZone,
+}: {
+  booking: Booking
+  meta: SchedulingMeta
+  timeZone: string
+}) {
+  const text = booking.selected_slot
+    ? formatDateTime(booking.selected_slot, timeZone)
+    : '—'
   if (meta.state === 'overdue') {
     return <span className="font-semibold text-red-600 dark:text-red-400">{text}</span>
   }
@@ -112,6 +132,7 @@ export default function BookingsPage() {
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null)
   const [activeAction, setActiveAction] = useState<ActiveActionState | null>(null)
   const getToken = useApiToken()
+  const tenantTz = useTenantTimezone()
 
   const { data: bookings, loading, refetch } = useApiData<Booking[]>(
     (token) => api.bookings.list(token, statusFilter ? { status: statusFilter } : undefined),
@@ -144,7 +165,7 @@ export default function BookingsPage() {
 
   const matchesScheduleRange = (booking: Booking) => {
     if (!scheduleDateFrom && !scheduleDateTo) return true
-    const meta = getSchedulingMeta(booking)
+    const meta = getSchedulingMeta(booking, tenantTz)
     if (!meta.dayKey) return false
     if (scheduleDateFrom && meta.dayKey < scheduleDateFrom) return false
     if (scheduleDateTo && meta.dayKey > scheduleDateTo) return false
@@ -171,28 +192,12 @@ export default function BookingsPage() {
   let overdueCount = 0
   let todayCount = 0
   for (const b of displayBookings) {
-    const s = getSchedulingMeta(b).state
+    const s = getSchedulingMeta(b, tenantTz).state
     if (s === 'overdue') overdueCount++
     else if (s === 'today') todayCount++
   }
 
   const prettyStatus = (s: string) => s.replace('_', ' ')
-  const prettySource = (s: string) => {
-    const v = (s || '').toLowerCase()
-    if (v === 'whatsapp') return 'WhatsApp'
-    if (v === 'call') return 'Voice Call'
-    if (v === 'api') return 'Dashboard/API'
-    return v ? `${v.charAt(0).toUpperCase()}${v.slice(1)}` : 'Unknown'
-  }
-  const sourceBadgeColor = (s: string) => {
-    const v = (s || '').toLowerCase()
-    if (v === 'call') return 'purple'
-    if (v === 'whatsapp') return 'lime'
-    if (v === 'facebook') return 'blue'
-    if (v === 'instagram') return 'pink'
-    if (v === 'web') return 'zinc'
-    return 'zinc'
-  }
 
   /** Stop card-level click from triggering when the operator hits an action button. */
   const stopBubble = (e: React.MouseEvent | React.KeyboardEvent) => {
@@ -311,6 +316,37 @@ export default function BookingsPage() {
               title="Appointment on or before this date"
             />
           </div>
+          {(() => {
+            const today = dayKeyInTz(new Date(), tenantTz)
+            const isTodayActive = scheduleDateFrom === today && scheduleDateTo === today
+            return (
+              <Button
+                plain
+                aria-pressed={isTodayActive}
+                title={
+                  isTodayActive
+                    ? 'Clear the today filter'
+                    : 'Show only bookings scheduled for today'
+                }
+                className={`text-xs ${
+                  isTodayActive
+                    ? 'bg-amber-100 text-amber-800 ring-1 ring-amber-300 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-500/40'
+                    : ''
+                }`}
+                onClick={() => {
+                  if (isTodayActive) {
+                    setScheduleDateFrom('')
+                    setScheduleDateTo('')
+                  } else {
+                    setScheduleDateFrom(today)
+                    setScheduleDateTo(today)
+                  }
+                }}
+              >
+                {isTodayActive ? 'Showing today ✓' : 'Today'}
+              </Button>
+            )
+          })()}
         </div>
         {hasActiveFilters && (
           <Button
@@ -358,7 +394,7 @@ export default function BookingsPage() {
             {viewMode === 'box' ? (
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 {filteredBookings.map((booking) => {
-                  const meta = getSchedulingMeta(booking)
+                  const meta = getSchedulingMeta(booking, tenantTz)
                   const cardTone =
                     meta.state === 'overdue'
                       ? 'border-red-300 bg-red-50/40 dark:border-red-500/40 dark:bg-red-500/5'
@@ -396,7 +432,7 @@ export default function BookingsPage() {
                         <div className="-mt-2 flex flex-wrap items-center gap-2">
                           <ScheduleBadge meta={meta} />
                           <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                            Created {formatDateTime(booking.created_at)}
+                            Created {formatDateTime(booking.created_at, tenantTz)}
                           </span>
                         </div>
 
@@ -413,34 +449,28 @@ export default function BookingsPage() {
                             <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                               Scheduled
                             </span>
-                            <ScheduledLine booking={booking} meta={meta} />
+                            <ScheduledLine booking={booking} meta={meta} timeZone={tenantTz} />
                           </div>
                           <div className="flex items-center justify-between rounded-md bg-white/70 px-2.5 py-1.5 dark:bg-zinc-900/50">
                             <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                               Source
                             </span>
-                            <Badge color={sourceBadgeColor(booking.source_channel)}>
-                              {prettySource(booking.source_channel)}
-                            </Badge>
+                            <SourceBadge channel={booking.source_channel} />
                           </div>
-                          {booking.source_channel.toLowerCase() === 'call' && (
+                          {(booking.source_channel.toLowerCase() === 'call' ||
+                            booking.source_channel.toLowerCase() === 'api') && (
                             <div className="flex items-center justify-between rounded-md bg-white/70 px-2.5 py-1.5 dark:bg-zinc-900/50">
                               <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                                From
+                                {booking.source_channel.toLowerCase() === 'call'
+                                  ? 'Vapi number'
+                                  : 'Created from'}
                               </span>
-                              <span className="font-medium text-zinc-800 dark:text-zinc-200">
+                              <span className="font-mono text-xs font-medium text-zinc-800 dark:text-zinc-200">
                                 {booking.source_contact || booking.customer_phone || '—'}
                               </span>
                             </div>
                           )}
                         </div>
-
-                        {meta.state === 'overdue' && ACTIVE_STATUSES.has(booking.status) && (
-                          <p className="-mt-1 inline-flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400">
-                            <ClockIcon className="h-3.5 w-3.5" aria-hidden="true" />
-                            Scheduled date has passed and the booking is still open.
-                          </p>
-                        )}
 
                         {ACTIVE_STATUSES.has(booking.status) && (
                           <div className="flex flex-wrap gap-2">{renderActionButtons(booking)}</div>
@@ -471,7 +501,7 @@ export default function BookingsPage() {
                   <span className="text-right">Actions</span>
                 </div>
                 {filteredBookings.map((booking) => {
-                  const meta = getSchedulingMeta(booking)
+                  const meta = getSchedulingMeta(booking, tenantTz)
                   const rowTone =
                     meta.state === 'overdue'
                       ? 'border-red-300 bg-red-50/40 dark:border-red-500/40 dark:bg-red-500/5'
@@ -510,7 +540,7 @@ export default function BookingsPage() {
                               Scheduled
                             </p>
                             <p className="whitespace-nowrap text-sm">
-                              <ScheduledLine booking={booking} meta={meta} />
+                              <ScheduledLine booking={booking} meta={meta} timeZone={tenantTz} />
                             </p>
                             {(meta.state === 'overdue' || meta.state === 'today') && (
                               <div className="mt-1">
@@ -530,18 +560,14 @@ export default function BookingsPage() {
                             <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500 xl:hidden dark:text-zinc-400">
                               Source
                             </span>
-                            <Badge color={sourceBadgeColor(booking.source_channel)}>
-                              {prettySource(booking.source_channel)}
-                            </Badge>
+                            <SourceBadge channel={booking.source_channel} />
                           </div>
                           <div className="min-w-0 xl:text-center">
                             <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 xl:hidden dark:text-zinc-400">
-                              From
+                              {booking.source_channel.toLowerCase() === 'call' ? 'Vapi number' : 'From'}
                             </p>
-                            <p className="truncate text-sm text-zinc-800 dark:text-zinc-200">
-                              {booking.source_channel.toLowerCase() === 'call'
-                                ? booking.source_contact || booking.customer_phone || '—'
-                                : '—'}
+                            <p className="truncate font-mono text-xs text-zinc-800 dark:text-zinc-200">
+                              {booking.source_contact || booking.customer_phone || '—'}
                             </p>
                           </div>
                           <div className="min-w-0">
@@ -553,9 +579,9 @@ export default function BookingsPage() {
                                 {prettyStatus(booking.status)}
                               </Badge>
                               <span className="max-w-56 text-[11px] leading-snug text-zinc-500 dark:text-zinc-400">
-                                Created {formatDateTime(booking.created_at)}
+                                Created {formatDateTime(booking.created_at, tenantTz)}
                                 <br />
-                                Updated {formatDateTime(booking.updated_at)}
+                                Updated {formatDateTime(booking.updated_at, tenantTz)}
                               </span>
                             </div>
                           </div>

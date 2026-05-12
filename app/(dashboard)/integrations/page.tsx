@@ -380,7 +380,7 @@ function IntegrationsPageInner() {
             <DialogDescription>
               {connectStep === 'pick'
                 ? 'Choose a provider. Only Google Calendar is available today; others are planned.'
-                : 'If you used Sign in with Google, you can adjust calendar ID and timezone here. Or paste a service account JSON key for the manual integration path.'}
+                : 'If you used Sign in with Google, you can adjust the calendar ID and event duration here. Pick the tenant timezone under Settings → Scheduling.'}
             </DialogDescription>
           </div>
           {connectStep === 'google-calendar' && (

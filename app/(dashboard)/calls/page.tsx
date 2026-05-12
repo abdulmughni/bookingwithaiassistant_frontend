@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import clsx from 'clsx'
+import { Tab } from '@headlessui/react'
 import {
   ArrowPathIcon,
   ChevronLeftIcon,
@@ -14,6 +15,7 @@ import {
   TrashIcon,
   ChatBubbleBottomCenterTextIcon,
   SpeakerWaveIcon,
+  CalendarDaysIcon,
 } from '@heroicons/react/20/solid'
 import { Heading } from '@/components/heading'
 import { Button } from '@/components/button'
@@ -29,11 +31,12 @@ import {
   DialogTitle,
 } from '@/components/dialog'
 import { ConfirmDeleteDialog } from '@/components/confirm-delete-dialog'
-import { useApiToken } from '@/lib/hooks'
+import { BookingDetailsDialog } from '@/components/booking-details-dialog'
+import { useApiToken, useTenantTimezone } from '@/lib/hooks'
 import { ApiError, api } from '@/lib/api'
 import { notifyError, notifySuccess } from '@/lib/notify'
-import { formatDateTime } from '@/lib/utils'
-import type { CallLogDetail, CallLogSummary } from '@/lib/types'
+import { formatDateTime, statusColor as bookingStatusColor } from '@/lib/utils'
+import type { Booking, CallLogDetail, CallLogSummary } from '@/lib/types'
 
 // ---------------------------------------------------------------------------
 // Filters (mirror bookings UX — selects + date range + clear + box/list views)
@@ -105,8 +108,15 @@ function callerPrimaryLine(call: CallLogSummary): string {
   return 'Unknown caller'
 }
 
-function whenLabel(call: CallLogSummary): string {
-  return formatDateTime(call.started_at) || formatDateTime(call.created_at)
+function whenLabel(call: CallLogSummary, timeZone?: string): string {
+  return (
+    formatDateTime(call.started_at, timeZone) ||
+    formatDateTime(call.created_at, timeZone)
+  )
+}
+
+function callBookingsCount(call: CallLogSummary): number {
+  return typeof call.bookings_count === 'number' ? call.bookings_count : 0
 }
 
 /** Page size for Calls list — kept in sync with API default (`GET /calls/paged`). */
@@ -118,6 +128,7 @@ const PAGE_SIZE = 20
 
 export default function CallsPage() {
   const getToken = useApiToken()
+  const tenantTz = useTenantTimezone()
   const [calls, setCalls] = useState<CallLogSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [total, setTotal] = useState<number | null>(null)
@@ -136,6 +147,7 @@ export default function CallsPage() {
   const [detailLoading, setDetailLoading] = useState(false)
   const [pendingDelete, setPendingDelete] = useState<CallLogSummary | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [bookingInDialog, setBookingInDialog] = useState<Booking | null>(null)
 
   const callsTopRef = useRef<HTMLDivElement | null>(null)
   const prevFilterKeyRef = useRef<string>('')
@@ -243,6 +255,7 @@ export default function CallsPage() {
   const closeDetail = () => {
     setSelectedId(null)
     setDetail(null)
+    setBookingInDialog(null)
   }
 
   const confirmDelete = async () => {
@@ -424,6 +437,7 @@ export default function CallsPage() {
                       <CallGridCard
                         key={call.id}
                         call={call}
+                        timeZone={tenantTz}
                         onOpen={() => openDetail(call.id)}
                         onDelete={() => setPendingDelete(call)}
                       />
@@ -431,11 +445,12 @@ export default function CallsPage() {
                   </div>
                 ) : (
                   <>
-                    <div className="mb-2 hidden rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-zinc-500 xl:grid xl:grid-cols-[minmax(6rem,1.35fr)_minmax(7rem,1fr)_auto_auto_minmax(9rem,1.15fr)_minmax(8rem,auto)] xl:gap-4 dark:border-zinc-700 dark:bg-zinc-900/80 dark:text-zinc-400">
+                    <div className="mb-2 hidden rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-zinc-500 xl:grid xl:grid-cols-[minmax(6rem,1.35fr)_minmax(7rem,1fr)_auto_auto_minmax(4.5rem,min-content)_minmax(9rem,1.15fr)_minmax(8rem,auto)] xl:gap-4 dark:border-zinc-700 dark:bg-zinc-900/80 dark:text-zinc-400">
                       <span>Caller</span>
                       <span>When</span>
                       <span className="text-center">Direction</span>
                       <span className="text-center">Meta</span>
+                      <span className="text-center">Bookings</span>
                       <span>Status</span>
                       <span className="text-right">Actions</span>
                     </div>
@@ -444,6 +459,7 @@ export default function CallsPage() {
                         <CallListRow
                           key={call.id}
                           call={call}
+                          timeZone={tenantTz}
                           onOpen={() => openDetail(call.id)}
                           onDelete={() => setPendingDelete(call)}
                         />
@@ -522,92 +538,140 @@ export default function CallsPage() {
                       {directionDisplayLabel(detail.direction)}
                     </span>
                     <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                      {whenLabel(detail)}
+                      {whenLabel(detail, tenantTz)}
                     </span>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              <DetailStat label="Direction" value={directionDisplayLabel(detail.direction)} />
-              <DetailStat label="Status" value={detail.status} />
-              <DetailStat label="Duration" value={formatDuration(detail.duration_seconds)} />
-              <DetailStat label="Cost" value={formatCost(detail.cost)} />
-              <DetailStat label="Ended reason" value={detail.ended_reason || '—'} capitalize={false} />
-              <DetailStat label="Started" value={formatDateTime(detail.started_at)} capitalize={false} />
-              <DetailStat label="Ended" value={formatDateTime(detail.ended_at)} capitalize={false} />
-              <DetailStat label="Vapi call id" value={detail.vapi_call_id} mono />
-            </div>
-
-            {detail.recording_url && (
-              <section className="overflow-hidden rounded-2xl border border-emerald-200/70 bg-linear-to-br from-emerald-50/90 via-white to-teal-50/40 shadow-sm dark:border-emerald-900/35 dark:from-emerald-950/40 dark:via-zinc-900 dark:to-teal-950/25">
-                <div className="flex items-center gap-2 border-b border-emerald-200/50 px-4 py-3 dark:border-emerald-900/40">
-                  <div className="flex size-9 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300">
-                    <SpeakerWaveIcon className="size-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-semibold text-zinc-950 dark:text-white">Recording</h3>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400">Play when the call has finished processing</p>
-                  </div>
-                </div>
-                <div className="p-4 pt-3">
-                  <audio
-                    controls
-                    src={detail.recording_url}
-                    className="h-11 w-full accent-emerald-600 dark:accent-emerald-500"
-                    preload="none"
-                  />
-                </div>
-              </section>
-            )}
-
-            {detail.summary && (
-              <section className="rounded-2xl border border-sky-200/70 bg-linear-to-b from-sky-50/80 to-white px-4 py-4 shadow-sm dark:border-sky-900/35 dark:from-sky-950/35 dark:to-zinc-900/80">
-                <div className="flex items-start gap-3">
-                  <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-sky-500/15 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300">
-                    <ChatBubbleBottomCenterTextIcon className="size-5" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <h3 className="text-sm font-semibold text-zinc-950 dark:text-white">Summary</h3>
-                    <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">
-                      {detail.summary}
-                    </p>
-                  </div>
-                </div>
-              </section>
-            )}
-
-            {detail.transcript && (
-              <section className="overflow-hidden rounded-2xl border border-zinc-200/90 bg-white shadow-sm dark:border-zinc-700/90 dark:bg-zinc-950/50">
-                <div className="flex items-center justify-between gap-3 border-b border-zinc-100 bg-zinc-50/90 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900/90">
-                  <div className="flex items-center gap-2">
-                    <ChatBubbleBottomCenterTextIcon className="size-4 text-zinc-500 dark:text-zinc-400" />
-                    <h3 className="text-sm font-semibold text-zinc-950 dark:text-white">Transcript</h3>
-                  </div>
-                  <span className="text-[11px] font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
-                    Full text
+            <Tab.Group>
+              <Tab.List className="inline-flex w-full gap-1 overflow-x-auto rounded-xl border border-zinc-200 bg-zinc-50 p-1 dark:border-zinc-800 dark:bg-zinc-900/60">
+                <Tab
+                  className={({ selected }) =>
+                    clsx(
+                      'inline-flex flex-1 items-center justify-center whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium outline-none transition-all',
+                      selected
+                        ? 'bg-white text-sky-700 shadow-sm ring-1 ring-zinc-950/5 dark:bg-zinc-800 dark:text-sky-300 dark:ring-white/10'
+                        : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100',
+                    )
+                  }
+                >
+                  Overview
+                </Tab>
+                <Tab
+                  className={({ selected }) =>
+                    clsx(
+                      'inline-flex flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium outline-none transition-all',
+                      selected
+                        ? 'bg-white text-sky-700 shadow-sm ring-1 ring-zinc-950/5 dark:bg-zinc-800 dark:text-sky-300 dark:ring-white/10'
+                        : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100',
+                    )
+                  }
+                >
+                  Bookings
+                  <span className="rounded-md bg-zinc-200/80 px-1.5 py-0.5 text-xs font-semibold tabular-nums text-zinc-700 dark:bg-zinc-700 dark:text-zinc-200">
+                    {(detail.bookings ?? []).length}
                   </span>
-                </div>
-                <pre className="max-h-[min(26rem,55vh)] overflow-auto whitespace-pre-wrap bg-zinc-50/50 p-4 text-xs leading-relaxed text-zinc-800 dark:bg-zinc-950/40 dark:text-zinc-300">
-                  {detail.transcript}
-                </pre>
-              </section>
-            )}
+                </Tab>
+              </Tab.List>
+              <Tab.Panels className="mt-4">
+                <Tab.Panel className="space-y-6 focus:outline-none">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    <DetailStat label="Direction" value={directionDisplayLabel(detail.direction)} />
+                    <DetailStat label="Status" value={detail.status} />
+                    <DetailStat label="Duration" value={formatDuration(detail.duration_seconds)} />
+                    <DetailStat label="Cost" value={formatCost(detail.cost)} />
+                    <DetailStat label="Ended reason" value={detail.ended_reason || '—'} capitalize={false} />
+                    <DetailStat label="Started" value={formatDateTime(detail.started_at, tenantTz)} capitalize={false} />
+                    <DetailStat label="Ended" value={formatDateTime(detail.ended_at, tenantTz)} capitalize={false} />
+                    <DetailStat label="Vapi call id" value={detail.vapi_call_id} mono />
+                    <DetailStat
+                      label="Bookings"
+                      value={String((detail.bookings ?? []).length || callBookingsCount(detail))}
+                    />
+                  </div>
 
-            {!detail.recording_url && !detail.transcript && !detail.summary && (
-              <div className="rounded-2xl border border-dashed border-zinc-200 bg-zinc-50/50 px-6 py-10 text-center dark:border-zinc-700 dark:bg-zinc-900/40">
-                <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-zinc-200/80 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
-                  <ChatBubbleBottomCenterTextIcon className="size-6" />
-                </div>
-                <p className="mt-3 text-sm font-medium text-zinc-800 dark:text-zinc-200">
-                  No recording or transcript yet
-                </p>
-                <p className="mx-auto mt-1 max-w-sm text-sm text-zinc-500 dark:text-zinc-400">
-                  Vapi usually attaches the recording, summary, and transcript after the call ends.
-                </p>
-              </div>
-            )}
+                  {detail.recording_url && (
+                    <section className="overflow-hidden rounded-2xl border border-emerald-200/70 bg-linear-to-br from-emerald-50/90 via-white to-teal-50/40 shadow-sm dark:border-emerald-900/35 dark:from-emerald-950/40 dark:via-zinc-900 dark:to-teal-950/25">
+                      <div className="flex items-center gap-2 border-b border-emerald-200/50 px-4 py-3 dark:border-emerald-900/40">
+                        <div className="flex size-9 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300">
+                          <SpeakerWaveIcon className="size-5" />
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-semibold text-zinc-950 dark:text-white">Recording</h3>
+                          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                            Play when the call has finished processing
+                          </p>
+                        </div>
+                      </div>
+                      <div className="p-4 pt-3">
+                        <audio
+                          controls
+                          src={detail.recording_url}
+                          className="h-11 w-full accent-emerald-600 dark:accent-emerald-500"
+                          preload="none"
+                        />
+                      </div>
+                    </section>
+                  )}
+
+                  {detail.summary && (
+                    <section className="rounded-2xl border border-sky-200/70 bg-linear-to-b from-sky-50/80 to-white px-4 py-4 shadow-sm dark:border-sky-900/35 dark:from-sky-950/35 dark:to-zinc-900/80">
+                      <div className="flex items-start gap-3">
+                        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-sky-500/15 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300">
+                          <ChatBubbleBottomCenterTextIcon className="size-5" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h3 className="text-sm font-semibold text-zinc-950 dark:text-white">Summary</h3>
+                          <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">
+                            {detail.summary}
+                          </p>
+                        </div>
+                      </div>
+                    </section>
+                  )}
+
+                  {detail.transcript && (
+                    <section className="overflow-hidden rounded-2xl border border-zinc-200/90 bg-white shadow-sm dark:border-zinc-700/90 dark:bg-zinc-950/50">
+                      <div className="flex items-center justify-between gap-3 border-b border-zinc-100 bg-zinc-50/90 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900/90">
+                        <div className="flex items-center gap-2">
+                          <ChatBubbleBottomCenterTextIcon className="size-4 text-zinc-500 dark:text-zinc-400" />
+                          <h3 className="text-sm font-semibold text-zinc-950 dark:text-white">Transcript</h3>
+                        </div>
+                        <span className="text-[11px] font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
+                          Full text
+                        </span>
+                      </div>
+                      <pre className="max-h-[min(26rem,55vh)] overflow-auto whitespace-pre-wrap bg-zinc-50/50 p-4 text-xs leading-relaxed text-zinc-800 dark:bg-zinc-950/40 dark:text-zinc-300">
+                        {detail.transcript}
+                      </pre>
+                    </section>
+                  )}
+
+                  {!detail.recording_url && !detail.transcript && !detail.summary && (
+                    <div className="rounded-2xl border border-dashed border-zinc-200 bg-zinc-50/50 px-6 py-10 text-center dark:border-zinc-700 dark:bg-zinc-900/40">
+                      <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-zinc-200/80 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
+                        <ChatBubbleBottomCenterTextIcon className="size-6" />
+                      </div>
+                      <p className="mt-3 text-sm font-medium text-zinc-800 dark:text-zinc-200">
+                        No recording or transcript yet
+                      </p>
+                      <p className="mx-auto mt-1 max-w-sm text-sm text-zinc-500 dark:text-zinc-400">
+                        Vapi usually attaches the recording, summary, and transcript after the call ends.
+                      </p>
+                    </div>
+                  )}
+                </Tab.Panel>
+                <Tab.Panel className="focus:outline-none">
+                  <CallBookingsPanel
+                    bookings={detail.bookings ?? []}
+                    timeZone={tenantTz}
+                    onOpenBooking={(b) => setBookingInDialog(b)}
+                  />
+                </Tab.Panel>
+              </Tab.Panels>
+            </Tab.Group>
           </DialogBody>
         )}
         <DialogActions className="border-t border-zinc-950/5 pt-6 dark:border-white/10">
@@ -616,6 +680,12 @@ export default function CallsPage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <BookingDetailsDialog
+        open={!!bookingInDialog}
+        booking={bookingInDialog}
+        onClose={() => setBookingInDialog(null)}
+      />
 
       <ConfirmDeleteDialog
         open={!!pendingDelete}
@@ -762,15 +832,72 @@ function CallsPagination({
 }
 
 // ---------------------------------------------------------------------------
+// Call detail — bookings tab
+// ---------------------------------------------------------------------------
+
+function CallBookingsPanel({
+  bookings,
+  timeZone,
+  onOpenBooking,
+}: {
+  bookings: Booking[]
+  timeZone?: string
+  onOpenBooking: (b: Booking) => void
+}) {
+  if (!bookings.length) {
+    return (
+      <div className="rounded-2xl border border-dashed border-zinc-200 bg-zinc-50/50 px-6 py-12 text-center dark:border-zinc-700 dark:bg-zinc-900/40">
+        <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-violet-100 text-violet-600 dark:bg-violet-950/50 dark:text-violet-300">
+          <CalendarDaysIcon className="size-6" />
+        </div>
+        <p className="mt-3 text-sm font-medium text-zinc-800 dark:text-zinc-200">No linked bookings</p>
+        <p className="mx-auto mt-1 max-w-sm text-sm text-zinc-500 dark:text-zinc-400">
+          When the assistant creates an appointment on this call, it appears here.
+        </p>
+      </div>
+    )
+  }
+  return (
+    <ul className="space-y-3">
+      {bookings.map((b) => (
+        <li key={b.id}>
+          <button
+            type="button"
+            onClick={() => onOpenBooking(b)}
+            className="flex w-full items-start gap-4 rounded-xl border border-zinc-200 bg-white p-4 text-left shadow-sm transition hover:border-sky-300 hover:shadow-md dark:border-zinc-700 dark:bg-zinc-900/80 dark:hover:border-sky-700"
+          >
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-violet-500/10 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300">
+              <CalendarDaysIcon className="size-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-semibold text-zinc-900 dark:text-white">{b.customer_name}</p>
+              <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+                {b.service_type}
+                {b.selected_slot ? ` · ${formatDateTime(b.selected_slot, timeZone)}` : ''}
+              </p>
+              <div className="mt-2">
+                <Badge color={bookingStatusColor(b.status)}>{b.status}</Badge>
+              </div>
+            </div>
+          </button>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Box card (grid)
 // ---------------------------------------------------------------------------
 
 function CallGridCard({
   call,
+  timeZone,
   onOpen,
   onDelete,
 }: {
   call: CallLogSummary
+  timeZone?: string
   onOpen: () => void
   onDelete: () => void
 }) {
@@ -803,7 +930,7 @@ function CallGridCard({
                 {callerPrimaryLine(call)}
               </p>
               <span className="shrink-0 text-xs text-zinc-400 dark:text-zinc-500">
-                {whenLabel(call)}
+                {whenLabel(call, timeZone)}
               </span>
             </div>
 
@@ -820,9 +947,9 @@ function CallGridCard({
             </div>
 
             <p className="mt-2 text-[11px] leading-snug text-zinc-500 dark:text-zinc-400">
-              Created {formatDateTime(call.created_at)}
+              Created {formatDateTime(call.created_at, timeZone)}
               <br />
-              Updated {formatDateTime(call.updated_at)}
+              Updated {formatDateTime(call.updated_at, timeZone)}
             </p>
 
             <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-zinc-600 dark:text-zinc-400">
@@ -846,6 +973,10 @@ function CallGridCard({
                   Transcript
                 </span>
               )}
+              <span className="inline-flex items-center gap-1 text-violet-700 dark:text-violet-300">
+                <CalendarDaysIcon className="size-3.5" />
+                {callBookingsCount(call)} {callBookingsCount(call) === 1 ? 'booking' : 'bookings'}
+              </span>
             </div>
           </div>
         </div>
@@ -875,10 +1006,12 @@ function CallGridCard({
 
 function CallListRow({
   call,
+  timeZone,
   onOpen,
   onDelete,
 }: {
   call: CallLogSummary
+  timeZone?: string
   onOpen: () => void
   onDelete: () => void
 }) {
@@ -892,7 +1025,7 @@ function CallListRow({
   return (
     <Card className="overflow-hidden border border-zinc-200 shadow-sm transition hover:border-zinc-300 hover:shadow-md dark:border-zinc-700 dark:hover:border-zinc-600">
       <CardBody className="p-0">
-        <div className="flex flex-col gap-3 p-4 xl:grid xl:grid-cols-[minmax(6rem,1.35fr)_minmax(7rem,1fr)_auto_auto_minmax(9rem,1.15fr)_minmax(8rem,auto)] xl:items-center xl:gap-4 xl:p-3">
+        <div className="flex flex-col gap-3 p-4 xl:grid xl:grid-cols-[minmax(6rem,1.35fr)_minmax(7rem,1fr)_auto_auto_minmax(4.5rem,min-content)_minmax(9rem,1.15fr)_minmax(8rem,auto)] xl:items-center xl:gap-4 xl:p-3">
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 xl:hidden dark:text-zinc-400">
               Caller
@@ -905,7 +1038,7 @@ function CallListRow({
             <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 xl:hidden dark:text-zinc-400">
               When
             </p>
-            <p className="whitespace-nowrap text-sm text-zinc-800 dark:text-zinc-200">{whenLabel(call)}</p>
+            <p className="whitespace-nowrap text-sm text-zinc-800 dark:text-zinc-200">{whenLabel(call, timeZone)}</p>
           </div>
 
           <div className="flex items-center gap-2 xl:justify-center">
@@ -943,6 +1076,16 @@ function CallListRow({
             )}
           </div>
 
+          <div className="flex flex-col items-start gap-1 xl:items-center">
+            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 xl:hidden dark:text-zinc-400">
+              Bookings
+            </p>
+            <span className="inline-flex items-center gap-1 text-sm font-semibold tabular-nums text-violet-700 dark:text-violet-300">
+              <CalendarDaysIcon className="size-4 shrink-0 opacity-80" />
+              {callBookingsCount(call)}
+            </span>
+          </div>
+
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 xl:hidden dark:text-zinc-400">
               Status
@@ -950,9 +1093,9 @@ function CallListRow({
             <div className="flex flex-col items-start gap-1">
               <Badge color={statusColor(call.status)}>{call.status}</Badge>
               <span className="max-w-56 text-[11px] leading-snug text-zinc-500 dark:text-zinc-400">
-                Created {formatDateTime(call.created_at)}
+                Created {formatDateTime(call.created_at, timeZone)}
                 <br />
-                Updated {formatDateTime(call.updated_at)}
+                Updated {formatDateTime(call.updated_at, timeZone)}
               </span>
               {call.ended_reason && (
                 <span className="text-[11px] text-zinc-400">{call.ended_reason}</span>

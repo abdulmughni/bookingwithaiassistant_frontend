@@ -8,18 +8,17 @@ import {
   PaperAirplaneIcon,
   PaperClipIcon,
   FaceSmileIcon,
-  EllipsisVerticalIcon,
-  PhoneIcon,
-  VideoCameraIcon,
-  UserCircleIcon,
 } from '@heroicons/react/24/outline'
 import {
   ChatBubbleLeftRightIcon,
-  PhotoIcon,
+  CalendarIcon as CalendarSolidIcon,
 } from '@heroicons/react/24/solid'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useApiToken } from '@/lib/hooks'
 import { api } from '@/lib/api'
+import { ChannelIcon } from '@/components/channel-icon'
+import { ConversationBookingsDrawer } from '@/components/conversation-bookings-drawer'
+import { renderRichText } from '../../../lib/rich-text'
 import type { Conversation, Message, MessageAttachment } from '@/lib/types'
 
 type ChannelTab = 'all' | 'facebook' | 'instagram' | 'whatsapp'
@@ -168,38 +167,22 @@ function ConversationAvatar({
 }
 
 function ChannelBadgeOverlay({ channel }: { channel: string }) {
+  // Common positioning: bottom-right of the avatar with a thin white ring so the
+  // glyph reads against any avatar gradient. The glyph itself comes from the
+  // shared `ChannelIcon` so the brand stays consistent across the app.
   const common =
-    'pointer-events-none absolute bottom-0 right-0 flex size-[22px] translate-x-0.5 translate-y-0.5 items-center justify-center rounded-full border-[2.5px] border-white text-white shadow-sm dark:border-zinc-900'
-  if (channel === 'facebook') {
+    'pointer-events-none absolute bottom-0 right-0 flex size-[22px] translate-x-0.5 translate-y-0.5 items-center justify-center rounded-full bg-white p-[2px] ring-2 ring-white shadow-sm dark:bg-zinc-900 dark:ring-zinc-900'
+  const c = (channel || '').toLowerCase()
+  if (c === 'facebook' || c === 'instagram' || c === 'whatsapp') {
     return (
-      <span className={clsx(common, 'bg-[#0084FF]')} title="Messenger">
-        <ChatBubbleLeftRightIcon className="size-3" aria-hidden />
-      </span>
-    )
-  }
-  if (channel === 'instagram') {
-    return (
-      <span
-        className={clsx(
-          common,
-          'bg-linear-to-br from-[#f58529] via-[#dd2a7b] to-[#8134af]',
-        )}
-        title="Instagram"
-      >
-        <PhotoIcon className="size-3" aria-hidden />
-      </span>
-    )
-  }
-  if (channel === 'whatsapp') {
-    return (
-      <span className={clsx(common, 'bg-[#25D366]')} title="WhatsApp">
-        <span className="text-[10px] font-bold leading-none">W</span>
+      <span className={common} title={c === 'facebook' ? 'Messenger' : c.charAt(0).toUpperCase() + c.slice(1)}>
+        <ChannelIcon channel={c} className="size-full" />
       </span>
     )
   }
   return (
-    <span className={clsx(common, 'bg-zinc-500')} title={channel}>
-      <ChatBubbleLeftRightIcon className="size-3 opacity-90" aria-hidden />
+    <span className={common} title={channel}>
+      <ChatBubbleLeftRightIcon className="size-3 text-zinc-500" aria-hidden />
     </span>
   )
 }
@@ -391,6 +374,13 @@ function MessageBubble({
     )
   }
 
+  // Inline link colour adapts to bubble background — light-on-blue for the AI
+  // bubble, blue-on-light for the customer bubble. This keeps Meta-style
+  // contrast without leaking knowledge of the parent into `renderRichText`.
+  const linkClassName = isCustomer
+    ? 'underline underline-offset-2 text-sky-700 hover:opacity-80 dark:text-sky-300'
+    : 'underline underline-offset-2 text-white hover:opacity-80'
+
   const isOutgoing = !isCustomer
 
   return (
@@ -443,7 +433,11 @@ function MessageBubble({
                 alignOutgoing={isOutgoing}
               />
             ) : null}
-            <p className="whitespace-pre-wrap">{bubbleBody}</p>
+            {bubbleBody && (
+              <p className="whitespace-pre-wrap wrap-break-word">
+                {renderRichText(bubbleBody, { linkClassName })}
+              </p>
+            )}
             <p
               className={clsx(
                 'mt-1 text-[11px]',
@@ -532,6 +526,7 @@ export default function ConversationsPage() {
   const [query, setQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
   const [channelTab, setChannelTab] = useState<ChannelTab>('all')
+  const [bookingsDrawerOpen, setBookingsDrawerOpen] = useState(false)
   const [messages, setMessages] = useState<Message[]>([])
   const [messagesLoading, setMessagesLoading] = useState(false)
   const [messagesLoadingMore, setMessagesLoadingMore] = useState(false)
@@ -722,12 +717,13 @@ export default function ConversationsPage() {
                 type="button"
                 onClick={() => setChannelTab(tab.id)}
                 className={clsx(
-                  'shrink-0 rounded-t-lg px-4 py-2.5 text-sm font-semibold transition-colors',
+                  'inline-flex shrink-0 items-center gap-1.5 rounded-t-lg px-4 py-2.5 text-sm font-semibold transition-colors',
                   active
                     ? 'bg-sky-50 text-sky-800 dark:bg-sky-950/60 dark:text-sky-200'
                     : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800',
                 )}
               >
+                {tab.id !== 'all' && <ChannelIcon channel={tab.id} className="size-4" />}
                 {tab.label}
               </button>
             )
@@ -893,22 +889,17 @@ export default function ConversationsPage() {
                     </p>
                   </div>
                 </div>
-                <div className="flex shrink-0 items-center gap-0.5 text-zinc-500 dark:text-zinc-400">
-                  <IconHeaderBtn label="Search">
-                    <MagnifyingGlassIcon className="size-5" />
-                  </IconHeaderBtn>
-                  <IconHeaderBtn label="Call">
-                    <PhoneIcon className="size-5" />
-                  </IconHeaderBtn>
-                  <IconHeaderBtn label="Video">
-                    <VideoCameraIcon className="size-5" />
-                  </IconHeaderBtn>
-                  <IconHeaderBtn label="Profile">
-                    <UserCircleIcon className="size-5" />
-                  </IconHeaderBtn>
-                  <IconHeaderBtn label="More">
-                    <EllipsisVerticalIcon className="size-5" />
-                  </IconHeaderBtn>
+                <div className="flex shrink-0 items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setBookingsDrawerOpen(true)}
+                    aria-label="Show bookings for this conversation"
+                    className="inline-flex items-center gap-2 rounded-full bg-sky-50 px-3 py-1.5 text-sm font-medium text-sky-700 ring-1 ring-sky-200 transition hover:bg-sky-100 dark:bg-sky-500/10 dark:text-sky-300 dark:ring-sky-500/30 dark:hover:bg-sky-500/15"
+                    title="View this contact's bookings"
+                  >
+                    <CalendarSolidIcon className="size-4" aria-hidden="true" />
+                    Bookings
+                  </button>
                 </div>
               </header>
 
@@ -1021,24 +1012,14 @@ export default function ConversationsPage() {
           )}
         </section>
       </div>
-    </div>
-  )
-}
 
-function IconHeaderBtn({
-  children,
-  label,
-}: {
-  children: React.ReactNode
-  label: string
-}) {
-  return (
-    <button
-      type="button"
-      className="rounded-full p-2 transition hover:bg-zinc-100 hover:text-zinc-800 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
-      aria-label={label}
-    >
-      {children}
-    </button>
+      <ConversationBookingsDrawer
+        open={bookingsDrawerOpen}
+        onClose={() => setBookingsDrawerOpen(false)}
+        conversationId={selected?.id ?? null}
+        customerName={selected ? displayName : ''}
+        channel={selected?.channel}
+      />
+    </div>
   )
 }

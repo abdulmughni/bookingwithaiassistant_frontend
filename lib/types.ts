@@ -13,6 +13,8 @@ export interface Tenant {
   supported_regions: string[]
   /** When industry is field_service: subset of hvac | plumbing | electrical. Empty = all three. */
   offered_trades?: string[]
+  /** IANA timezone (e.g. "America/New_York"). Authoritative source for booking conversions. */
+  timezone: string
   working_hours: Record<string, unknown>
   booking_buffers: Record<string, unknown>
   escalation_rules: Record<string, unknown>
@@ -36,6 +38,13 @@ export interface Tenant {
   updated_at: string
 }
 
+export interface TimezoneChoice {
+  /** IANA name saved on the tenant, e.g. "America/New_York". */
+  value: string
+  /** Friendly label shown to the user in the dropdown. */
+  label: string
+}
+
 export interface TenantStats {
   total_bookings: number
   confirmed_bookings: number
@@ -51,6 +60,8 @@ export interface ChannelAccount {
   channel: 'whatsapp' | 'facebook' | 'instagram' | 'web'
   account_id: string
   label: string
+  /** Profile or page image URL when the server stored one (OAuth). */
+  picture_url?: string | null
   is_active: boolean
   verify_token: string
   /** True when a Page token is stored server-side; raw token is never returned. */
@@ -252,6 +263,8 @@ export interface CallLogSummary {
   ended_at: string | null
   created_at: string
   updated_at: string
+  /** Bookings created during this Vapi session (requires backend linkage). */
+  bookings_count: number
 }
 
 /** Full call record (GET /api/calls/{id}). */
@@ -260,6 +273,7 @@ export interface CallLogDetail extends CallLogSummary {
   transcript: string | null
   summary: string | null
   metadata: Record<string, unknown>
+  bookings: Booking[]
 }
 
 /** Paged call list response from /api/calls/paged. */

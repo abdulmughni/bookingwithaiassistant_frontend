@@ -92,6 +92,8 @@ export const api = {
     update: (token: string, data: Record<string, unknown>) =>
       request<import('./types').Tenant>('/api/tenants/me', { token, method: 'PATCH', body: JSON.stringify(data) }),
     stats: (token: string) => request<import('./types').TenantStats>('/api/tenants/me/stats', { token }),
+    timezones: (token: string) =>
+      request<import('./types').TimezoneChoice[]>('/api/tenants/timezones', { token }),
   },
 
   channels: {
@@ -151,6 +153,11 @@ export const api = {
       }),
     searchByPhone: (token: string, phone: string) =>
       request<import('./types').Booking[]>(`/api/bookings/search/phone/${encodeURIComponent(phone)}`, { token }),
+    searchByConversation: (token: string, conversationId: string) =>
+      request<import('./types').Booking[]>(
+        `/api/bookings/search/conversation/${encodeURIComponent(conversationId)}`,
+        { token },
+      ),
   },
 
   conversations: {

@@ -19,10 +19,11 @@ import {
 } from '@/components/dialog'
 import { Field, FieldGroup, Label } from '@/components/fieldset'
 import { Card, CardBody } from '@/components/card'
+import { ChannelIcon } from '@/components/channel-icon'
 import { useApiData, useApiToken, useFreshOrgToken } from '@/lib/hooks'
 import { ApiError, api } from '@/lib/api'
 import { notifyError, notifySuccess } from '@/lib/notify'
-import { channelColor, formatDate } from '@/lib/utils'
+import { formatDate } from '@/lib/utils'
 import type { ChannelAccount } from '@/lib/types'
 
 const channelAccent: Record<string, string> = {
@@ -36,6 +37,39 @@ function connectionBadgeColor(status: string): 'lime' | 'red' | 'amber' {
   if (status === 'verified') return 'lime'
   if (status === 'error') return 'red'
   return 'amber'
+}
+
+function ChannelAvatar({ ch }: { ch: ChannelAccount }) {
+  // Meta CDN URLs occasionally fail (expired tokens, referrer policy). When the
+  // <img> errors we swap to the brand-icon fallback so the card never breaks.
+  const [pictureFailed, setPictureFailed] = useState(false)
+  const showPicture = Boolean(ch.picture_url) && !pictureFailed
+  return (
+    <div className="relative shrink-0">
+      {showPicture ? (
+        // eslint-disable-next-line @next/next/no-img-element -- Meta CDN profile URLs (domain varies per account)
+        <img
+          src={ch.picture_url || ''}
+          alt=""
+          referrerPolicy="no-referrer"
+          onError={() => setPictureFailed(true)}
+          className="size-12 rounded-full object-cover shadow-sm ring-2 ring-zinc-950/5 dark:ring-white/10"
+        />
+      ) : (
+        <div className="flex size-12 items-center justify-center rounded-full bg-zinc-100 shadow-sm ring-2 ring-zinc-950/5 dark:bg-zinc-800 dark:ring-white/10">
+          <ChannelIcon channel={ch.channel} className="h-7 w-7" colored />
+        </div>
+      )}
+      {showPicture && (
+        <div
+          className="absolute -bottom-0.5 -right-0.5 flex size-6 items-center justify-center rounded-full bg-white shadow-md ring-1 ring-zinc-200 dark:bg-zinc-900 dark:ring-zinc-600"
+          title={ch.channel}
+        >
+          <ChannelIcon channel={ch.channel} className="h-3.5 w-3.5" colored />
+        </div>
+      )}
+    </div>
+  )
 }
 
 function ChannelAccountCard({
@@ -63,18 +97,19 @@ function ChannelAccountCard({
     >
       <CardBody className="flex flex-1 flex-col">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge color={channelColor(ch.channel)} className="capitalize">
-                {ch.channel}
-              </Badge>
-              <Badge color={ch.is_active ? 'lime' : 'zinc'}>
-                {ch.is_active ? 'Active' : 'Inactive'}
-              </Badge>
+          <div className="flex min-w-0 flex-1 gap-3">
+            <ChannelAvatar ch={ch} />
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge color={ch.is_active ? 'lime' : 'zinc'}>
+                  {ch.is_active ? 'Active' : 'Inactive'}
+                </Badge>
+              </div>
+              <h3 className="mt-3 text-base font-semibold tracking-tight text-zinc-950 dark:text-white">
+                {ch.label || 'Unnamed account'}
+              </h3>
+              <p className="mt-1 text-xs capitalize text-zinc-500 dark:text-zinc-400">{ch.channel}</p>
             </div>
-            <h3 className="mt-3 text-base font-semibold tracking-tight text-zinc-950 dark:text-white">
-              {ch.label || 'Unnamed account'}
-            </h3>
           </div>
           <div className="flex shrink-0 flex-col items-end gap-1 text-right">
             <Badge color={connectionBadgeColor(conn)}>
@@ -361,7 +396,7 @@ function AccountsPageInner() {
             <DialogTitle>Connect destination</DialogTitle>
             <DialogDescription>
               {connectMode === 'destination'
-                ? 'Choose a platform. Facebook Page uses secure login — no copying tokens by hand.'
+                ? 'Connect Facebook Messenger, Instagram, or WhatsApp so you can send and receive customer messages from one dashboard.'
                 : 'Enter account details manually (advanced).'}
             </DialogDescription>
           </div>
@@ -374,107 +409,68 @@ function AccountsPageInner() {
 
         <DialogBody className="max-h-[70vh] overflow-y-auto pr-1">
           {connectMode === 'destination' ? (
-            <div className="grid gap-4 lg:grid-cols-2">
-              <div
+            <div className="grid gap-4 sm:grid-cols-3">
+              <button
+                type="button"
+                disabled={oauthLoading}
+                onClick={handleFacebookPageOAuth}
                 className={clsx(
-                  'rounded-2xl bg-zinc-100/90 p-4 dark:bg-zinc-800/50',
-                  'ring-1 ring-zinc-950/5 dark:ring-white/10',
+                  'flex flex-col items-center gap-3 rounded-2xl bg-white px-4 py-8 text-center shadow-sm ring-1 ring-zinc-950/10 transition hover:bg-zinc-50 disabled:opacity-50 dark:bg-zinc-900 dark:ring-white/10 dark:hover:bg-zinc-800',
                 )}
               >
-                <div className="mb-3 flex justify-center">
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1 text-xs font-semibold shadow-sm ring-1 ring-zinc-950/10 dark:bg-zinc-900 dark:ring-white/10">
-                    <span className="text-[#1877F2]">Facebook</span>
-                    <span className="text-red-600">LIVE</span>
-                  </span>
+                <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#1877F2]/10">
+                  <ChannelIcon channel="facebook" className="h-9 w-9" colored />
+                </span>
+                <div>
+                  <p className="text-sm font-semibold text-zinc-900 dark:text-white">Facebook Page</p>
+                  <p className="mt-1 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
+                    Messenger for your Page — sign in with Meta (no manual tokens).
+                  </p>
                 </div>
-                <div className="flex flex-col gap-2">
-                  <button
-                    type="button"
-                    disabled={oauthLoading}
-                    onClick={handleFacebookPageOAuth}
-                    className={clsx(
-                      'flex items-center gap-3 rounded-xl bg-white px-4 py-3 text-left text-sm font-medium text-blue-600 shadow-sm ring-1 ring-zinc-950/10 transition hover:bg-zinc-50 disabled:opacity-50 dark:bg-zinc-900 dark:text-blue-400 dark:ring-white/10 dark:hover:bg-zinc-800',
-                    )}
-                  >
-                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#1877F2]/10 text-[#1877F2]">
-                      f
-                    </span>
-                    {oauthLoading ? 'Redirecting to Meta…' : 'Page'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => notifyError('Group connection is not supported yet. Use a Facebook Page for now.')}
-                    className="flex items-center gap-3 rounded-xl bg-white px-4 py-3 text-left text-sm font-medium text-blue-600/60 shadow-sm ring-1 ring-zinc-950/10 dark:bg-zinc-900 dark:text-blue-400/50 dark:ring-white/10"
-                  >
-                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-500/10 text-zinc-500">
-                      f
-                    </span>
-                    Group
-                    <Badge color="zinc" className="ml-auto text-[10px]">
-                      Soon
-                    </Badge>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => notifyError('Profile connection is not supported yet. Use a Facebook Page for now.')}
-                    className="flex items-center gap-3 rounded-xl bg-white px-4 py-3 text-left text-sm font-medium text-blue-600/60 shadow-sm ring-1 ring-zinc-950/10 dark:bg-zinc-900 dark:text-blue-400/50 dark:ring-white/10"
-                  >
-                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-500/10 text-zinc-500">
-                      f
-                    </span>
-                    Profile
-                    <Badge color="zinc" className="ml-auto text-[10px]">
-                      Soon
-                    </Badge>
-                  </button>
-                </div>
-              </div>
+                <span className="text-xs font-medium text-blue-600 dark:text-blue-400">
+                  {oauthLoading ? 'Redirecting…' : 'Connect'}
+                </span>
+              </button>
 
-              <div className="flex flex-col gap-3">
-                <button
-                  type="button"
-                  disabled={oauthLoading}
-                  onClick={handleInstagramOAuth}
-                  className="flex items-center gap-3 rounded-xl bg-white px-4 py-4 text-left shadow-sm ring-1 ring-zinc-950/10 disabled:opacity-50 dark:bg-zinc-900 dark:ring-white/10"
-                >
-                  <span
-                    className="flex h-10 w-10 items-center justify-center rounded-lg text-lg text-white"
-                    style={{
-                      background: 'linear-gradient(135deg, #f58529, #dd2a7b, #8134af)',
-                    }}
-                  >
-                    ◎
-                  </span>
-                  <div>
-                    <p className="font-medium text-zinc-900 dark:text-white">Instagram</p>
-                    <p className="text-xs text-zinc-500">
-                      {oauthLoading ? 'Redirecting to Meta…' : 'Business account linked to a Page'}
-                    </p>
-                  </div>
-                  <Badge color="lime" className="ml-auto">
-                    Live
-                  </Badge>
-                </button>
-                <button
-                  type="button"
-                  disabled={oauthLoading}
-                  onClick={handleWhatsAppOAuth}
-                  className="flex items-center gap-3 rounded-xl bg-white px-4 py-4 text-left shadow-sm ring-1 ring-zinc-950/10 disabled:opacity-50 dark:bg-zinc-900 dark:ring-white/10"
-                >
-                  <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#25D366] text-lg text-white">
-                    ✓
-                  </span>
-                  <div>
-                    <p className="font-medium text-zinc-900 dark:text-white">WhatsApp</p>
-                    <p className="text-xs text-zinc-500">
-                      {oauthLoading ? 'Redirecting to Meta...' : 'Embedded signup'}
-                    </p>
-                  </div>
-                  <Badge color="lime" className="ml-auto">
-                    Live
-                  </Badge>
-                </button>
-              </div>
+              <button
+                type="button"
+                disabled={oauthLoading}
+                onClick={handleInstagramOAuth}
+                className="flex flex-col items-center gap-3 rounded-2xl bg-white px-4 py-8 text-center shadow-sm ring-1 ring-zinc-950/10 transition hover:bg-zinc-50 disabled:opacity-50 dark:bg-zinc-900 dark:ring-white/10 dark:hover:bg-zinc-800"
+              >
+                <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-zinc-100 dark:bg-zinc-800">
+                  <ChannelIcon channel="instagram" className="h-9 w-9" colored />
+                </span>
+                <div>
+                  <p className="text-sm font-semibold text-zinc-900 dark:text-white">Instagram</p>
+                  <p className="mt-1 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
+                    Business inbox linked to a Facebook Page you manage.
+                  </p>
+                </div>
+                <span className="text-xs font-medium text-pink-600 dark:text-pink-400">
+                  {oauthLoading ? 'Redirecting…' : 'Connect'}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                disabled={oauthLoading}
+                onClick={handleWhatsAppOAuth}
+                className="flex flex-col items-center gap-3 rounded-2xl bg-white px-4 py-8 text-center shadow-sm ring-1 ring-zinc-950/10 transition hover:bg-zinc-50 disabled:opacity-50 dark:bg-zinc-900 dark:ring-white/10 dark:hover:bg-zinc-800"
+              >
+                <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#25D366]/10">
+                  <ChannelIcon channel="whatsapp" className="h-9 w-9" colored />
+                </span>
+                <div>
+                  <p className="text-sm font-semibold text-zinc-900 dark:text-white">WhatsApp</p>
+                  <p className="mt-1 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
+                    Cloud API number via Meta embedded signup.
+                  </p>
+                </div>
+                <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                  {oauthLoading ? 'Redirecting…' : 'Connect'}
+                </span>
+              </button>
             </div>
           ) : (
             <FieldGroup>

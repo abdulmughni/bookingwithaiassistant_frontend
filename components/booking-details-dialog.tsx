@@ -15,19 +15,13 @@ import {
 import { Dialog, DialogTitle } from '@/components/dialog'
 import { Badge } from '@/components/badge'
 import { Button } from '@/components/button'
-import { useApiToken } from '@/lib/hooks'
+import { ChannelIcon, SourceBadge, channelLabel } from '@/components/channel-icon'
+import { useApiToken, useTenantTimezone } from '@/lib/hooks'
 import { api } from '@/lib/api'
 import { formatDateTime, formatRelativeTime, statusColor } from '@/lib/utils'
 import type { Booking, BookingDetails, BookingMessagePreview } from '@/lib/types'
 
 const prettyStatus = (s: string) => s.replace('_', ' ')
-const prettySource = (s: string) => {
-  const v = (s || '').toLowerCase()
-  if (v === 'whatsapp') return 'WhatsApp'
-  if (v === 'call') return 'Voice call'
-  if (v === 'api') return 'Dashboard / API'
-  return v ? `${v.charAt(0).toUpperCase()}${v.slice(1)}` : 'Unknown'
-}
 
 function formatDuration(seconds: number | null): string {
   if (!seconds || seconds <= 0) return '—'
@@ -90,6 +84,7 @@ export function BookingDetailsDialog({
   onClose: () => void
 }) {
   const getToken = useApiToken()
+  const tenantTz = useTenantTimezone()
   const [details, setDetails] = useState<BookingDetails | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -140,11 +135,11 @@ export function BookingDetailsDialog({
           <div className="flex flex-wrap items-center gap-2">
             <DialogTitle className="mt-0! truncate">{data.customer_name}</DialogTitle>
             <Badge color={statusColor(data.status)}>{prettyStatus(data.status)}</Badge>
-            <Badge color="zinc">{prettySource(data.source_channel)}</Badge>
+            <SourceBadge channel={data.source_channel} />
           </div>
           <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
             Booking ID <span className="font-mono">{data.id}</span> · created{' '}
-            {formatDateTime(data.created_at)}
+            {formatDateTime(data.created_at, tenantTz)}
           </p>
         </div>
       </div>
@@ -172,7 +167,7 @@ export function BookingDetailsDialog({
         {/* Meta grid */}
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <MetaTile icon={CalendarDaysIcon} label="Scheduled">
-            {data.selected_slot ? formatDateTime(data.selected_slot) : '—'}
+            {data.selected_slot ? formatDateTime(data.selected_slot, tenantTz) : '—'}
           </MetaTile>
           <MetaTile icon={WrenchScrewdriverIcon} label="Service">
             {data.service_type || '—'}
@@ -185,7 +180,10 @@ export function BookingDetailsDialog({
           </MetaTile>
           <MetaTile icon={ChatBubbleLeftRightIcon} label="Conversation">
             {details?.conversation_channel ? (
-              <span className="capitalize">{details.conversation_channel}</span>
+              <span className="inline-flex items-center gap-1.5">
+                <ChannelIcon channel={details.conversation_channel} />
+                {channelLabel(details.conversation_channel)}
+              </span>
             ) : (
               data.conversation_id || <span className="text-zinc-400">No linked chat</span>
             )}
@@ -196,7 +194,7 @@ export function BookingDetailsDialog({
             )}
           </MetaTile>
           <MetaTile icon={ClockIcon} label="Last update">
-            {formatDateTime(data.updated_at)}
+            {formatDateTime(data.updated_at, tenantTz)}
           </MetaTile>
         </div>
 
@@ -223,7 +221,7 @@ export function BookingDetailsDialog({
                   {prettyStatus(data.status)}
                 </span>{' '}
                 {formatRelativeTime(data.status_changed_at)} ·{' '}
-                {formatDateTime(data.status_changed_at)}
+                {formatDateTime(data.status_changed_at, tenantTz)}
               </p>
             )}
           </section>
@@ -251,7 +249,7 @@ export function BookingDetailsDialog({
               </div>
               <span className="text-xs text-zinc-500 dark:text-zinc-400">
                 {formatDuration(details.call.duration_seconds)} ·{' '}
-                {details.call.started_at ? formatDateTime(details.call.started_at) : '—'}
+                {details.call.started_at ? formatDateTime(details.call.started_at, tenantTz) : '—'}
               </span>
             </div>
             {details.call.summary && (

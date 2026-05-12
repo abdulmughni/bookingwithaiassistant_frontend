@@ -1,14 +1,18 @@
-export function formatDate(dateStr: string | null | undefined): string {
+export function formatDate(dateStr: string | null | undefined, timeZone?: string): string {
   if (!dateStr) return '—'
   const d = new Date(dateStr)
   return d.toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
+    timeZone: timeZone || undefined,
   })
 }
 
-export function formatDateTime(dateStr: string | null | undefined): string {
+export function formatDateTime(
+  dateStr: string | null | undefined,
+  timeZone?: string,
+): string {
   if (!dateStr) return '—'
   const d = new Date(dateStr)
   return d.toLocaleString('en-US', {
@@ -17,6 +21,8 @@ export function formatDateTime(dateStr: string | null | undefined): string {
     year: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
+    timeZone: timeZone || undefined,
+    timeZoneName: timeZone ? 'short' : undefined,
   })
 }
 
