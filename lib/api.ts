@@ -337,6 +337,18 @@ export const api = {
       request<import('./types').VoiceToolsResponse>('/api/voice/tools', { token }),
   },
 
+  plans: {
+    list: (token: string) => request<import('./types').Plan[]>('/api/plans', { token }),
+    mySubscription: (token: string) =>
+      request<import('./types').Subscription>('/api/tenants/me/subscription', { token }),
+    assign: (token: string, planId: string) =>
+      request<import('./types').Subscription>('/api/tenants/me/subscription', {
+        token,
+        method: 'POST',
+        body: JSON.stringify({ plan_id: planId }),
+      }),
+  },
+
   credentials: {
     list: (token: string) => request<import('./types').Credential[]>('/api/credentials', { token }),
     store: (token: string, data: { ref: string; integration_type: string; credentials: Record<string, unknown> }) =>

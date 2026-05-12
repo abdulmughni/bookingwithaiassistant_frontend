@@ -4,6 +4,7 @@ import {
   ChatBubbleLeftRightIcon,
   LinkIcon,
   Cog6ToothIcon,
+  CreditCardIcon,
   KeyIcon,
   PhoneIcon,
   MicrophoneIcon,
@@ -17,5 +18,6 @@ export const mainNavItems = [
   { label: 'Voice setup', href: '/voice', icon: MicrophoneIcon },
   { label: 'Accounts', href: '/accounts', icon: LinkIcon },
   { label: 'Integrations', href: '/integrations', icon: KeyIcon },
+  { label: 'Plans', href: '/plans', icon: CreditCardIcon },
   { label: 'Settings', href: '/settings', icon: Cog6ToothIcon },
 ]

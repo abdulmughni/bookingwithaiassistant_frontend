@@ -375,3 +375,48 @@ export interface VoiceToolsResponse {
   total: number
   bound_count: number
 }
+
+// ---------------------------------------------------------------------------
+// Plans + subscription (matches api/services/usage.py and api/routes/plans.py)
+// ---------------------------------------------------------------------------
+
+/** A pricing tier shown on the standalone /plans page. */
+export interface Plan {
+  id: string
+  name: string
+  monthly_price_cents: number
+  currency: string
+  messages_quota: number
+  call_minutes_quota: number
+  features: string[]
+  best_for: string
+  is_featured: boolean
+}
+
+/**
+ * Quota states are computed from the worst-of (messages, call minutes):
+ *  - "ok"       — < 80% used
+ *  - "warning"  — 80–99%   (amber bar, soft banner)
+ *  - "over"     — 100–119% (red bar, grace overage still allowed)
+ *  - "blocked"  — ≥ 120%   (outbound traffic rejected by the backend gate)
+ *  - "no_plan"  — tenant has no active subscription
+ */
+export type QuotaState = 'ok' | 'warning' | 'over' | 'blocked' | 'no_plan'
+
+export interface SubscriptionUsage {
+  messages_used: number
+  messages_remaining: number
+  messages_pct: number
+  call_minutes_used: number
+  call_minutes_remaining: number
+  call_minutes_pct: number
+  quota_state: QuotaState
+}
+
+export interface Subscription {
+  plan: Plan | null
+  /** ISO 8601 UTC; null when the tenant has no active plan yet. */
+  period_start: string | null
+  period_end: string | null
+  usage: SubscriptionUsage
+}

@@ -124,3 +124,80 @@ export function useTenantTimezone(): string {
   return tz
 }
 
+// ---------------------------------------------------------------------------
+// Subscription (plan + usage) — sidebar widget + /plans page share this.
+// ---------------------------------------------------------------------------
+
+/**
+ * Current tenant's plan + 30-day usage window. Polled every 60s so the
+ * sidebar "X messages left" stays roughly live without a websocket.
+ *
+ * Returns ``data: null`` on first paint while the API is in-flight; the
+ * widget renders a tiny skeleton in that case. ``refetch`` is exposed so
+ * the /plans page can immediately update the sidebar after a switch.
+ */
+export function useSubscription({ pollMs = 60000 }: { pollMs?: number } = {}) {
+  const getToken = useApiToken()
+  const [data, setData] = useState<import('./types').Subscription | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const refetch = useCallback(async () => {
+    try {
+      const token = await getToken()
+      const sub = await api.plans.mySubscription(token)
+      setData(sub)
+      setError(null)
+    } catch (err) {
+      if (err instanceof ApiError) setError(err.message)
+      else setError(err instanceof Error ? err.message : 'Failed to load subscription')
+    } finally {
+      setLoading(false)
+    }
+  }, [getToken])
+
+  useEffect(() => {
+    let cancelled = false
+    void refetch()
+    if (pollMs <= 0) return
+    const t = setInterval(() => {
+      if (!cancelled) void refetch()
+    }, pollMs)
+    return () => {
+      cancelled = true
+      clearInterval(t)
+    }
+  }, [refetch, pollMs])
+
+  return { data, loading, error, refetch }
+}
+
+/** Catalogue of pricing tiers (rendered on /plans). Fetches once. */
+export function usePlans() {
+  const getToken = useApiToken()
+  const [data, setData] = useState<import('./types').Plan[] | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const refetch = useCallback(async () => {
+    setLoading(true)
+    try {
+      const token = await getToken()
+      const plans = await api.plans.list(token)
+      setData(plans)
+      setError(null)
+    } catch (err) {
+      if (err instanceof ApiError) setError(err.message)
+      else setError(err instanceof Error ? err.message : 'Failed to load plans')
+    } finally {
+      setLoading(false)
+    }
+  }, [getToken])
+
+  useEffect(() => {
+    void refetch()
+  }, [refetch])
+
+  return { data, loading, error, refetch }
+}
+

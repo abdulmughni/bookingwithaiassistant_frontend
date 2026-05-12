@@ -23,6 +23,7 @@ import {
   NavbarOrganizationSwitcher,
   OrganizationGate,
 } from '@/components/organization-gate'
+import { SidebarUsageCard } from '@/components/sidebar-usage-card'
 
 export default function DashboardLayout({
   children,
@@ -93,6 +94,7 @@ export default function DashboardLayout({
           </SidebarBody>
 
           <SidebarFooter>
+            <SidebarUsageCard />
             <SidebarSection>
               <SidebarItem
                 onClick={() => signOut()}
