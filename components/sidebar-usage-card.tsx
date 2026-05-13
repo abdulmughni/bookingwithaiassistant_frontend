@@ -1,11 +1,59 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import clsx from 'clsx'
-import { ArrowUpRightIcon, SparklesIcon } from '@heroicons/react/20/solid'
+import {
+  ArrowPathIcon,
+  ArrowUpRightIcon,
+  SparklesIcon,
+} from '@heroicons/react/20/solid'
 
-import { useSubscription } from '@/lib/hooks'
+import { useSubscription, useTenantTimezone } from '@/lib/hooks'
 import type { QuotaState, Subscription } from '@/lib/types'
+
+/**
+ * Compact renewal date (e.g. "Jun 11" or "Jun 11, 2027" when the renewal
+ * year differs from now). Rendered in the **tenant timezone**.
+ */
+function formatRenewalDate(
+  periodEndIso: string | null,
+  timeZone: string,
+): string {
+  if (!periodEndIso) return ''
+  const end = new Date(periodEndIso)
+  if (Number.isNaN(end.getTime())) return ''
+  const nowYear = new Intl.DateTimeFormat(undefined, {
+    year: 'numeric',
+    timeZone,
+  }).format(new Date())
+  const endYear = new Intl.DateTimeFormat(undefined, {
+    year: 'numeric',
+    timeZone,
+  }).format(end)
+  const opts: Intl.DateTimeFormatOptions =
+    endYear === nowYear
+      ? { month: 'short', day: 'numeric', timeZone }
+      : { month: 'short', day: 'numeric', year: 'numeric', timeZone }
+  return new Intl.DateTimeFormat(undefined, opts).format(end)
+}
+
+/** Long-form date string used in the tooltip (e.g. "Thursday, June 11, 2026"). */
+function formatRenewalLong(
+  periodEndIso: string | null,
+  timeZone: string,
+): string {
+  if (!periodEndIso) return ''
+  const end = new Date(periodEndIso)
+  if (Number.isNaN(end.getTime())) return ''
+  return new Intl.DateTimeFormat(undefined, {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone,
+  }).format(end)
+}
 
 /**
  * Compact "what plan am I on / how much have I used" card pinned to the
@@ -25,7 +73,21 @@ import type { QuotaState, Subscription } from '@/lib/types'
  * can't miss that outbound traffic is being refused by the backend gate.
  */
 export function SidebarUsageCard() {
-  const { data, loading } = useSubscription()
+  const { data, loading, refetch } = useSubscription()
+  // Local "refreshing" state so we can spin the icon for the duration of the
+  // click — independent of the 60s background poll's loading flag, which
+  // toggles too briefly to register visually.
+  const [refreshing, setRefreshing] = useState(false)
+
+  const handleRefresh = async () => {
+    if (refreshing) return
+    setRefreshing(true)
+    try {
+      await refetch()
+    } finally {
+      setRefreshing(false)
+    }
+  }
 
   if (loading && !data) {
     return (
@@ -41,7 +103,13 @@ export function SidebarUsageCard() {
     return <NoPlanCard />
   }
 
-  return <ActivePlanCard subscription={data} />
+  return (
+    <ActivePlanCard
+      subscription={data}
+      onRefresh={handleRefresh}
+      refreshing={refreshing}
+    />
+  )
 }
 
 // ---------------------------------------------------------------------------
@@ -79,14 +147,28 @@ function NoPlanCard() {
 // Active plan card
 // ---------------------------------------------------------------------------
 
-function ActivePlanCard({ subscription }: { subscription: Subscription }) {
+function ActivePlanCard({
+  subscription,
+  onRefresh,
+  refreshing,
+}: {
+  subscription: Subscription
+  onRefresh: () => void
+  refreshing: boolean
+}) {
   const { plan, period_end, usage } = subscription
+  const tenantTz = useTenantTimezone()
   if (!plan) return <NoPlanCard />
 
   const state = usage.quota_state
   const blocked = state === 'blocked'
   const over = state === 'over'
   const warning = state === 'warning'
+
+  const renewalLabel = formatRenewalDate(period_end, tenantTz)
+  // Long-form date kept on the tooltip so the operator can see the exact
+  // calendar day on hover even when the inline text is just "Jun 11".
+  const renewalLongLabel = formatRenewalLong(period_end, tenantTz)
 
   return (
     <div
@@ -108,7 +190,7 @@ function ActivePlanCard({ subscription }: { subscription: Subscription }) {
       )}
 
       <div className="px-3 py-2.5">
-        {/* Plan name + featured ★ */}
+        {/* Plan name + featured ★ on the left, renewal date + refresh on the right */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 min-w-0">
             <span className="truncate text-sm font-semibold text-zinc-900 dark:text-white">
@@ -123,9 +205,33 @@ function ActivePlanCard({ subscription }: { subscription: Subscription }) {
               </span>
             )}
           </div>
-          <span className="shrink-0 text-[11px] text-zinc-500 dark:text-zinc-400">
-            {formatPeriodHint(period_end)}
-          </span>
+          <div className="flex shrink-0 items-center gap-1.5">
+            {renewalLabel && (
+              <span
+                title={renewalLongLabel}
+                className="text-[11px] text-zinc-500 dark:text-zinc-400"
+              >
+                Renews {renewalLabel}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={onRefresh}
+              disabled={refreshing}
+              aria-label="Refresh usage"
+              title="Refresh usage"
+              className={clsx(
+                'rounded-md p-1 text-zinc-400 transition',
+                'hover:bg-zinc-100 hover:text-zinc-700',
+                'dark:hover:bg-zinc-800 dark:hover:text-zinc-200',
+                'disabled:cursor-not-allowed disabled:opacity-60',
+              )}
+            >
+              <ArrowPathIcon
+                className={clsx('size-3.5', refreshing && 'animate-spin')}
+              />
+            </button>
+          </div>
         </div>
 
         {/* Bars */}
@@ -228,16 +334,4 @@ function barColor(state: QuotaState): string {
     default:
       return 'bg-indigo-500'
   }
-}
-
-function formatPeriodHint(periodEndIso: string | null): string {
-  if (!periodEndIso) return ''
-  const end = new Date(periodEndIso)
-  if (Number.isNaN(end.getTime())) return ''
-  const now = new Date()
-  const msLeft = end.getTime() - now.getTime()
-  const daysLeft = Math.max(0, Math.ceil(msLeft / (1000 * 60 * 60 * 24)))
-  if (daysLeft <= 0) return 'Resetting…'
-  if (daysLeft === 1) return 'Resets in 1d'
-  return `Resets in ${daysLeft}d`
 }
