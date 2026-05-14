@@ -1,5 +1,10 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'
 
+/** Sent on every backend fetch so ngrok does not inject its HTML interstitial. */
+const NGROK_BROWSER_HEADER: Record<string, string> = {
+  'ngrok-skip-browser-warning': 'true',
+}
+
 class ApiError extends Error {
   constructor(
     public status: number,
@@ -38,6 +43,7 @@ async function request<T>(
 ): Promise<T> {
   const { token, ...fetchOptions } = options
   const headers: Record<string, string> = {
+    ...NGROK_BROWSER_HEADER,
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(fetchOptions.headers as Record<string, string> || {}),
@@ -65,7 +71,10 @@ async function requestFormData<T>(
 ): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     method,
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    headers: {
+      ...NGROK_BROWSER_HEADER,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: formData,
   })
   if (!res.ok) {
@@ -78,7 +87,10 @@ async function requestFormData<T>(
 async function requestDelete(token: string, path: string): Promise<void> {
   const res = await fetch(`${API_BASE}${path}`, {
     method: 'DELETE',
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    headers: {
+      ...NGROK_BROWSER_HEADER,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
   })
   if (!res.ok) {
     const body = await res.text()
