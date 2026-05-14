@@ -10,14 +10,14 @@
 !.yarn/releases
 !.yarn/versions
 
-# testing
-/coverage
-
-# next.js
+# next.js build outputs
 /.next/
 /out/
+.next/
+build/
 
 # production
+/dist
 /build
 
 # misc
@@ -30,8 +30,10 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files
 .env*
+!.env.example
+!.env.local.example
 
 # vercel
 .vercel
@@ -39,3 +41,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Optional but useful
+# coverage
+/coverage
+
+# IDE
+.vscode/
+.idea/
