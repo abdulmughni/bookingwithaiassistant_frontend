@@ -233,8 +233,14 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({}),
       }),
-    googleCalendarStart: (token: string) =>
-      request<{ authorization_url: string }>('/api/oauth/google/start', {
+    jobberStart: (token: string) =>
+      request<{ authorization_url: string }>('/api/oauth/jobber/start', {
+        token,
+        method: 'POST',
+        body: JSON.stringify({}),
+      }),
+    jobberDisconnect: (token: string) =>
+      request<null>('/api/oauth/jobber/disconnect', {
         token,
         method: 'POST',
         body: JSON.stringify({}),

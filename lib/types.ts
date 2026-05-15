@@ -18,9 +18,6 @@ export interface Tenant {
   working_hours: Record<string, unknown>
   booking_buffers: Record<string, unknown>
   escalation_rules: Record<string, unknown>
-  calendar_type: string
-  calendar_credential_ref: string
-  calendar_settings: Record<string, unknown>
   crm_type: string
   crm_credential_ref: string
   prices: Record<string, unknown>
@@ -86,8 +83,6 @@ export interface Booking {
   service_type: string
   selected_slot: string | null
   notes: string | null
-  calendar_event_id: string | null
-  confirmation_url: string | null
   crm_job_id: string | null
   crm_contact_id: string | null
   status: 'confirmed' | 'cancelled' | 'rescheduled' | 'completed' | 'no_show' | string

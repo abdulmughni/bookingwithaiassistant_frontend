@@ -18,12 +18,6 @@ import { notifyError, notifySuccess } from '@/lib/notify'
 import type { Credential, PromptConfig, Tenant, TimezoneChoice } from '@/lib/types'
 import { DocumentsTab } from './documents-tab'
 
-/** DB uses google | calcom | none — normalize legacy UI value. */
-function normalizeCalendarType(v: string) {
-  if (v === 'gcal') return 'google'
-  return v || 'none'
-}
-
 // ---------------------------------------------------------------------------
 // Tab type
 // ---------------------------------------------------------------------------
@@ -66,7 +60,6 @@ function TenantConfigTab({
   const [escalationStuckTurns, setEscalationStuckTurns] = useState('3')
   const [escalationLowConfidence, setEscalationLowConfidence] = useState('0.65')
 
-  const [calendarType, setCalendarType] = useState('none')
   const [crmType, setCrmType] = useState('none')
 
   const [confidenceThreshold, setConfidenceThreshold] = useState('0.75')
@@ -74,17 +67,6 @@ function TenantConfigTab({
 
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
-
-  const calendarSelectOptions = useMemo(() => {
-    const opts: { value: string; label: string }[] = [{ value: 'none', label: 'None' }]
-    if (credentials.some((c) => c.integration_type === 'gcal' && c.exists)) {
-      opts.push({ value: 'google', label: 'Google Calendar' })
-    }
-    if (credentials.some((c) => c.integration_type === 'calcom' && c.exists)) {
-      opts.push({ value: 'calcom', label: 'Cal.com' })
-    }
-    return opts
-  }, [credentials])
 
   const crmSelectOptions = useMemo(() => {
     const opts: { value: string; label: string }[] = [{ value: 'none', label: 'None' }]
@@ -134,10 +116,6 @@ function TenantConfigTab({
     setEscalationStuckTurns(String((er as { stuck_turns?: number }).stuck_turns ?? 3))
     setEscalationLowConfidence(String((er as { low_confidence?: number }).low_confidence ?? 0.65))
 
-    const allowedCal = new Set(calendarSelectOptions.map((o) => o.value))
-    const wantCal = normalizeCalendarType(tenant.calendar_type || 'none')
-    setCalendarType(allowedCal.has(wantCal) ? wantCal : 'none')
-
     const allowedCrm = new Set(crmSelectOptions.map((o) => o.value))
     const wantCrm = tenant.crm_type || 'none'
     setCrmType(allowedCrm.has(wantCrm) ? wantCrm : 'none')
@@ -145,7 +123,7 @@ function TenantConfigTab({
     setConfidenceThreshold(String(tenant.confidence_threshold ?? 0.75))
     setMaxTurns(String(tenant.max_turns ?? 12))
 
-  }, [tenant, calendarSelectOptions, crmSelectOptions])
+  }, [tenant, crmSelectOptions])
 
   // Load the curated IANA list once. The dropdown is the only way to set the
   // tenant timezone — values saved on the tenant are pure IANA strings.
@@ -219,7 +197,6 @@ function TenantConfigTab({
         working_hours: workingHours as Record<string, unknown>,
         booking_buffers: { minimum_minutes: minM, slot_duration_minutes: slotM },
         escalation_rules: { stuck_turns: stuck, low_confidence: lowConf },
-        calendar_type: calendarType || 'none',
         crm_type: crmType || 'none',
         confidence_threshold: ct,
         max_turns: mt,
@@ -382,19 +359,12 @@ function TenantConfigTab({
       <section>
         <Subheading>Integrations</Subheading>
         <Text className="mb-4 text-sm text-zinc-500">
-          Choose which systems you use. Store API keys and secrets on the <strong>Integrations</strong> page — not here.
+          Choose your CRM for booking sync. Store OAuth keys on the <strong>Integrations</strong> page — not here.
         </Text>
         <FieldGroup>
           <Field>
-            <Label>Calendar provider</Label>
-            <Description>Only integrations you have added under <strong>Integrations</strong> (with credentials stored) appear here.</Description>
-            <Select value={calendarType} onChange={(e) => setCalendarType(e.target.value)}>
-              {calendarSelectOptions.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
-            </Select>
-          </Field>
-          <Field>
             <Label>CRM provider</Label>
-            <Description>Same as calendar — only providers with stored credentials are listed.</Description>
+            <Description>Only providers with stored credentials appear here.</Description>
             <Select value={crmType} onChange={(e) => setCrmType(e.target.value)}>
               {crmSelectOptions.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
             </Select>

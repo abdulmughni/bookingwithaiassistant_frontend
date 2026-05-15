@@ -196,6 +196,14 @@ export function BookingDetailsDialog({
           <MetaTile icon={ClockIcon} label="Last update">
             {formatDateTime(data.updated_at, tenantTz)}
           </MetaTile>
+          {(data.crm_job_id || data.crm_contact_id) && (
+            <MetaTile icon={IdentificationIcon} label="CRM">
+              <div className="flex flex-col gap-1 font-mono text-[11px] leading-snug">
+                {data.crm_job_id ? <span>Job: {data.crm_job_id}</span> : null}
+                {data.crm_contact_id ? <span>Contact: {data.crm_contact_id}</span> : null}
+              </div>
+            </MetaTile>
+          )}
         </div>
 
         {/* Operator note + status timestamp */}
@@ -299,16 +307,6 @@ export function BookingDetailsDialog({
       </div>
 
       <div className="mt-8 flex justify-end gap-2">
-        {data.confirmation_url && (
-          <Button
-            outline
-            href={data.confirmation_url}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Open calendar event
-          </Button>
-        )}
         <Button onClick={onClose}>Close</Button>
       </div>
     </Dialog>
