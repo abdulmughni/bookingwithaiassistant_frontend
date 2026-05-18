@@ -174,14 +174,23 @@ function AccountsPageInner() {
     const ig = searchParams.get('ig_oauth')
     if (!fb && !wa && !ig) return
     const msg = searchParams.get('message')
-    if (fb === 'success') {
-      const n = searchParams.get('pages')
-      notifySuccess(
-        n ? `Facebook connected — ${n} page(s) added.` : 'Facebook pages connected successfully.',
-      )
+    const formatMetaSuccess = () => {
+      const pages = Number(searchParams.get('pages') || '0')
+      const instagram = Number(searchParams.get('instagram') || searchParams.get('accounts') || '0')
+      const parts: string[] = []
+      if (pages > 0) parts.push(`${pages} Facebook page${pages === 1 ? '' : 's'}`)
+      if (instagram > 0)
+        parts.push(`${instagram} Instagram account${instagram === 1 ? '' : 's'}`)
+      if (parts.length === 0) return 'Meta connection completed.'
+      return `Meta connected — ${parts.join(' + ')} added.`
+    }
+    if (fb === 'success' || ig === 'success') {
+      notifySuccess(formatMetaSuccess())
       refetch()
     } else if (fb === 'error') {
       notifyError(msg || 'Facebook connection failed.')
+    } else if (ig === 'error') {
+      notifyError(msg || 'Instagram connection failed.')
     }
     if (wa === 'success') {
       const n = searchParams.get('numbers')
@@ -192,31 +201,24 @@ function AccountsPageInner() {
     } else if (wa === 'error') {
       notifyError(msg || 'WhatsApp connection failed.')
     }
-    if (ig === 'success') {
-      const n = searchParams.get('accounts')
-      notifySuccess(
-        n ? `Instagram connected — ${n} account(s) added.` : 'Instagram connected successfully.',
-      )
-      refetch()
-    } else if (ig === 'error') {
-      notifyError(msg || 'Instagram connection failed.')
-    }
     router.replace('/accounts')
   }, [searchParams, router, refetch])
 
-  const handleFacebookPageOAuth = async () => {
+  const handleMetaOAuth = async () => {
     setOauthLoading(true)
     try {
       const token = await getFreshToken()
       if (!token) {
-        notifyError('Select a workspace (organization) before connecting Facebook.')
+        notifyError('Select a workspace (organization) before connecting Facebook & Instagram.')
         setOauthLoading(false)
         return
       }
       const { authorization_url } = await api.oauth.facebookStart(token)
       window.location.assign(authorization_url)
     } catch (e) {
-      notifyError(e instanceof ApiError ? e.message : 'Could not start Facebook connection')
+      notifyError(
+        e instanceof ApiError ? e.message : 'Could not start Facebook & Instagram connection',
+      )
       setOauthLoading(false)
     }
   }
@@ -234,23 +236,6 @@ function AccountsPageInner() {
       window.location.assign(authorization_url)
     } catch (e) {
       notifyError(e instanceof ApiError ? e.message : 'Could not start WhatsApp connection')
-      setOauthLoading(false)
-    }
-  }
-
-  const handleInstagramOAuth = async () => {
-    setOauthLoading(true)
-    try {
-      const token = await getFreshToken()
-      if (!token) {
-        notifyError('Select a workspace (organization) before connecting Instagram.')
-        setOauthLoading(false)
-        return
-      }
-      const { authorization_url } = await api.oauth.instagramStart(token)
-      window.location.assign(authorization_url)
-    } catch (e) {
-      notifyError(e instanceof ApiError ? e.message : 'Could not start Instagram connection')
       setOauthLoading(false)
     }
   }
@@ -409,46 +394,35 @@ function AccountsPageInner() {
 
         <DialogBody className="max-h-[70vh] overflow-y-auto pr-1">
           {connectMode === 'destination' ? (
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2">
               <button
                 type="button"
                 disabled={oauthLoading}
-                onClick={handleFacebookPageOAuth}
+                onClick={handleMetaOAuth}
                 className={clsx(
                   'flex flex-col items-center gap-3 rounded-2xl bg-white px-4 py-8 text-center shadow-sm ring-1 ring-zinc-950/10 transition hover:bg-zinc-50 disabled:opacity-50 dark:bg-zinc-900 dark:ring-white/10 dark:hover:bg-zinc-800',
                 )}
               >
-                <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#1877F2]/10">
-                  <ChannelIcon channel="facebook" className="h-9 w-9" colored />
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#1877F2]/10">
+                    <ChannelIcon channel="facebook" className="h-9 w-9" colored />
+                  </span>
+                  <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-zinc-100 dark:bg-zinc-800">
+                    <ChannelIcon channel="instagram" className="h-9 w-9" colored />
+                  </span>
+                </div>
                 <div>
-                  <p className="text-sm font-semibold text-zinc-900 dark:text-white">Facebook Page</p>
+                  <p className="text-sm font-semibold text-zinc-900 dark:text-white">
+                    Facebook &amp; Instagram
+                  </p>
                   <p className="mt-1 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
-                    Messenger for your Page — sign in with Meta (no manual tokens).
+                    One Meta sign-in. We connect every Page you select and any Instagram business
+                    accounts linked to those Pages — Messenger and DMs both arrive on the same
+                    webhook.
                   </p>
                 </div>
                 <span className="text-xs font-medium text-blue-600 dark:text-blue-400">
-                  {oauthLoading ? 'Redirecting…' : 'Connect'}
-                </span>
-              </button>
-
-              <button
-                type="button"
-                disabled={oauthLoading}
-                onClick={handleInstagramOAuth}
-                className="flex flex-col items-center gap-3 rounded-2xl bg-white px-4 py-8 text-center shadow-sm ring-1 ring-zinc-950/10 transition hover:bg-zinc-50 disabled:opacity-50 dark:bg-zinc-900 dark:ring-white/10 dark:hover:bg-zinc-800"
-              >
-                <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-zinc-100 dark:bg-zinc-800">
-                  <ChannelIcon channel="instagram" className="h-9 w-9" colored />
-                </span>
-                <div>
-                  <p className="text-sm font-semibold text-zinc-900 dark:text-white">Instagram</p>
-                  <p className="mt-1 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
-                    Business inbox linked to a Facebook Page you manage.
-                  </p>
-                </div>
-                <span className="text-xs font-medium text-pink-600 dark:text-pink-400">
-                  {oauthLoading ? 'Redirecting…' : 'Connect'}
+                  {oauthLoading ? 'Redirecting…' : 'Connect with Meta'}
                 </span>
               </button>
 
