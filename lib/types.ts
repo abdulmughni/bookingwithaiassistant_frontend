@@ -20,6 +20,8 @@ export interface Tenant {
   escalation_rules: Record<string, unknown>
   crm_type: string
   crm_credential_ref: string
+  /** Jobber scheduling: auto-assign, arrival window, technician expertise map. */
+  crm_settings?: CrmSettings
   prices: Record<string, unknown>
   emergency_surcharge: string
   overtime_surcharge: string
@@ -33,6 +35,17 @@ export interface Tenant {
   is_active: boolean
   created_at: string
   updated_at: string
+}
+
+export interface CrmSettings {
+  auto_assign_technician: boolean
+  arrival_window_minutes: number
+  technician_expertise: Record<string, string[]>
+}
+
+export interface JobberTechnician {
+  id: string
+  name: string
 }
 
 export interface TimezoneChoice {

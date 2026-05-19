@@ -12,6 +12,7 @@ import { Badge } from '@/components/badge'
 import { Field, FieldGroup, Label, Description } from '@/components/fieldset'
 import { TagInput } from '@/components/tag-input'
 import { WorkingHoursEditor } from '@/components/working-hours-editor'
+import { JobberCrmSettings, parseCrmSettings } from '@/components/jobber-crm-settings'
 import { useApiData, useApiToken } from '@/lib/hooks'
 import { ApiError, api } from '@/lib/api'
 import { notifyError, notifySuccess } from '@/lib/notify'
@@ -61,6 +62,9 @@ function TenantConfigTab({
   const [escalationLowConfidence, setEscalationLowConfidence] = useState('0.65')
 
   const [crmType, setCrmType] = useState('none')
+  const [crmSettings, setCrmSettings] = useState(
+    parseCrmSettings(undefined),
+  )
 
   const [confidenceThreshold, setConfidenceThreshold] = useState('0.75')
   const [maxTurns, setMaxTurns] = useState('12')
@@ -119,6 +123,7 @@ function TenantConfigTab({
     const allowedCrm = new Set(crmSelectOptions.map((o) => o.value))
     const wantCrm = tenant.crm_type || 'none'
     setCrmType(allowedCrm.has(wantCrm) ? wantCrm : 'none')
+    setCrmSettings(parseCrmSettings(tenant.crm_settings as Record<string, unknown> | undefined))
 
     setConfidenceThreshold(String(tenant.confidence_threshold ?? 0.75))
     setMaxTurns(String(tenant.max_turns ?? 12))
@@ -164,6 +169,13 @@ function TenantConfigTab({
     const mt = parseInt(maxTurns, 10)
     if (Number.isNaN(ct) || ct < 0 || ct > 1) { notifyError('Confidence threshold must be between 0 and 1'); return }
     if (Number.isNaN(mt) || mt < 1) { notifyError('Max turns must be at least 1'); return }
+    if (crmType === 'jobber') {
+      const aw = crmSettings.arrival_window_minutes
+      if (Number.isNaN(aw) || aw < 15 || aw > 480) {
+        notifyError('Arrival window must be between 15 and 480 minutes')
+        return
+      }
+    }
 
     setSaving(true)
     setSaved(false)
@@ -198,6 +210,7 @@ function TenantConfigTab({
         booking_buffers: { minimum_minutes: minM, slot_duration_minutes: slotM },
         escalation_rules: { stuck_turns: stuck, low_confidence: lowConf },
         crm_type: crmType || 'none',
+        crm_settings: crmSettings,
         confidence_threshold: ct,
         max_turns: mt,
       })
@@ -369,6 +382,24 @@ function TenantConfigTab({
               {crmSelectOptions.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
             </Select>
           </Field>
+          {crmType === 'jobber' ? (
+            <JobberCrmSettings
+              value={crmSettings}
+              onChange={setCrmSettings}
+              jobberConnected={
+                crmType === 'jobber' &&
+                Boolean(tenant.crm_credential_ref) &&
+                credentials.some(
+                  (c) =>
+                    c.integration_type === 'jobber' &&
+                    c.exists &&
+                    c.ref === tenant.crm_credential_ref,
+                )
+              }
+              getToken={getToken}
+              serviceTypes={serviceTypes}
+            />
+          ) : null}
         </FieldGroup>
       </section>
 

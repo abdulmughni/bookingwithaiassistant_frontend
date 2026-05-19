@@ -105,7 +105,14 @@ function IntegrationCard({
           {cred.integration_type === 'jobber' ? (
             <>
               Bookings confirmed in chat or by phone sync to Jobber as Jobs; clients are matched or
-              created by phone.
+              created by phone. In the Jobber Developer Center, set your app webhook URL to{' '}
+              <code className="rounded bg-zinc-200/80 px-1 py-0.5 text-[10px] dark:bg-zinc-700">
+                {typeof process.env.NEXT_PUBLIC_API_BASE_URL === 'string' &&
+                process.env.NEXT_PUBLIC_API_BASE_URL
+                  ? `${process.env.NEXT_PUBLIC_API_BASE_URL.replace(/\/$/, '')}/webhooks/jobber`
+                  : 'https://<your-api>/webhooks/jobber'}
+              </code>{' '}
+              and subscribe to visit/job events so availability stays in sync.
             </>
           ) : cred.integration_type === 'hubspot' ? (
             <>CRM sync — connect credentials here, then choose HubSpot under Settings → Integrations.</>

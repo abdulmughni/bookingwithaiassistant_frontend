@@ -106,6 +106,10 @@ export const api = {
     stats: (token: string) => request<import('./types').TenantStats>('/api/tenants/me/stats', { token }),
     timezones: (token: string) =>
       request<import('./types').TimezoneChoice[]>('/api/tenants/timezones', { token }),
+    jobberTechnicians: (token: string) =>
+      request<import('./types').JobberTechnician[]>('/api/tenants/me/jobber/technicians', {
+        token,
+      }),
   },
 
   channels: {
