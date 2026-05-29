@@ -2,16 +2,12 @@
 
 import Link from 'next/link'
 import { ExclamationTriangleIcon } from '@heroicons/react/20/solid'
-import { useApiData, useApiToken } from '@/lib/hooks'
+import { useApiData } from '@/lib/hooks'
 import { api } from '@/lib/api'
 import type { Tenant } from '@/lib/types'
 
 export function JobberReconnectBanner() {
-  const token = useApiToken()
-  const { data: tenant } = useApiData<Tenant>(
-    token ? ['tenant-me-jobber-banner', token] : null,
-    () => api.tenants.me(token!),
-  )
+  const { data: tenant } = useApiData<Tenant>((token) => api.tenants.me(token))
 
   const needsReconnect =
     tenant?.crm_type === 'jobber' &&
