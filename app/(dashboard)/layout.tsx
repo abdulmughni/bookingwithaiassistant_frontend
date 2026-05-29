@@ -24,6 +24,7 @@ import {
   OrganizationGate,
 } from '@/components/organization-gate'
 import { SidebarUsageCard } from '@/components/sidebar-usage-card'
+import { JobberReconnectBanner } from '@/components/jobber-reconnect-banner'
 
 export default function DashboardLayout({
   children,
@@ -127,7 +128,10 @@ export default function DashboardLayout({
       {fullBleedPage ? (
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">{children}</div>
       ) : (
-        <div className="px-4 py-6 sm:px-6 lg:px-8 lg:py-8">{children}</div>
+        <div className="px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+          <JobberReconnectBanner />
+          {children}
+        </div>
       )}
     </SidebarLayout>
     </OrganizationGate>

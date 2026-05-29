@@ -61,6 +61,8 @@ function IntegrationCard({
     cred.integration_type === 'jobber' &&
     tenant?.crm_type === 'jobber' &&
     tenant?.crm_credential_ref === cred.ref
+  const jobberNeedsReconnect =
+    jobberLinked && Boolean(tenant?.crm_settings?.jobber_needs_reconnect)
 
   return (
     <Card
@@ -91,6 +93,11 @@ function IntegrationCard({
                   Workspace linked
                 </Badge>
               )}
+              {jobberNeedsReconnect && (
+                <Badge color="amber" className="text-[10px]">
+                  Reconnect required
+                </Badge>
+              )}
             </div>
             <h3 className="mt-3 text-base font-semibold tracking-tight text-zinc-950 dark:text-white">
               {integrationLabel(cred.integration_type)}
@@ -100,6 +107,21 @@ function IntegrationCard({
             Updated {formatDate(cred.updated_at)}
           </span>
         </div>
+
+        {jobberNeedsReconnect ? (
+          <p className="mt-3 rounded-lg border border-amber-300/70 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-950 dark:border-amber-500/40 dark:bg-amber-950/30 dark:text-amber-50">
+            Live calendar sync is paused. Click <strong>Connect Jobber</strong> below to
+            reconnect — customers cannot get accurate availability until this is fixed.
+            {tenant?.crm_settings?.jobber_last_error ? (
+              <>
+                {' '}
+                <span className="block mt-1 opacity-80">
+                  {tenant.crm_settings.jobber_last_error}
+                </span>
+              </>
+            ) : null}
+          </p>
+        ) : null}
 
         <p className="mt-3 rounded-lg bg-zinc-50 px-3 py-2 text-xs leading-relaxed text-zinc-600 dark:bg-zinc-800/60 dark:text-zinc-300">
           {cred.integration_type === 'jobber' ? (
