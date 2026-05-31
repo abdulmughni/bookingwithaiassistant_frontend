@@ -12,7 +12,6 @@ import { Badge } from '@/components/badge'
 import { Field, FieldGroup, Label, Description } from '@/components/fieldset'
 import { TagInput } from '@/components/tag-input'
 import { WorkingHoursEditor } from '@/components/working-hours-editor'
-import { JobberCrmSettings, parseCrmSettings } from '@/components/jobber-crm-settings'
 import { useApiData, useApiToken } from '@/lib/hooks'
 import { ApiError, api } from '@/lib/api'
 import { notifyError, notifySuccess } from '@/lib/notify'
@@ -24,15 +23,109 @@ import { DocumentsTab } from './documents-tab'
 // ---------------------------------------------------------------------------
 type SettingsTab = 'tenant' | 'prompts' | 'documents'
 
+type TenantFormSnapshot = {
+  name: string
+  industry_type: string
+  offered_trades: string[]
+  service_types: string[]
+  required_fields: string[]
+  optional_fields: string[]
+  emergency_keywords: string[]
+  service_areas: string[]
+  service_area_zips: string[]
+  supported_regions: string[]
+  payment_methods: string[]
+  timezone: string
+  working_hours: Record<string, unknown>
+  booking_buffers: { minimum_minutes: number; slot_duration_minutes: number }
+  escalation_rules: { stuck_turns: number; low_confidence: number }
+  crm_type: string
+  confidence_threshold: number
+  max_turns: number
+}
+
+function resolveIndustryType(raw: string): string {
+  return raw === 'general' ? 'field_service' : raw || 'hvac'
+}
+
+function resolveOfferedTrades(tenant: Tenant): { hvac: boolean; plumbing: boolean; electrical: boolean } {
+  const ind = resolveIndustryType(tenant.industry_type || 'hvac')
+  const ot = tenant.offered_trades || []
+  if (ind === 'field_service' || ind === 'general') {
+    if (ot.length === 0) {
+      return { hvac: true, plumbing: true, electrical: true }
+    }
+    return {
+      hvac: ot.includes('hvac'),
+      plumbing: ot.includes('plumbing'),
+      electrical: ot.includes('electrical'),
+    }
+  }
+  return {
+    hvac: ind === 'hvac',
+    plumbing: ind === 'plumbing',
+    electrical: ind === 'electrical',
+  }
+}
+
+function snapshotFromTenant(
+  tenant: Tenant,
+  allowedCrmValues: Set<string>,
+): TenantFormSnapshot {
+  const industryType = resolveIndustryType(tenant.industry_type || 'hvac')
+  const trades = resolveOfferedTrades(tenant)
+  const bb = tenant.booking_buffers || {}
+  const er = tenant.escalation_rules || {}
+  const wantCrm = tenant.crm_type || 'none'
+
+  return {
+    name: tenant.name || '',
+    industry_type: industryType,
+    offered_trades:
+      industryType === 'field_service'
+        ? (() => {
+            const picks: string[] = []
+            if (trades.hvac) picks.push('hvac')
+            if (trades.plumbing) picks.push('plumbing')
+            if (trades.electrical) picks.push('electrical')
+            return picks
+          })()
+        : [],
+    service_types: [...(tenant.service_types || [])],
+    required_fields: [...(tenant.required_fields || [])],
+    optional_fields: [...(tenant.optional_fields || [])],
+    emergency_keywords: [...(tenant.emergency_keywords || [])],
+    service_areas: [...(tenant.service_areas || [])],
+    service_area_zips: [...(tenant.service_area_zips || [])],
+    supported_regions: [...(tenant.supported_regions || [])],
+    payment_methods: [...(tenant.payment_methods || [])],
+    timezone: tenant.timezone || 'UTC',
+    working_hours: { ...(tenant.working_hours || {}) },
+    booking_buffers: {
+      minimum_minutes: Number((bb as { minimum_minutes?: number }).minimum_minutes ?? 60),
+      slot_duration_minutes: Number((bb as { slot_duration_minutes?: number }).slot_duration_minutes ?? 90),
+    },
+    escalation_rules: {
+      stuck_turns: Number((er as { stuck_turns?: number }).stuck_turns ?? 3),
+      low_confidence: Number((er as { low_confidence?: number }).low_confidence ?? 0.65),
+    },
+    crm_type: allowedCrmValues.has(wantCrm) ? wantCrm : 'none',
+    confidence_threshold: Number(tenant.confidence_threshold ?? 0.75),
+    max_turns: Number(tenant.max_turns ?? 12),
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Tenant Configuration Tab (existing settings)
 // ---------------------------------------------------------------------------
 function TenantConfigTab({
   tenant,
   credentials,
+  onSaved,
 }: {
   tenant: Tenant
   credentials: Credential[]
+  onSaved: () => void
 }) {
   const getToken = useApiToken()
 
@@ -62,9 +155,6 @@ function TenantConfigTab({
   const [escalationLowConfidence, setEscalationLowConfidence] = useState('0.65')
 
   const [crmType, setCrmType] = useState('none')
-  const [crmSettings, setCrmSettings] = useState(
-    parseCrmSettings(undefined),
-  )
 
   const [confidenceThreshold, setConfidenceThreshold] = useState('0.75')
   const [maxTurns, setMaxTurns] = useState('12')
@@ -83,52 +173,116 @@ function TenantConfigTab({
     return opts
   }, [credentials])
 
-  useEffect(() => {
-    setName(tenant.name || '')
-    const ind = tenant.industry_type || 'hvac'
-    setIndustryType(ind === 'general' ? 'field_service' : ind)
-    const ot = tenant.offered_trades || []
-    if (ind === 'field_service' || ind === 'general') {
-      if (ot.length === 0) {
-        setOfferedHvac(true)
-        setOfferedPlumbing(true)
-        setOfferedElectrical(true)
-      } else {
-        setOfferedHvac(ot.includes('hvac'))
-        setOfferedPlumbing(ot.includes('plumbing'))
-        setOfferedElectrical(ot.includes('electrical'))
-      }
-    } else {
-      setOfferedHvac(ind === 'hvac')
-      setOfferedPlumbing(ind === 'plumbing')
-      setOfferedElectrical(ind === 'electrical')
+  const allowedCrmValues = useMemo(
+    () => new Set(crmSelectOptions.map((o) => o.value)),
+    [crmSelectOptions],
+  )
+
+  const baseline = useMemo(
+    () => snapshotFromTenant(tenant, allowedCrmValues),
+    [tenant, allowedCrmValues],
+  )
+
+  const currentSnapshot = useMemo((): TenantFormSnapshot => {
+    const minM = parseInt(minBookingMinutes, 10)
+    const slotM = parseInt(slotDurationMinutes, 10)
+    const stuck = parseInt(escalationStuckTurns, 10)
+    const lowConf = parseFloat(escalationLowConfidence)
+    const ct = parseFloat(confidenceThreshold)
+    const mt = parseInt(maxTurns, 10)
+
+    return {
+      name: name.trim(),
+      industry_type: industryType.trim(),
+      offered_trades:
+        industryType === 'field_service'
+          ? (() => {
+              const picks: string[] = []
+              if (offeredHvac) picks.push('hvac')
+              if (offeredPlumbing) picks.push('plumbing')
+              if (offeredElectrical) picks.push('electrical')
+              return picks
+            })()
+          : [],
+      service_types: serviceTypes,
+      required_fields: requiredFields,
+      optional_fields: optionalFields,
+      emergency_keywords: emergencyKeywords,
+      service_areas: serviceAreas,
+      service_area_zips: serviceAreaZips,
+      supported_regions: supportedRegions,
+      payment_methods: paymentMethods,
+      timezone: timezone.trim() || 'UTC',
+      working_hours: workingHours,
+      booking_buffers: {
+        minimum_minutes: Number.isNaN(minM) ? baseline.booking_buffers.minimum_minutes : minM,
+        slot_duration_minutes: Number.isNaN(slotM) ? baseline.booking_buffers.slot_duration_minutes : slotM,
+      },
+      escalation_rules: {
+        stuck_turns: Number.isNaN(stuck) ? baseline.escalation_rules.stuck_turns : stuck,
+        low_confidence: Number.isNaN(lowConf) ? baseline.escalation_rules.low_confidence : lowConf,
+      },
+      crm_type: crmType || 'none',
+      confidence_threshold: Number.isNaN(ct) ? baseline.confidence_threshold : ct,
+      max_turns: Number.isNaN(mt) ? baseline.max_turns : mt,
     }
-    setServiceTypes([...(tenant.service_types || [])])
-    setRequiredFields([...(tenant.required_fields || [])])
-    setOptionalFields([...(tenant.optional_fields || [])])
-    setEmergencyKeywords([...(tenant.emergency_keywords || [])])
-    setServiceAreas([...(tenant.service_areas || [])])
-    setServiceAreaZips([...(tenant.service_area_zips || [])])
-    setSupportedRegions([...(tenant.supported_regions || [])])
-    setPaymentMethods([...(tenant.payment_methods || [])])
-    setTimezone(tenant.timezone || 'UTC')
-    setWorkingHours({ ...(tenant.working_hours || {}) })
-    const bb = tenant.booking_buffers || {}
-    setMinBookingMinutes(String((bb as { minimum_minutes?: number }).minimum_minutes ?? 60))
-    setSlotDurationMinutes(String((bb as { slot_duration_minutes?: number }).slot_duration_minutes ?? 90))
-    const er = tenant.escalation_rules || {}
-    setEscalationStuckTurns(String((er as { stuck_turns?: number }).stuck_turns ?? 3))
-    setEscalationLowConfidence(String((er as { low_confidence?: number }).low_confidence ?? 0.65))
+  }, [
+    name,
+    industryType,
+    offeredHvac,
+    offeredPlumbing,
+    offeredElectrical,
+    serviceTypes,
+    requiredFields,
+    optionalFields,
+    emergencyKeywords,
+    serviceAreas,
+    serviceAreaZips,
+    supportedRegions,
+    paymentMethods,
+    timezone,
+    workingHours,
+    minBookingMinutes,
+    slotDurationMinutes,
+    escalationStuckTurns,
+    escalationLowConfidence,
+    crmType,
+    confidenceThreshold,
+    maxTurns,
+    baseline,
+  ])
 
-    const allowedCrm = new Set(crmSelectOptions.map((o) => o.value))
-    const wantCrm = tenant.crm_type || 'none'
-    setCrmType(allowedCrm.has(wantCrm) ? wantCrm : 'none')
-    setCrmSettings(parseCrmSettings(tenant.crm_settings as Record<string, unknown> | undefined))
+  const isDirty = useMemo(
+    () => JSON.stringify(currentSnapshot) !== JSON.stringify(baseline),
+    [currentSnapshot, baseline],
+  )
 
-    setConfidenceThreshold(String(tenant.confidence_threshold ?? 0.75))
-    setMaxTurns(String(tenant.max_turns ?? 12))
-
-  }, [tenant, crmSelectOptions])
+  useEffect(() => {
+    const snap = snapshotFromTenant(tenant, allowedCrmValues)
+    setName(snap.name)
+    setIndustryType(snap.industry_type)
+    const trades = resolveOfferedTrades(tenant)
+    setOfferedHvac(trades.hvac)
+    setOfferedPlumbing(trades.plumbing)
+    setOfferedElectrical(trades.electrical)
+    setServiceTypes([...snap.service_types])
+    setRequiredFields([...snap.required_fields])
+    setOptionalFields([...snap.optional_fields])
+    setEmergencyKeywords([...snap.emergency_keywords])
+    setServiceAreas([...snap.service_areas])
+    setServiceAreaZips([...snap.service_area_zips])
+    setSupportedRegions([...snap.supported_regions])
+    setPaymentMethods([...snap.payment_methods])
+    setTimezone(snap.timezone)
+    setWorkingHours({ ...snap.working_hours })
+    setMinBookingMinutes(String(snap.booking_buffers.minimum_minutes))
+    setSlotDurationMinutes(String(snap.booking_buffers.slot_duration_minutes))
+    setEscalationStuckTurns(String(snap.escalation_rules.stuck_turns))
+    setEscalationLowConfidence(String(snap.escalation_rules.low_confidence))
+    setCrmType(snap.crm_type)
+    setConfidenceThreshold(String(snap.confidence_threshold))
+    setMaxTurns(String(snap.max_turns))
+  }, [tenant, allowedCrmValues])
 
   // Load the curated IANA list once. The dropdown is the only way to set the
   // tenant timezone — values saved on the tenant are pure IANA strings.
@@ -169,13 +323,6 @@ function TenantConfigTab({
     const mt = parseInt(maxTurns, 10)
     if (Number.isNaN(ct) || ct < 0 || ct > 1) { notifyError('Confidence threshold must be between 0 and 1'); return }
     if (Number.isNaN(mt) || mt < 1) { notifyError('Max turns must be at least 1'); return }
-    if (crmType === 'jobber') {
-      const aw = crmSettings.arrival_window_minutes
-      if (Number.isNaN(aw) || aw < 15 || aw > 480) {
-        notifyError('Arrival window must be between 15 and 480 minutes')
-        return
-      }
-    }
 
     setSaving(true)
     setSaved(false)
@@ -210,12 +357,12 @@ function TenantConfigTab({
         booking_buffers: { minimum_minutes: minM, slot_duration_minutes: slotM },
         escalation_rules: { stuck_turns: stuck, low_confidence: lowConf },
         crm_type: crmType || 'none',
-        crm_settings: crmSettings,
         confidence_threshold: ct,
         max_turns: mt,
       })
       notifySuccess('Settings saved')
       setSaved(true)
+      onSaved()
       setTimeout(() => setSaved(false), 3000)
     } catch (e) {
       notifyError(e instanceof ApiError ? e.message : 'Could not save settings')
@@ -382,24 +529,6 @@ function TenantConfigTab({
               {crmSelectOptions.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
             </Select>
           </Field>
-          {crmType === 'jobber' ? (
-            <JobberCrmSettings
-              value={crmSettings}
-              onChange={setCrmSettings}
-              jobberConnected={
-                crmType === 'jobber' &&
-                Boolean(tenant.crm_credential_ref) &&
-                credentials.some(
-                  (c) =>
-                    c.integration_type === 'jobber' &&
-                    c.exists &&
-                    c.ref === tenant.crm_credential_ref,
-                )
-              }
-              getToken={getToken}
-              serviceTypes={serviceTypes}
-            />
-          ) : null}
         </FieldGroup>
       </section>
 
@@ -423,10 +552,15 @@ function TenantConfigTab({
       </section>
 
       <div className="flex items-center gap-4 pt-4">
-        <Button type="submit" disabled={saving}>
+        <Button type="submit" disabled={saving || !isDirty}>
           {saving ? 'Saving...' : 'Save settings'}
         </Button>
-        {saved && <Text className="text-sm text-green-600 dark:text-green-400">Settings saved successfully</Text>}
+        {isDirty && !saving && (
+          <Text className="text-sm text-amber-600 dark:text-amber-400">Unsaved changes</Text>
+        )}
+        {saved && !isDirty && (
+          <Text className="text-sm text-green-600 dark:text-green-400">Settings saved successfully</Text>
+        )}
       </div>
     </form>
   )
@@ -678,7 +812,7 @@ export default function SettingsPage() {
 
       {/* Tab content */}
       {activeTab === 'tenant' && tenant && credentials && (
-        <TenantConfigTab tenant={tenant} credentials={credentials} />
+        <TenantConfigTab tenant={tenant} credentials={credentials} onSaved={refetch} />
       )}
       {activeTab === 'documents' && <DocumentsTab />}
       {activeTab === 'prompts' && <PromptConfigTab />}

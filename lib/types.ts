@@ -20,7 +20,7 @@ export interface Tenant {
   escalation_rules: Record<string, unknown>
   crm_type: string
   crm_credential_ref: string
-  /** Jobber scheduling: auto-assign, arrival window, technician expertise map. */
+  /** Jobber OAuth health fields (read-only in Settings). */
   crm_settings?: CrmSettings
   prices: Record<string, unknown>
   emergency_surcharge: string
@@ -38,19 +38,11 @@ export interface Tenant {
 }
 
 export interface CrmSettings {
-  auto_assign_technician: boolean
-  arrival_window_minutes: number
-  technician_expertise: Record<string, string[]>
   /** True when Jobber OAuth refresh failed — owner should reconnect. */
   jobber_needs_reconnect?: boolean
   jobber_last_error?: string
   jobber_last_refresh_at?: string
   jobber_last_refresh_ok_at?: string
-}
-
-export interface JobberTechnician {
-  id: string
-  name: string
 }
 
 export interface TimezoneChoice {
