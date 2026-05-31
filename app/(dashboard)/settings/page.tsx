@@ -37,7 +37,11 @@ type TenantFormSnapshot = {
   payment_methods: string[]
   timezone: string
   working_hours: Record<string, unknown>
-  booking_buffers: { minimum_minutes: number; slot_duration_minutes: number }
+  booking_buffers: {
+    minimum_minutes: number
+    slot_duration_minutes: number
+    max_simultaneous_bookings: number
+  }
   escalation_rules: { stuck_turns: number; low_confidence: number }
   crm_type: string
   confidence_threshold: number
@@ -104,6 +108,9 @@ function snapshotFromTenant(
     booking_buffers: {
       minimum_minutes: Number((bb as { minimum_minutes?: number }).minimum_minutes ?? 60),
       slot_duration_minutes: Number((bb as { slot_duration_minutes?: number }).slot_duration_minutes ?? 90),
+      max_simultaneous_bookings: Number(
+        (bb as { max_simultaneous_bookings?: number }).max_simultaneous_bookings ?? 1,
+      ),
     },
     escalation_rules: {
       stuck_turns: Number((er as { stuck_turns?: number }).stuck_turns ?? 3),
@@ -151,6 +158,7 @@ function TenantConfigTab({
   const [workingHours, setWorkingHours] = useState<Record<string, unknown>>({})
   const [minBookingMinutes, setMinBookingMinutes] = useState('60')
   const [slotDurationMinutes, setSlotDurationMinutes] = useState('90')
+  const [maxSimultaneousBookings, setMaxSimultaneousBookings] = useState('1')
   const [escalationStuckTurns, setEscalationStuckTurns] = useState('3')
   const [escalationLowConfidence, setEscalationLowConfidence] = useState('0.65')
 
@@ -186,6 +194,7 @@ function TenantConfigTab({
   const currentSnapshot = useMemo((): TenantFormSnapshot => {
     const minM = parseInt(minBookingMinutes, 10)
     const slotM = parseInt(slotDurationMinutes, 10)
+    const maxSim = parseInt(maxSimultaneousBookings, 10)
     const stuck = parseInt(escalationStuckTurns, 10)
     const lowConf = parseFloat(escalationLowConfidence)
     const ct = parseFloat(confidenceThreshold)
@@ -217,6 +226,9 @@ function TenantConfigTab({
       booking_buffers: {
         minimum_minutes: Number.isNaN(minM) ? baseline.booking_buffers.minimum_minutes : minM,
         slot_duration_minutes: Number.isNaN(slotM) ? baseline.booking_buffers.slot_duration_minutes : slotM,
+        max_simultaneous_bookings: Number.isNaN(maxSim)
+          ? baseline.booking_buffers.max_simultaneous_bookings
+          : maxSim,
       },
       escalation_rules: {
         stuck_turns: Number.isNaN(stuck) ? baseline.escalation_rules.stuck_turns : stuck,
@@ -244,6 +256,7 @@ function TenantConfigTab({
     workingHours,
     minBookingMinutes,
     slotDurationMinutes,
+    maxSimultaneousBookings,
     escalationStuckTurns,
     escalationLowConfidence,
     crmType,
@@ -277,6 +290,7 @@ function TenantConfigTab({
     setWorkingHours({ ...snap.working_hours })
     setMinBookingMinutes(String(snap.booking_buffers.minimum_minutes))
     setSlotDurationMinutes(String(snap.booking_buffers.slot_duration_minutes))
+    setMaxSimultaneousBookings(String(snap.booking_buffers.max_simultaneous_bookings))
     setEscalationStuckTurns(String(snap.escalation_rules.stuck_turns))
     setEscalationLowConfidence(String(snap.escalation_rules.low_confidence))
     setCrmType(snap.crm_type)
@@ -315,9 +329,14 @@ function TenantConfigTab({
     }
     const minM = parseInt(minBookingMinutes, 10)
     const slotM = parseInt(slotDurationMinutes, 10)
+    const maxSim = parseInt(maxSimultaneousBookings, 10)
     const stuck = parseInt(escalationStuckTurns, 10)
     const lowConf = parseFloat(escalationLowConfidence)
-    if (Number.isNaN(minM) || Number.isNaN(slotM)) { notifyError('Booking buffer minutes must be numbers'); return }
+    if (Number.isNaN(minM) || Number.isNaN(slotM) || Number.isNaN(maxSim)) {
+      notifyError('Booking buffer settings must be valid numbers')
+      return
+    }
+    if (maxSim < 1) { notifyError('Max simultaneous bookings must be at least 1'); return }
     if (Number.isNaN(stuck) || Number.isNaN(lowConf)) { notifyError('Escalation rules must be valid numbers'); return }
     const ct = parseFloat(confidenceThreshold)
     const mt = parseInt(maxTurns, 10)
@@ -354,7 +373,11 @@ function TenantConfigTab({
         payment_methods: paymentMethods,
         timezone: timezone.trim() || 'UTC',
         working_hours: workingHours as Record<string, unknown>,
-        booking_buffers: { minimum_minutes: minM, slot_duration_minutes: slotM },
+        booking_buffers: {
+          minimum_minutes: minM,
+          slot_duration_minutes: slotM,
+          max_simultaneous_bookings: maxSim,
+        },
         escalation_rules: { stuck_turns: stuck, low_confidence: lowConf },
         crm_type: crmType || 'none',
         confidence_threshold: ct,
@@ -507,6 +530,19 @@ function TenantConfigTab({
             <Field><Label>Minimum booking lead time (minutes)</Label><Input type="number" min={0} value={minBookingMinutes} onChange={(e) => setMinBookingMinutes(e.target.value)} /></Field>
             <Field><Label>Default slot duration (minutes)</Label><Input type="number" min={15} value={slotDurationMinutes} onChange={(e) => setSlotDurationMinutes(e.target.value)} /></Field>
           </div>
+          <Field>
+            <Label>Max simultaneous bookings</Label>
+            <Description>
+              How many appointments can overlap at the same time (e.g. 3 if you have three technicians).
+              A time stays bookable until this limit is reached.
+            </Description>
+            <Input
+              type="number"
+              min={1}
+              value={maxSimultaneousBookings}
+              onChange={(e) => setMaxSimultaneousBookings(e.target.value)}
+            />
+          </Field>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field><Label>Escalation: stuck turns</Label><Input type="number" min={1} value={escalationStuckTurns} onChange={(e) => setEscalationStuckTurns(e.target.value)} /></Field>
             <Field><Label>Escalation: low confidence threshold</Label><Input type="number" step="0.01" min={0} max={1} value={escalationLowConfidence} onChange={(e) => setEscalationLowConfidence(e.target.value)} /></Field>
