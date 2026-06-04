@@ -204,7 +204,9 @@ function ActivePlanCard({
 
   const overallState = usage.quota_state
   const blocked = overallState === 'blocked'
-  const stressed = blocked || overallState === 'over' || overallState === 'warning'
+  const over = overallState === 'over'
+  const warning = overallState === 'warning'
+  const stressed = blocked || over || warning
 
   const renewalLabel = formatRenewalDate(period_end, tenantTz)
   const renewalLongLabel = formatRenewalLong(period_end, tenantTz)
@@ -223,7 +225,7 @@ function ActivePlanCard({
         </div>
       )}
 
-      {!blocked && overallState === 'over' && (
+      {!blocked && over && (
         <div className="border-b border-amber-200/80 bg-amber-50 px-3.5 py-2 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100">
           You are over quota. Upgrade soon to avoid blocked sends.
         </div>
@@ -298,14 +300,14 @@ function ActivePlanCard({
           href="/plans"
           className={clsx(
             'mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-semibold transition',
-            blocked || overallState === 'over'
+            blocked || over
               ? 'bg-red-600 text-white hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-500'
               : warning
                 ? 'bg-amber-500 text-white hover:bg-amber-600'
                 : 'bg-brand-600 text-white hover:bg-brand-700 dark:bg-brand-600 dark:hover:bg-brand-500',
           )}
         >
-          {blocked || overallState === 'over' ? 'Upgrade plan' : 'Manage plan'}
+          {blocked || over ? 'Upgrade plan' : 'Manage plan'}
           <ArrowUpRightIcon className="size-3.5" />
         </Link>
       </div>
