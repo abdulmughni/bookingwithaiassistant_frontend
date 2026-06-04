@@ -596,7 +596,7 @@ function TenantConfigTab({
           <Text className="text-sm text-amber-600 dark:text-amber-400">Unsaved changes</Text>
         )}
         {saved && !isDirty && (
-          <Text className="text-sm text-green-600 dark:text-green-400">Settings saved successfully</Text>
+          <Text className="text-sm text-brand-600 dark:text-brand-400">Settings saved successfully</Text>
         )}
       </div>
     </form>

@@ -384,7 +384,7 @@ function AccountsPageInner() {
         title="Channel accounts"
         description="Connect WhatsApp, Facebook Messenger, and Instagram so customer messages reach your dashboard."
       >
-        <Button color="emerald" onClick={() => {
+        <Button color="brand" onClick={() => {
             setConnectMode('destination')
             setShowConnect(true)
           }}>

@@ -43,9 +43,9 @@ const COPY: Record<
     busyLabel: 'Saving…',
     color: 'green',
     icon: CheckCircleIcon,
-    iconBg: 'bg-emerald-50 dark:bg-emerald-500/10',
-    iconRing: 'ring-emerald-200 dark:ring-emerald-500/30',
-    iconText: 'text-emerald-600 dark:text-emerald-400',
+    iconBg: 'bg-brand-50 dark:bg-brand-500/10',
+    iconRing: 'ring-brand-200 dark:ring-brand-500/30',
+    iconText: 'text-brand-600 dark:text-brand-400',
     notePlaceholder: 'e.g. Replaced compressor, customer happy.',
   },
   'no-show': {

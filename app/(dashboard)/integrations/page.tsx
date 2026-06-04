@@ -244,7 +244,7 @@ function ConnectProviderRow({
         'group flex w-full items-center gap-4 rounded-2xl border px-4 py-4 text-left transition',
         disabled
           ? 'cursor-default border-zinc-200/80 bg-zinc-50/50 opacity-90 dark:border-zinc-700/60 dark:bg-zinc-800/30'
-          : 'border-zinc-200 bg-white hover:border-lime-300 hover:bg-lime-50/30 hover:shadow-sm dark:border-zinc-700 dark:bg-zinc-900 dark:hover:border-lime-600/40 dark:hover:bg-lime-950/20',
+          : 'border-zinc-200 bg-white hover:border-brand-300 hover:bg-brand-50/40 hover:shadow-sm dark:border-zinc-700 dark:bg-zinc-900 dark:hover:border-brand-600/50 dark:hover:bg-brand-950/30',
         (disabled || loading) && 'pointer-events-none',
       )}
     >
@@ -276,7 +276,7 @@ function ConnectProviderRow({
           {loading ? '…' : badge}
         </Badge>
         {!disabled && !loading ? (
-          <ChevronRightIcon className="size-5 text-zinc-300 transition group-hover:text-lime-600 dark:text-zinc-600 dark:group-hover:text-lime-400" />
+          <ChevronRightIcon className="size-5 text-zinc-300 transition group-hover:text-brand-600 dark:text-zinc-600 dark:group-hover:text-brand-400" />
         ) : null}
       </div>
     </button>
@@ -361,7 +361,7 @@ function IntegrationsPageInner() {
         title="Integrations"
         description="Connect your field-service CRM so AI bookings land on your live schedule."
       >
-        <Button color="emerald" onClick={() => setShowConnect(true)}>
+        <Button color="brand" onClick={() => setShowConnect(true)}>
           Connect
         </Button>
       </PageHeader>

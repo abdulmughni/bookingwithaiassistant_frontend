@@ -587,9 +587,9 @@ export default function CallsPage() {
                   </div>
 
                   {detail.recording_url && (
-                    <section className="overflow-hidden rounded-2xl border border-emerald-200/70 bg-linear-to-br from-emerald-50/90 via-white to-teal-50/40 shadow-sm dark:border-emerald-900/35 dark:from-emerald-950/40 dark:via-zinc-900 dark:to-teal-950/25">
-                      <div className="flex items-center gap-2 border-b border-emerald-200/50 px-4 py-3 dark:border-emerald-900/40">
-                        <div className="flex size-9 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300">
+                    <section className="overflow-hidden rounded-2xl border border-brand-200/70 bg-linear-to-br from-brand-50/90 via-white to-teal-50/40 shadow-sm dark:border-brand-900/35 dark:from-brand-950/40 dark:via-zinc-900 dark:to-teal-950/25">
+                      <div className="flex items-center gap-2 border-b border-brand-200/50 px-4 py-3 dark:border-brand-900/40">
+                        <div className="flex size-9 items-center justify-center rounded-lg bg-brand-500/15 text-brand-700 dark:bg-brand-500/20 dark:text-brand-300">
                           <SpeakerWaveIcon className="size-5" />
                         </div>
                         <div>
@@ -603,7 +603,7 @@ export default function CallsPage() {
                         <audio
                           controls
                           src={detail.recording_url}
-                          className="h-11 w-full accent-emerald-600 dark:accent-emerald-500"
+                          className="h-11 w-full accent-brand-600 dark:accent-brand-500"
                           preload="none"
                         />
                       </div>
@@ -956,7 +956,7 @@ function CallGridCard({
                 {formatCost(call.cost)}
               </span>
               {call.has_recording && (
-                <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                <span className="inline-flex items-center gap-1 text-brand-600 dark:text-brand-400">
                   <SpeakerWaveIcon className="size-3.5" />
                   Recording
                 </span>
@@ -1059,7 +1059,7 @@ function CallListRow({
               {formatCost(call.cost)}
             </span>
             {call.has_recording && (
-              <span className="inline-flex text-emerald-600 dark:text-emerald-400" aria-label="Has recording">
+              <span className="inline-flex text-brand-600 dark:text-brand-400" aria-label="Has recording">
                 <SpeakerWaveIcon className="size-4" />
               </span>
             )}

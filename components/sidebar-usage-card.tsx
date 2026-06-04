@@ -121,20 +121,20 @@ function NoPlanCard() {
     <Link
       href="/plans"
       className={clsx(
-        'group mx-1 mb-1 block rounded-xl border border-dashed border-indigo-300 bg-indigo-50/60 p-3',
-        'transition hover:border-indigo-400 hover:bg-indigo-50',
-        'dark:border-indigo-700/60 dark:bg-indigo-500/10 dark:hover:bg-indigo-500/15',
+        'group mx-1 mb-1 block rounded-xl border border-dashed border-brand-300 bg-brand-50/60 p-3',
+        'transition hover:border-brand-400 hover:bg-brand-50',
+        'dark:border-brand-700/60 dark:bg-brand-500/10 dark:hover:bg-brand-500/15',
       )}
     >
       <div className="flex items-center gap-2">
-        <span className="flex size-7 items-center justify-center rounded-lg bg-indigo-600 text-white shadow-sm">
+        <span className="flex size-7 items-center justify-center rounded-lg bg-brand-600 text-white shadow-sm">
           <SparklesIcon className="size-4" />
         </span>
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-indigo-900 dark:text-indigo-200">
+          <p className="text-sm font-semibold text-brand-900 dark:text-brand-200">
             Choose a plan
           </p>
-          <p className="truncate text-xs text-indigo-700/80 dark:text-indigo-300/80">
+          <p className="truncate text-xs text-brand-700/80 dark:text-brand-300/80">
             Unlock messaging and voice quotas
           </p>
         </div>
@@ -260,7 +260,7 @@ function ActivePlanCard({
               ? 'text-red-700 hover:text-red-800 dark:text-red-300 dark:hover:text-red-200'
               : warning
                 ? 'text-amber-700 hover:text-amber-800 dark:text-amber-300 dark:hover:text-amber-200'
-                : 'text-indigo-700 hover:text-indigo-800 dark:text-indigo-300 dark:hover:text-indigo-200',
+                : 'text-brand-700 hover:text-brand-800 dark:text-brand-300 dark:hover:text-brand-200',
           )}
         >
           {blocked || over ? 'Upgrade plan' : 'Manage plan'}
@@ -332,6 +332,6 @@ function barColor(state: QuotaState): string {
       return 'bg-zinc-400'
     case 'ok':
     default:
-      return 'bg-indigo-500'
+      return 'bg-brand-500'
   }
 }

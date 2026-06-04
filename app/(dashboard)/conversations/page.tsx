@@ -719,7 +719,7 @@ export default function ConversationsPage() {
                 className={clsx(
                   'inline-flex shrink-0 items-center gap-1.5 rounded-t-lg px-4 py-2.5 text-sm font-semibold transition-colors',
                   active
-                    ? 'border-b-2 border-emerald-600 bg-emerald-50 text-emerald-800 dark:border-emerald-500 dark:bg-emerald-950/50 dark:text-emerald-200'
+                    ? 'border-b-2 border-brand-600 bg-brand-50 text-brand-800 dark:border-brand-500 dark:bg-brand-950/50 dark:text-brand-200'
                     : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800',
                 )}
               >
@@ -746,7 +746,7 @@ export default function ConversationsPage() {
                   placeholder="Search conversations"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  className="w-full rounded-full border border-zinc-200 bg-zinc-50 py-2 pl-10 pr-3 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/25 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white"
+                  className="w-full rounded-full border border-zinc-200 bg-zinc-50 py-2 pl-10 pr-3 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/25 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white"
                 />
               </div>
               <button
@@ -883,7 +883,7 @@ export default function ConversationsPage() {
                       {selected.status === 'active' && (
                         <>
                           {' '}
-                          · <span className="text-emerald-600 dark:text-emerald-400">Active</span>
+                          · <span className="text-brand-600 dark:text-brand-400">Active</span>
                         </>
                       )}
                     </p>

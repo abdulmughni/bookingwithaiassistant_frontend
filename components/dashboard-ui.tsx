@@ -99,7 +99,7 @@ export function settingsTabClass(active: boolean): string {
   return clsx(
     'whitespace-nowrap border-b-2 pb-3 text-sm font-medium transition-colors',
     active
-      ? 'border-emerald-600 text-emerald-700 dark:border-emerald-500 dark:text-emerald-400'
+      ? 'border-brand-600 text-brand-700 dark:border-brand-500 dark:text-brand-400'
       : 'border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700 dark:text-zinc-400 dark:hover:border-zinc-600 dark:hover:text-zinc-300',
   )
 }

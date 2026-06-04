@@ -1,5 +1,6 @@
 'use client'
 
+import clsx from 'clsx'
 import { usePathname } from 'next/navigation'
 import { useUser, useClerk, UserButton } from '@clerk/nextjs'
 import { SidebarLayout } from '@/components/sidebar-layout'
@@ -25,7 +26,7 @@ import {
 } from '@/components/organization-gate'
 import { SidebarUsageCard } from '@/components/sidebar-usage-card'
 import { JobberReconnectBanner } from '@/components/jobber-reconnect-banner'
-import { APP_BRAND_NAME } from '@/lib/brand'
+import { APP_BRAND_NAME, brandLogoClass } from '@/lib/brand'
 
 export default function DashboardLayout({
   children,
@@ -56,7 +57,12 @@ export default function DashboardLayout({
             <SidebarSection>
               <SidebarItem href="/">
                 <span className="flex items-center gap-2">
-                  <span className="flex size-7 items-center justify-center rounded-lg bg-linear-to-br from-emerald-600 to-green-600 text-xs font-bold text-white shadow-sm shadow-emerald-500/25">
+                  <span
+                    className={clsx(
+                      'flex size-7 items-center justify-center rounded-lg text-xs font-bold',
+                      brandLogoClass,
+                    )}
+                  >
                     B
                   </span>
                   <SidebarLabel className="text-sm font-semibold">

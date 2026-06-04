@@ -10,6 +10,17 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  /* Beyonds Logic brand blue (BL logo) */
+  --color-brand-50: #eef2ff;
+  --color-brand-100: #dbe4ff;
+  --color-brand-200: #b8c9ff;
+  --color-brand-400: #5c7aff;
+  --color-brand-500: #3b59ff;
+  --color-brand-600: #2b44ff;
+  --color-brand-700: #2438e6;
+  --color-brand-800: #1e2eb8;
+  --color-brand-900: #182594;
+  --color-brand-950: #0f1847;
 }
 
 @media (prefers-color-scheme: dark) {

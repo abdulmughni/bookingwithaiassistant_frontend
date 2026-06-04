@@ -82,7 +82,7 @@ function KpiCard({
       className={clsx(
         'relative overflow-hidden rounded-2xl border p-5 transition',
         highlight
-          ? 'border-transparent bg-linear-to-br from-emerald-500 to-green-600 text-white shadow-lg shadow-emerald-500/20'
+          ? 'border-transparent bg-linear-to-br from-brand-500 to-brand-700 text-white shadow-lg shadow-brand-500/20'
           : 'border-zinc-200/80 bg-white shadow-sm hover:border-zinc-300 hover:shadow-md dark:border-zinc-700/80 dark:bg-zinc-900/80',
       )}
     >
@@ -90,7 +90,7 @@ function KpiCard({
         <p
           className={clsx(
             'text-sm font-medium',
-            highlight ? 'text-emerald-50' : 'text-zinc-500 dark:text-zinc-400',
+            highlight ? 'text-brand-50' : 'text-zinc-500 dark:text-zinc-400',
           )}
         >
           {label}
@@ -118,7 +118,7 @@ function KpiCard({
         <p
           className={clsx(
             'mt-1 text-xs font-medium',
-            highlight ? 'text-emerald-50/90' : 'text-zinc-400 dark:text-zinc-500',
+            highlight ? 'text-brand-50/90' : 'text-zinc-400 dark:text-zinc-500',
           )}
         >
           {hint}
@@ -155,7 +155,7 @@ function WeeklyBarChart({
               New bookings · last 7 days
             </p>
           </div>
-          <Badge color="emerald" className="text-xs">
+          <Badge color="blue" className="text-xs">
             {total} total
           </Badge>
         </div>
@@ -174,8 +174,8 @@ function WeeklyBarChart({
                       className={clsx(
                         'relative w-full max-w-11 rounded-lg transition-all duration-500',
                         d.isToday
-                          ? 'bg-linear-to-t from-emerald-600 to-emerald-400'
-                          : 'bg-emerald-500/80 dark:bg-emerald-500/60',
+                          ? 'bg-linear-to-t from-brand-600 to-brand-400'
+                          : 'bg-brand-500/80 dark:bg-brand-500/60',
                       )}
                       style={{ height: `${Math.max(pct, d.count > 0 ? 8 : 3)}%` }}
                       title={`${d.count} booking${d.count === 1 ? '' : 's'}`}
@@ -191,7 +191,7 @@ function WeeklyBarChart({
                     className={clsx(
                       'text-xs font-medium',
                       d.isToday
-                        ? 'text-emerald-600 dark:text-emerald-400'
+                        ? 'text-brand-600 dark:text-brand-400'
                         : 'text-zinc-400 dark:text-zinc-500',
                     )}
                   >
@@ -258,8 +258,8 @@ function CompletionGauge({
                 />
                 <defs>
                   <linearGradient id="gaugeGradient" x1="0" y1="0" x2="1" y2="0">
-                    <stop offset="0%" stopColor="#34d399" />
-                    <stop offset="100%" stopColor="#059669" />
+                    <stop offset="0%" stopColor="#5c7aff" />
+                    <stop offset="100%" stopColor="#2b44ff" />
                   </linearGradient>
                 </defs>
               </svg>
@@ -272,7 +272,7 @@ function CompletionGauge({
             </div>
 
             <div className="mt-auto space-y-2 pt-4">
-              <GaugeLegend color="bg-emerald-500" label="Completed" value={completed} />
+              <GaugeLegend color="bg-brand-500" label="Completed" value={completed} />
               <GaugeLegend
                 color="bg-sky-400"
                 label="Upcoming"
@@ -323,7 +323,7 @@ function initials(name: string): string {
 }
 
 const AVATAR_TINTS = [
-  'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
+  'bg-brand-500/15 text-brand-700 dark:text-brand-300',
   'bg-sky-500/15 text-sky-700 dark:text-sky-300',
   'bg-violet-500/15 text-violet-700 dark:text-violet-300',
   'bg-amber-500/15 text-amber-700 dark:text-amber-300',
@@ -504,7 +504,7 @@ export default function DashboardPage() {
         <Button href="/conversations" outline>
           Conversations
         </Button>
-        <Button href="/bookings" color="emerald">
+        <Button href="/bookings" color="brand">
           View bookings
         </Button>
       </PageHeader>

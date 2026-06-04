@@ -34,11 +34,11 @@ const SECTION_THEME: Record<
   { ring: string; bg: string; iconWrap: string; bar: string; label: string }
 > = {
   pricing: {
-    ring: 'ring-emerald-500/20 dark:ring-emerald-400/25',
-    bg: 'from-emerald-50/90 to-white dark:from-emerald-950/40 dark:to-zinc-900',
-    iconWrap: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300',
-    bar: 'from-emerald-400 to-teal-500',
-    label: 'text-emerald-800 dark:text-emerald-200',
+    ring: 'ring-brand-500/20 dark:ring-brand-400/25',
+    bg: 'from-brand-50/90 to-white dark:from-brand-950/40 dark:to-zinc-900',
+    iconWrap: 'bg-brand-100 text-brand-700 dark:bg-brand-900/50 dark:text-brand-300',
+    bar: 'from-brand-400 to-brand-600',
+    label: 'text-brand-800 dark:text-brand-200',
   },
   policy_warranty: {
     ring: 'ring-sky-500/20 dark:ring-sky-400/25',
@@ -345,13 +345,13 @@ export function DocumentsTab() {
       <div
         className={`flex flex-col gap-3 rounded-2xl border px-5 py-4 sm:flex-row sm:items-center sm:justify-between ${
           status.rag_configured
-            ? 'border-emerald-200/80 bg-gradient-to-r from-emerald-50/80 to-teal-50/50 dark:border-emerald-900/40 dark:from-emerald-950/30 dark:to-teal-950/20'
+            ? 'border-brand-200/80 bg-gradient-to-r from-brand-50/80 to-brand-100/50 dark:border-brand-900/40 dark:from-brand-950/30 dark:to-brand-950/20'
             : 'border-amber-200 bg-amber-50/80 dark:border-amber-900/40 dark:bg-amber-950/25'
         }`}
       >
         <div className="flex items-center gap-3">
           {status.rag_configured ? (
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-500 text-white shadow-sm shadow-emerald-500/30">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-500 text-white shadow-sm shadow-brand-500/30">
               <SparklesIcon className="h-6 w-6" />
             </div>
           ) : (
@@ -439,21 +439,21 @@ export function DocumentsTab() {
                 )}
 
                 {st.phase === 'success' && st.successChunks != null && (
-                  <div className="mt-5 overflow-hidden rounded-xl border border-emerald-200/90 bg-gradient-to-br from-emerald-50 to-teal-50/80 shadow-sm dark:border-emerald-900/50 dark:from-emerald-950/50 dark:to-teal-950/30">
+                  <div className="mt-5 overflow-hidden rounded-xl border border-brand-200/90 bg-gradient-to-br from-brand-50 to-brand-100/80 shadow-sm dark:border-brand-900/50 dark:from-brand-950/50 dark:to-brand-950/30">
                     <div className="px-4 pt-3">
-                      <div className="mb-2 flex items-center justify-between text-xs font-semibold text-emerald-800 dark:text-emerald-200">
+                      <div className="mb-2 flex items-center justify-between text-xs font-semibold text-brand-800 dark:text-brand-200">
                         <span>Synced to Pinecone</span>
                         <span>100%</span>
                       </div>
                       <SectionProgressBar phase="success" progress={100} barClass={theme.bar} />
                     </div>
                     <div className="flex items-start gap-3 p-4 pt-3">
-                      <CheckCircleSolid className="h-9 w-9 shrink-0 text-emerald-500" />
+                      <CheckCircleSolid className="h-9 w-9 shrink-0 text-brand-500" />
                       <div className="min-w-0 flex-1">
-                        <p className="font-semibold text-emerald-950 dark:text-emerald-50">
+                        <p className="font-semibold text-brand-950 dark:text-brand-50">
                           This section is live in your vector index
                         </p>
-                        <p className="mt-1 text-sm text-emerald-900/90 dark:text-emerald-100/90">
+                        <p className="mt-1 text-sm text-brand-900/90 dark:text-brand-100/90">
                           <span className="font-medium">{st.successTitle}</span>
                           {st.successFilename ? (
                             <>
@@ -462,14 +462,14 @@ export function DocumentsTab() {
                             </>
                           ) : null}
                         </p>
-                        <p className="mt-2 text-xs leading-relaxed text-emerald-800 dark:text-emerald-200/90">
+                        <p className="mt-2 text-xs leading-relaxed text-brand-800 dark:text-brand-200/90">
                           {st.successChunks} chunk{st.successChunks === 1 ? '' : 's'} indexed — your assistant can
                           search this content in the next customer chat.
                         </p>
                         <button
                           type="button"
                           onClick={() => dismissSuccess(dt.id)}
-                          className="mt-3 text-xs font-medium text-emerald-800 underline decoration-emerald-500/50 underline-offset-2 hover:text-emerald-950 dark:text-emerald-300 dark:hover:text-white"
+                          className="mt-3 text-xs font-medium text-brand-800 underline decoration-brand-500/50 underline-offset-2 hover:text-brand-950 dark:text-brand-300 dark:hover:text-white"
                         >
                           Dismiss
                         </button>
@@ -518,7 +518,7 @@ export function DocumentsTab() {
                         className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-4 py-8 transition-colors ${
                           status.rag_configured && st.phase !== 'uploading'
                             ? dragOverId === dt.id
-                              ? 'border-emerald-400 bg-emerald-50/80 dark:border-emerald-500/50 dark:bg-emerald-950/30'
+                              ? 'border-brand-400 bg-brand-50/80 dark:border-brand-500/50 dark:bg-brand-950/30'
                               : 'border-zinc-300 bg-white/50 hover:border-zinc-400 hover:bg-white/80 dark:border-zinc-600 dark:bg-zinc-950/30 dark:hover:border-zinc-500'
                             : 'cursor-not-allowed border-zinc-200 bg-zinc-50/50 opacity-60 dark:border-zinc-800 dark:bg-zinc-900/50'
                         }`}
@@ -601,7 +601,7 @@ export function DocumentsTab() {
                               <div className="min-w-0">
                                 <div className="flex flex-wrap items-center gap-2">
                                   <p className="font-medium text-zinc-900 dark:text-white">{doc.title}</p>
-                                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200">
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-brand-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-800 dark:bg-brand-900/40 dark:text-brand-200">
                                     <CheckCircleIcon className="h-3 w-3" />
                                     In Pinecone
                                   </span>

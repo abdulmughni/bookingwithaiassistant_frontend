@@ -72,7 +72,7 @@ function ScheduleBadge({ state }: { state: SchedulingState }) {
   }
   if (state === 'upcoming') {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-500/30">
+      <span className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-700 ring-1 ring-brand-200 dark:bg-brand-500/10 dark:text-brand-400 dark:ring-brand-500/30">
         Upcoming
       </span>
     )
@@ -322,7 +322,7 @@ export function ConversationBookingsDrawer({
                 <SummaryTile
                   label="Upcoming"
                   value={upcoming.length}
-                  tone="emerald"
+                  tone="brand"
                 />
               </div>
               <BookingsGroup
@@ -380,13 +380,13 @@ function SummaryTile({
 }: {
   label: string
   value: number
-  tone: 'red' | 'amber' | 'emerald'
+  tone: 'red' | 'amber' | 'brand'
 }) {
   const tones: Record<typeof tone, string> = {
     red: 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300',
     amber: 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300',
-    emerald:
-      'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300',
+    brand:
+      'bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-300',
   }
   return (
     <div className={`rounded-lg px-3 py-2 ${tones[tone]}`}>

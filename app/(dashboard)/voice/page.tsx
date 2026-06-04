@@ -654,15 +654,15 @@ export default function VoicePage() {
           sync, phone, webhook secret state). Replaces the older
           three-card status strip, so the eye lands on a single coherent
           surface instead of a row of disconnected boxes. */}
-      <Card className="relative overflow-hidden border-zinc-200/80 bg-linear-to-br from-emerald-50 via-white to-green-50/60 dark:border-zinc-700/80 dark:from-emerald-950/30 dark:via-zinc-900 dark:to-green-950/20">
+      <Card className="relative overflow-hidden border-zinc-200/80 bg-linear-to-br from-brand-50 via-white to-brand-50/60 dark:border-zinc-700/80 dark:from-brand-950/30 dark:via-zinc-900 dark:to-brand-950/20">
         <div
           aria-hidden
-          className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-emerald-200/40 blur-3xl dark:bg-emerald-500/10"
+          className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-brand-200/40 blur-3xl dark:bg-brand-500/10"
         />
         <CardBody className="relative">
           <div className="flex flex-wrap items-start justify-between gap-6">
             <div className="flex min-w-0 items-start gap-4">
-              <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-linear-to-br from-emerald-600 to-green-600 text-white shadow-lg shadow-emerald-500/25 ring-1 ring-white/40">
+              <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-linear-to-br from-brand-600 to-brand-600 text-white shadow-lg shadow-brand-500/25 ring-1 ring-white/40">
                 <MicrophoneIcon className="size-6" />
               </div>
               <div className="min-w-0">
@@ -739,8 +739,8 @@ export default function VoicePage() {
               }
             />
             <HeroStat
-              icon={<PhoneIcon className="size-5 text-emerald-600 dark:text-emerald-400" />}
-              accent="emerald"
+              icon={<PhoneIcon className="size-5 text-brand-600 dark:text-brand-400" />}
+              accent="brand"
               label="Phone number"
               value={
                 config.phone_number_id ? (
@@ -761,7 +761,7 @@ export default function VoicePage() {
               label="Webhook secret"
               value={
                 config.has_webhook_secret ? (
-                  <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                  <span className="inline-flex items-center gap-1 text-xs font-medium text-brand-700 dark:text-brand-400">
                     <CheckCircleIcon className="size-4" />
                     Configured
                   </span>
@@ -949,7 +949,7 @@ export default function VoicePage() {
 
                   <PanelSection
                     icon={<CpuChipIcon className="size-5" />}
-                    accent="emerald"
+                    accent="brand"
                     title="Reasoning model"
                     subtitle="Which LLM powers the conversation, and when to hang up."
                   >
@@ -1216,7 +1216,7 @@ export default function VoicePage() {
 
                   <PanelSection
                     icon={<LanguageIcon className="size-5" />}
-                    accent="emerald"
+                    accent="brand"
                     title="Output formatting"
                     subtitle="How Deepgram cleans up the transcribed text before the LLM sees it."
                   >
@@ -1297,7 +1297,7 @@ export default function VoicePage() {
 
                   <PanelSection
                     icon={<ShieldCheckIcon className="size-5" />}
-                    accent="emerald"
+                    accent="brand"
                     title="Audio quality"
                     subtitle="Filter background noise and tune end-of-utterance detection."
                   >
@@ -1614,7 +1614,7 @@ export default function VoicePage() {
           <CardBody>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="flex items-start gap-3">
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 ring-1 ring-emerald-500/20 dark:text-emerald-400">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-500/10 text-brand-600 ring-1 ring-brand-500/20 dark:text-brand-400">
                   <PhoneIcon className="size-5" />
                 </div>
                 <div className="min-w-0">
@@ -1728,10 +1728,10 @@ function StatusPill({
 }) {
   const tone: Record<typeof color, { ring: string; dot: string; text: string; bg: string }> = {
     lime: {
-      ring: 'ring-emerald-500/30',
-      dot: 'bg-emerald-500',
-      text: 'text-emerald-700 dark:text-emerald-300',
-      bg: 'bg-emerald-50 dark:bg-emerald-950/40',
+      ring: 'ring-brand-500/30',
+      dot: 'bg-brand-500',
+      text: 'text-brand-700 dark:text-brand-300',
+      bg: 'bg-brand-50 dark:bg-brand-950/40',
     },
     amber: {
       ring: 'ring-amber-500/30',
@@ -1764,7 +1764,7 @@ function StatusPill({
     >
       <span className="relative flex size-2">
         {color === 'lime' && (
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand-400 opacity-60" />
         )}
         <span className={clsx('relative inline-flex size-2 rounded-full', t.dot)} />
       </span>
@@ -1779,7 +1779,7 @@ function StatusPill({
 
 const HERO_STAT_ACCENTS = {
   sky: 'bg-sky-500/10 ring-sky-500/20',
-  emerald: 'bg-emerald-500/10 ring-emerald-500/20',
+  brand: 'bg-brand-500/10 ring-brand-500/20',
   violet: 'bg-violet-500/10 ring-violet-500/20',
 } as const
 
@@ -1842,7 +1842,7 @@ function CopyButton({ text }: { text: string }) {
     >
       {copied ? (
         <>
-          <CheckIcon className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+          <CheckIcon className="size-3.5 text-brand-600 dark:text-brand-400" />
           Copied
         </>
       ) : (
@@ -1878,10 +1878,10 @@ const PANEL_ACCENTS: Record<
     iconText: 'text-violet-600 dark:text-violet-400',
     iconRing: 'ring-violet-500/20',
   },
-  emerald: {
-    iconBg: 'bg-emerald-500/10',
-    iconText: 'text-emerald-600 dark:text-emerald-400',
-    iconRing: 'ring-emerald-500/20',
+  brand: {
+    iconBg: 'bg-brand-500/10',
+    iconText: 'text-brand-600 dark:text-brand-400',
+    iconRing: 'ring-brand-500/20',
   },
   rose: {
     iconBg: 'bg-rose-500/10',
@@ -1967,7 +1967,7 @@ function SwitchTile({
       className={clsx(
         'flex items-start gap-3 rounded-xl border p-4 transition-colors',
         checked
-          ? 'border-emerald-300 bg-emerald-50/50 dark:border-emerald-800/60 dark:bg-emerald-950/20'
+          ? 'border-brand-300 bg-brand-50/50 dark:border-brand-800/60 dark:bg-brand-950/20'
           : 'border-zinc-200 bg-zinc-50/40 dark:border-zinc-800 dark:bg-zinc-900/40',
       )}
     >

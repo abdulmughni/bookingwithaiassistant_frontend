@@ -126,12 +126,12 @@ function PlanCard({
       className={clsx(
         'relative flex flex-col rounded-2xl border bg-white p-6 shadow-sm transition dark:bg-zinc-900',
         featured
-          ? 'border-emerald-400 ring-1 ring-emerald-200/80 md:scale-[1.03] dark:border-emerald-600 dark:ring-emerald-900/60'
+          ? 'border-brand-400 ring-1 ring-brand-200/80 md:scale-[1.03] dark:border-brand-600 dark:ring-brand-900/60'
           : 'border-zinc-200/80 dark:border-zinc-700/80',
       )}
     >
       {featured && (
-        <div className="absolute -top-3 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full bg-emerald-600 px-3 py-1 text-xs font-semibold text-white shadow">
+        <div className="absolute -top-3 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full bg-brand-600 px-3 py-1 text-xs font-semibold text-white shadow">
           <StarIcon className="size-3.5" />
           Most popular
         </div>
@@ -140,7 +140,7 @@ function PlanCard({
       <div className="flex items-baseline justify-between">
         <Subheading className="mt-0!">{plan.name}</Subheading>
         {current && (
-          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+          <span className="rounded-full bg-brand-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-brand-700 dark:bg-brand-500/15 dark:text-brand-300">
             Current
           </span>
         )}
@@ -177,7 +177,7 @@ function PlanCard({
       <ul className="mt-5 space-y-2 text-sm text-zinc-700 dark:text-zinc-300">
         {plan.features.map((feature) => (
           <li key={feature} className="flex items-start gap-2">
-            <CheckIcon className="mt-0.5 size-4 shrink-0 text-emerald-500" />
+            <CheckIcon className="mt-0.5 size-4 shrink-0 text-brand-500" />
             <span>{feature}</span>
           </li>
         ))}
@@ -197,7 +197,7 @@ function PlanCard({
         </Button>
       ) : (
         <Button
-          color={featured ? 'emerald' : 'dark/zinc'}
+          color={featured ? 'brand' : 'dark/zinc'}
           disabled={busy || disabled || subscriptionLoading}
           onClick={onSelect}
           className="w-full"
@@ -219,7 +219,7 @@ function PlanCardSkeleton({ featured = false }: { featured?: boolean }) {
       className={clsx(
         'h-105 animate-pulse rounded-2xl border bg-white p-6 dark:bg-zinc-900',
         featured
-          ? 'border-emerald-200 dark:border-emerald-800/60'
+          ? 'border-brand-200 dark:border-brand-800/60'
           : 'border-zinc-200 dark:border-zinc-800',
       )}
     >
