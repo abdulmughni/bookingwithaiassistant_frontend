@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import clsx from 'clsx'
+import { ChevronRightIcon } from '@heroicons/react/20/solid'
 import { Heading } from '@/components/heading'
 import { Button } from '@/components/button'
 import { Badge } from '@/components/badge'
@@ -35,17 +36,53 @@ function integrationLabel(type: string): string {
   }
 }
 
-function integrationAccent(type: string): string {
+function integrationSummary(type: string): string {
   switch (type) {
     case 'jobber':
-      return 'border-l-lime-500'
+      return 'Syncs AI bookings to your Jobber schedule.'
     case 'hubspot':
-      return 'border-l-orange-500'
+      return 'CRM sync for contacts and deals.'
     case 'vapi':
-      return 'border-l-violet-500'
+      return 'Voice assistant API credentials.'
     default:
-      return 'border-l-zinc-400'
+      return 'Connected credentials for this workspace.'
   }
+}
+
+function IntegrationAvatar({ type }: { type: string }) {
+  const styles: Record<string, string> = {
+    jobber: 'bg-lime-500/15 text-lime-700 ring-lime-500/20 dark:text-lime-300',
+    hubspot: 'bg-orange-500/15 text-orange-700 ring-orange-500/20 dark:text-orange-300',
+    vapi: 'bg-violet-500/15 text-violet-700 ring-violet-500/20 dark:text-violet-300',
+  }
+  const letter = type === 'jobber' ? 'J' : type === 'hubspot' ? 'H' : type === 'vapi' ? 'V' : '?'
+  return (
+    <span
+      className={clsx(
+        'flex size-11 shrink-0 items-center justify-center rounded-xl text-sm font-bold ring-1',
+        styles[type] ?? 'bg-zinc-500/10 text-zinc-600 ring-zinc-500/15 dark:text-zinc-300',
+      )}
+    >
+      {letter}
+    </span>
+  )
+}
+
+function integrationStatus(
+  cred: Credential,
+  tenant: Tenant | null,
+): { label: string; color: 'lime' | 'amber' | 'red' | 'zinc' } {
+  const jobberLinked =
+    cred.integration_type === 'jobber' &&
+    tenant?.crm_type === 'jobber' &&
+    tenant?.crm_credential_ref === cred.ref
+  const jobberNeedsReconnect =
+    jobberLinked && Boolean(tenant?.crm_settings?.jobber_needs_reconnect)
+
+  if (!cred.exists) return { label: 'Not configured', color: 'red' }
+  if (jobberNeedsReconnect) return { label: 'Reconnect required', color: 'amber' }
+  if (jobberLinked || cred.exists) return { label: 'Connected', color: 'lime' }
+  return { label: 'Connected', color: 'lime' }
 }
 
 function IntegrationCard({
@@ -57,101 +94,123 @@ function IntegrationCard({
   tenant: Tenant | null
   onRemove: () => void
 }) {
-  const jobberLinked =
+  const status = integrationStatus(cred, tenant)
+  const jobberNeedsReconnect =
     cred.integration_type === 'jobber' &&
     tenant?.crm_type === 'jobber' &&
-    tenant?.crm_credential_ref === cred.ref
-  const jobberNeedsReconnect =
-    jobberLinked && Boolean(tenant?.crm_settings?.jobber_needs_reconnect)
+    tenant?.crm_credential_ref === cred.ref &&
+    Boolean(tenant?.crm_settings?.jobber_needs_reconnect)
 
   return (
-    <Card
-      className={clsx(
-        'flex flex-col border border-zinc-200 border-l-4 bg-white/95 pl-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg dark:border-zinc-700 dark:bg-zinc-900/90 dark:hover:border-zinc-600 sm:pl-5',
-        integrationAccent(cred.integration_type),
-      )}
-    >
-      <CardBody className="flex flex-1 flex-col">
-        <div className="flex flex-wrap items-start justify-between gap-3">
+    <Card className="overflow-hidden border-zinc-200/80 bg-white shadow-sm transition hover:border-zinc-300 hover:shadow-md dark:border-zinc-700/80 dark:bg-zinc-900/80 dark:hover:border-zinc-600">
+      <CardBody className="p-0">
+        <div className="flex items-start gap-4 p-5 sm:p-6">
+          <IntegrationAvatar type={cred.integration_type} />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge
-                color={
-                  cred.integration_type === 'jobber'
-                    ? 'lime'
-                    : cred.integration_type === 'hubspot'
-                      ? 'orange'
-                      : 'violet'
-                }
-                className="capitalize"
-              >
+              <h3 className="text-base font-semibold text-zinc-950 dark:text-white">
                 {integrationLabel(cred.integration_type)}
+              </h3>
+              <Badge color={status.color} className="text-[10px]">
+                {status.label}
               </Badge>
-              <Badge color={cred.exists ? 'lime' : 'red'}>{cred.exists ? 'Credentials' : 'Missing'}</Badge>
-              {jobberLinked && (
-                <Badge color="lime" className="text-[10px]">
-                  Workspace linked
-                </Badge>
-              )}
-              {jobberNeedsReconnect && (
-                <Badge color="amber" className="text-[10px]">
-                  Reconnect required
-                </Badge>
-              )}
             </div>
-            <h3 className="mt-3 text-base font-semibold tracking-tight text-zinc-950 dark:text-white">
-              {integrationLabel(cred.integration_type)}
-            </h3>
+            <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+              {integrationSummary(cred.integration_type)}
+            </p>
+            <p className="mt-2 text-xs text-zinc-400 dark:text-zinc-500">
+              Updated {formatDate(cred.updated_at)}
+            </p>
           </div>
-          <span className="text-[11px] text-zinc-400 dark:text-zinc-500">
-            Updated {formatDate(cred.updated_at)}
-          </span>
         </div>
 
         {jobberNeedsReconnect ? (
-          <p className="mt-3 rounded-lg border border-amber-300/70 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-950 dark:border-amber-500/40 dark:bg-amber-950/30 dark:text-amber-50">
-            Live calendar sync is paused. Click <strong>Connect Jobber</strong> below to
-            reconnect — customers cannot get accurate availability until this is fixed.
+          <div className="border-t border-amber-200/80 bg-amber-50/90 px-5 py-3 text-sm text-amber-950 dark:border-amber-500/30 dark:bg-amber-950/25 dark:text-amber-100 sm:px-6">
+            Calendar sync is paused. Use <strong>Connect Jobber</strong> to sign in again.
             {tenant?.crm_settings?.jobber_last_error ? (
-              <>
-                {' '}
-                <span className="block mt-1 opacity-80">
-                  {tenant.crm_settings.jobber_last_error}
-                </span>
-              </>
+              <span className="mt-1 block text-xs opacity-80">
+                {tenant.crm_settings.jobber_last_error}
+              </span>
             ) : null}
-          </p>
+          </div>
         ) : null}
 
-        <p className="mt-3 rounded-lg bg-zinc-50 px-3 py-2 text-xs leading-relaxed text-zinc-600 dark:bg-zinc-800/60 dark:text-zinc-300">
-          {cred.integration_type === 'jobber' ? (
-            <>
-              Bookings confirmed in chat or by phone sync to Jobber as Jobs; clients are matched or
-              created by phone. In the Jobber Developer Center, set your app webhook URL to{' '}
-              <code className="rounded bg-zinc-200/80 px-1 py-0.5 text-[10px] dark:bg-zinc-700">
-                {typeof process.env.NEXT_PUBLIC_API_BASE_URL === 'string' &&
-                process.env.NEXT_PUBLIC_API_BASE_URL
-                  ? `${process.env.NEXT_PUBLIC_API_BASE_URL.replace(/\/$/, '')}/webhooks/jobber`
-                  : 'https://<your-api>/webhooks/jobber'}
-              </code>{' '}
-              and subscribe to visit/job events so availability stays in sync.
-            </>
-          ) : cred.integration_type === 'hubspot' ? (
-            <>CRM sync — connect credentials here, then choose HubSpot under Settings → Integrations.</>
-          ) : cred.integration_type === 'vapi' ? (
-            <>Voice API credentials for this workspace.</>
-          ) : (
-            <>Encrypted credentials for this integration.</>
-          )}
-        </p>
-
-        <div className="mt-5 flex flex-wrap gap-2 border-t border-zinc-950/10 pt-4 dark:border-white/10">
-          <Button plain className="text-xs font-medium text-red-600 dark:text-red-400" onClick={onRemove}>
+        <div className="flex items-center justify-end gap-3 border-t border-zinc-950/5 px-5 py-3 dark:border-white/10 sm:px-6">
+          <Button
+            plain
+            className="text-sm font-medium text-red-600 hover:text-red-700 dark:text-red-400"
+            onClick={onRemove}
+          >
             {cred.integration_type === 'jobber' ? 'Disconnect' : 'Remove'}
           </Button>
         </div>
       </CardBody>
     </Card>
+  )
+}
+
+function ConnectProviderRow({
+  title,
+  subtitle,
+  letter,
+  accent,
+  badge,
+  badgeColor,
+  disabled,
+  loading,
+  onClick,
+}: {
+  title: string
+  subtitle: string
+  letter: string
+  accent: string
+  badge: string
+  badgeColor: 'lime' | 'zinc'
+  disabled?: boolean
+  loading?: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled || loading}
+      className={clsx(
+        'group flex w-full items-center gap-4 rounded-2xl border px-4 py-4 text-left transition',
+        disabled
+          ? 'cursor-default border-zinc-200/80 bg-zinc-50/50 opacity-90 dark:border-zinc-700/60 dark:bg-zinc-800/30'
+          : 'border-zinc-200 bg-white hover:border-lime-300 hover:bg-lime-50/30 hover:shadow-sm dark:border-zinc-700 dark:bg-zinc-900 dark:hover:border-lime-600/40 dark:hover:bg-lime-950/20',
+        (disabled || loading) && 'pointer-events-none',
+      )}
+    >
+      <span
+        className={clsx(
+          'flex size-12 shrink-0 items-center justify-center rounded-xl text-base font-bold ring-1',
+          accent,
+        )}
+      >
+        {letter}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p
+          className={clsx(
+            'font-semibold',
+            disabled ? 'text-zinc-500 dark:text-zinc-400' : 'text-zinc-900 dark:text-white',
+          )}
+        >
+          {title}
+        </p>
+        <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">{subtitle}</p>
+      </div>
+      <div className="flex shrink-0 items-center gap-2">
+        <Badge color={badgeColor} className="text-[10px]">
+          {loading ? '…' : badge}
+        </Badge>
+        {!disabled && !loading ? (
+          <ChevronRightIcon className="size-5 text-zinc-300 transition group-hover:text-lime-600 dark:text-zinc-600 dark:group-hover:text-lime-400" />
+        ) : null}
+      </div>
+    </button>
   )
 }
 
@@ -230,112 +289,93 @@ function IntegrationsPageInner() {
   return (
     <>
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
+        <div className="max-w-xl">
           <Heading>Integrations</Heading>
-          <Text className="mt-1">
-            Connect Jobber so AI-confirmed bookings from messages and calls appear on your Jobber schedule.
-            More field-service CRMs will be added here over time.
+          <Text className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+            Connect your field-service CRM so AI bookings land on your live schedule.
           </Text>
         </div>
-        <Button onClick={() => setShowConnect(true)}>Add integration</Button>
+        <Button onClick={() => setShowConnect(true)}>Connect</Button>
       </div>
 
       <Divider className="mt-6" />
 
-      <div className="mt-6">
+      <div className="mt-6 max-w-2xl">
         {loading || tenantLoading ? (
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {Array.from({ length: 3 }).map((_, i) => (
+          <div className="space-y-3">
+            {Array.from({ length: 2 }).map((_, i) => (
               <div
                 key={i}
-                className="h-56 animate-pulse rounded-xl border border-zinc-950/10 bg-zinc-100 dark:border-white/10 dark:bg-zinc-800"
+                className="h-28 animate-pulse rounded-2xl border border-zinc-950/10 bg-zinc-100 dark:border-white/10 dark:bg-zinc-800"
               />
             ))}
           </div>
         ) : visibleCredentials.length > 0 ? (
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <ul className="space-y-3">
             {visibleCredentials.map((cred) => (
-              <IntegrationCard
-                key={cred.ref}
-                cred={cred}
-                tenant={tenant ?? null}
-                onRemove={() => void handleDelete(cred)}
-              />
+              <li key={cred.ref}>
+                <IntegrationCard
+                  cred={cred}
+                  tenant={tenant ?? null}
+                  onRemove={() => void handleDelete(cred)}
+                />
+              </li>
             ))}
-          </div>
+          </ul>
         ) : (
-          <Card>
-            <CardBody className="py-12 text-center">
-              <Text>No integrations yet</Text>
-              <p className="mx-auto mt-2 max-w-md text-sm text-zinc-500 dark:text-zinc-400">
-                Connect Jobber to sync visits from AI chat and voice into your Jobber account.
+          <Card className="border-dashed border-zinc-300/80 bg-zinc-50/50 dark:border-zinc-600 dark:bg-zinc-900/40">
+            <CardBody className="py-14 text-center">
+              <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-lime-500/10 text-lg font-bold text-lime-700 ring-1 ring-lime-500/20 dark:text-lime-300">
+                J
+              </div>
+              <p className="mt-4 text-base font-medium text-zinc-900 dark:text-white">
+                No CRM connected yet
+              </p>
+              <p className="mx-auto mt-1 max-w-sm text-sm text-zinc-500 dark:text-zinc-400">
+                Start with Jobber to sync visits from chat and voice into your calendar.
               </p>
               <Button className="mt-6" onClick={() => setShowConnect(true)}>
-                Add integration
+                Connect Jobber
               </Button>
             </CardBody>
           </Card>
         )}
       </div>
 
-      <Dialog open={showConnect} onClose={setShowConnect} size="3xl">
-        <DialogTitle>Connect integration</DialogTitle>
+      <Dialog open={showConnect} onClose={setShowConnect} size="lg">
+        <DialogTitle>Connect CRM</DialogTitle>
         <DialogDescription>
-          Bookings created by the AI use your CRM for the live schedule — there is no separate Google Calendar
-          connection.
+          Bookings use your CRM schedule — no separate calendar app.
         </DialogDescription>
 
-        <DialogBody className="max-h-[70vh] overflow-y-auto pr-1">
-          <div
-            className={clsx(
-              'rounded-2xl bg-zinc-100/90 p-4 dark:bg-zinc-800/50',
-              'ring-1 ring-zinc-950/5 dark:ring-white/10',
-            )}
-          >
-            <p className="mb-3 text-center text-xs font-semibold uppercase tracking-wide text-zinc-500">
-              Field service CRM
-            </p>
-            <div className="flex flex-col gap-2">
-              <button
-                type="button"
-                onClick={() => void handleJobberOAuth()}
-                disabled={jobberOauthLoading}
-                className="flex items-center gap-3 rounded-xl bg-white px-4 py-4 text-left shadow-sm ring-1 ring-zinc-950/10 transition hover:bg-zinc-50 disabled:opacity-60 dark:bg-zinc-900 dark:ring-white/10 dark:hover:bg-zinc-800"
-              >
-                <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-lime-500/15 text-lime-700 dark:text-lime-300">
-                  <span className="font-bold">J</span>
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="font-medium text-zinc-900 dark:text-white">Jobber</p>
-                  <p className="text-xs text-zinc-500">Sign in with Jobber · pushes bookings to your schedule</p>
-                </div>
-                <Badge color="lime" className="shrink-0">
-                  {jobberOauthLoading ? '…' : 'Live'}
-                </Badge>
-              </button>
-              <button
-                type="button"
-                onClick={() => notifyError('Housecall Pro integration is not available yet.')}
-                className="flex items-center gap-3 rounded-xl bg-white/80 px-4 py-4 text-left shadow-sm ring-1 ring-zinc-950/10 dark:bg-zinc-900/80 dark:ring-white/10"
-              >
-                <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500/15 text-amber-700 dark:text-amber-300">
-                  H
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="font-medium text-zinc-600 dark:text-zinc-400">Housecall Pro</p>
-                  <p className="text-xs text-zinc-400">Field service scheduling</p>
-                </div>
-                <Badge color="zinc" className="shrink-0 text-[10px]">
-                  Soon
-                </Badge>
-              </button>
-            </div>
+        <DialogBody>
+          <div className="space-y-3">
+            <ConnectProviderRow
+              title="Jobber"
+              subtitle="OAuth sign-in · syncs jobs and visits"
+              letter="J"
+              accent="bg-lime-500/15 text-lime-700 ring-lime-500/25 dark:text-lime-300"
+              badge="Available"
+              badgeColor="lime"
+              loading={jobberOauthLoading}
+              onClick={() => void handleJobberOAuth()}
+            />
+            <ConnectProviderRow
+              title="Housecall Pro"
+              subtitle="Coming soon"
+              letter="H"
+              accent="bg-amber-500/10 text-amber-700/80 ring-amber-500/15 dark:text-amber-400/80"
+              badge="Soon"
+              badgeColor="zinc"
+              disabled
+              onClick={() => notifyError('Housecall Pro is not available yet.')}
+            />
           </div>
         </DialogBody>
 
         <DialogActions>
           <Button plain onClick={() => setShowConnect(false)}>
-            Close
+            Cancel
           </Button>
         </DialogActions>
       </Dialog>
@@ -347,9 +387,9 @@ export default function IntegrationsPage() {
   return (
     <Suspense
       fallback={
-        <div className="space-y-6">
+        <div className="max-w-2xl space-y-3">
           <div className="h-8 w-48 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
-          <div className="h-64 animate-pulse rounded-lg bg-zinc-100 dark:bg-zinc-800" />
+          <div className="h-28 animate-pulse rounded-2xl bg-zinc-100 dark:bg-zinc-800" />
         </div>
       }
     >
