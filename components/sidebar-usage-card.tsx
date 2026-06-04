@@ -236,12 +236,10 @@ function ActivePlanCard({
           Your plan
         </p>
 
-        <div className="mt-2 flex items-start justify-between gap-2">
+        <div className="mt-1 flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
-            <div className="inline-flex max-w-full items-center gap-1.5 rounded-xl bg-brand-50 px-2.5 py-1 ring-1 ring-brand-200/80 dark:bg-brand-950/50 dark:ring-brand-800/60">
-              <span className="truncate text-sm font-semibold text-brand-800 dark:text-brand-200">
-                {plan.name}
-              </span>
+            <p className="flex min-w-0 items-center gap-1 truncate text-sm font-semibold text-zinc-900 dark:text-white">
+              {plan.name}
               {plan.is_featured && (
                 <span
                   title="Popular tier"
@@ -251,16 +249,16 @@ function ActivePlanCard({
                   ★
                 </span>
               )}
-            </div>
+            </p>
             {renewalLabel ? (
               <p
-                className="mt-1.5 text-[11px] text-zinc-500 dark:text-zinc-400"
+                className="mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-400"
                 title={renewalLongLabel || undefined}
               >
                 Quota resets <span className="font-medium text-zinc-700 dark:text-zinc-300">{renewalLabel}</span>
               </p>
             ) : (
-              <p className="mt-1.5 text-[11px] text-zinc-500 dark:text-zinc-400">
+              <p className="mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-400">
                 30-day usage window
               </p>
             )}
@@ -299,16 +297,16 @@ function ActivePlanCard({
         <Link
           href="/plans"
           className={clsx(
-            'mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-semibold transition',
+            'mt-2.5 inline-flex items-center gap-1 text-xs font-medium transition',
             blocked || over
-              ? 'bg-red-600 text-white hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-500'
+              ? 'text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300'
               : warning
-                ? 'bg-amber-500 text-white hover:bg-amber-600'
-                : 'bg-brand-600 text-white hover:bg-brand-700 dark:bg-brand-600 dark:hover:bg-brand-500',
+                ? 'text-amber-700 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300'
+                : 'text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300',
           )}
         >
           {blocked || over ? 'Upgrade plan' : 'Manage plan'}
-          <ArrowUpRightIcon className="size-3.5" />
+          <ArrowUpRightIcon className="size-3" />
         </Link>
       </div>
     </PlanCardShell>
