@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Heading, Subheading } from '@/components/heading'
+import { Subheading } from '@/components/heading'
+import { PageHeader, PageShell, settingsTabClass } from '@/components/dashboard-ui'
 import { Button } from '@/components/button'
 import { Divider } from '@/components/divider'
 import { Text } from '@/components/text'
@@ -801,45 +802,32 @@ export default function SettingsPage() {
   }
 
   return (
-    <>
-      <Heading>Settings</Heading>
-      <Text className="mt-2 text-sm text-zinc-500">
-        Manage your organization profile, knowledge base documents, AI prompts, and assistant behavior.
-      </Text>
+    <PageShell>
+      <PageHeader
+        title="Settings"
+        description="Manage your organization profile, knowledge base documents, AI prompts, and assistant behavior."
+      />
 
-      {/* Tab navigation */}
-      <div className="mt-6 border-b border-zinc-200 dark:border-zinc-700">
-        <nav className="-mb-px flex gap-6" aria-label="Settings tabs">
+      <div className="rounded-2xl border border-zinc-200/80 bg-white px-4 shadow-sm dark:border-zinc-700/80 dark:bg-zinc-900/80 sm:px-6">
+        <nav className="-mb-px flex gap-6 border-b border-zinc-200/80 pt-2 dark:border-zinc-700/80" aria-label="Settings tabs">
           <button
             type="button"
             onClick={() => setActiveTab('tenant')}
-            className={`whitespace-nowrap border-b-2 pb-3 text-sm font-medium transition-colors ${
-              activeTab === 'tenant'
-                ? 'border-blue-500 text-blue-600 dark:border-blue-400 dark:text-blue-400'
-                : 'border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700 dark:text-zinc-400 dark:hover:border-zinc-600 dark:hover:text-zinc-300'
-            }`}
+            className={settingsTabClass(activeTab === 'tenant')}
           >
             Tenant Configuration
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('documents')}
-            className={`whitespace-nowrap border-b-2 pb-3 text-sm font-medium transition-colors ${
-              activeTab === 'documents'
-                ? 'border-blue-500 text-blue-600 dark:border-blue-400 dark:text-blue-400'
-                : 'border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700 dark:text-zinc-400 dark:hover:border-zinc-600 dark:hover:text-zinc-300'
-            }`}
+            className={settingsTabClass(activeTab === 'documents')}
           >
             Knowledge documents
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('prompts')}
-            className={`whitespace-nowrap border-b-2 pb-3 text-sm font-medium transition-colors ${
-              activeTab === 'prompts'
-                ? 'border-blue-500 text-blue-600 dark:border-blue-400 dark:text-blue-400'
-                : 'border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700 dark:text-zinc-400 dark:hover:border-zinc-600 dark:hover:text-zinc-300'
-            }`}
+            className={settingsTabClass(activeTab === 'prompts')}
           >
             Prompt Configuration
           </button>
@@ -852,6 +840,6 @@ export default function SettingsPage() {
       )}
       {activeTab === 'documents' && <DocumentsTab />}
       {activeTab === 'prompts' && <PromptConfigTab />}
-    </>
+    </PageShell>
   )
 }

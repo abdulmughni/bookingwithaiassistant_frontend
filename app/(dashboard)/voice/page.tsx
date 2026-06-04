@@ -647,22 +647,22 @@ export default function VoicePage() {
   if (!config) return null
 
   return (
-    <>
+    <div className="space-y-6">
       {/* ───────── HERO ─────────────────────────────────────────────────
           One glanceable header that carries: branding, status, primary
           action, and the four most-asked-for facts (assistant id, last
           sync, phone, webhook secret state). Replaces the older
           three-card status strip, so the eye lands on a single coherent
           surface instead of a row of disconnected boxes. */}
-      <Card className="relative overflow-hidden border-zinc-200/80 bg-linear-to-br from-sky-50 via-white to-violet-50/60 dark:border-white/10 dark:from-sky-950/30 dark:via-zinc-900 dark:to-violet-950/30">
+      <Card className="relative overflow-hidden border-zinc-200/80 bg-linear-to-br from-emerald-50 via-white to-green-50/60 dark:border-zinc-700/80 dark:from-emerald-950/30 dark:via-zinc-900 dark:to-green-950/20">
         <div
           aria-hidden
-          className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-sky-200/40 blur-3xl dark:bg-sky-500/10"
+          className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-emerald-200/40 blur-3xl dark:bg-emerald-500/10"
         />
         <CardBody className="relative">
           <div className="flex flex-wrap items-start justify-between gap-6">
             <div className="flex min-w-0 items-start gap-4">
-              <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-linear-to-br from-sky-500 to-violet-500 text-white shadow-lg shadow-sky-500/20 ring-1 ring-white/40">
+              <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-linear-to-br from-emerald-600 to-green-600 text-white shadow-lg shadow-emerald-500/25 ring-1 ring-white/40">
                 <MicrophoneIcon className="size-6" />
               </div>
               <div className="min-w-0">
@@ -1711,7 +1711,7 @@ export default function VoicePage() {
           </CardBody>
         </Card>
       )}
-    </>
+    </div>
   )
 }
 

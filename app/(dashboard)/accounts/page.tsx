@@ -3,10 +3,9 @@
 import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import clsx from 'clsx'
-import { Heading } from '@/components/heading'
 import { Button } from '@/components/button'
+import { PageHeader, PageShell } from '@/components/dashboard-ui'
 import { Badge } from '@/components/badge'
-import { Divider } from '@/components/divider'
 import { Text } from '@/components/text'
 import { Input } from '@/components/input'
 import { Select } from '@/components/select'
@@ -31,6 +30,61 @@ const channelAccent: Record<string, string> = {
   facebook: 'border-l-sky-500',
   instagram: 'border-l-fuchsia-500',
   web: 'border-l-zinc-400',
+}
+
+const destinationIconFrame: Record<'facebook' | 'instagram' | 'whatsapp', string> = {
+  facebook: 'border-sky-200 bg-sky-50 dark:border-sky-700/80 dark:bg-sky-950/50',
+  instagram: 'border-fuchsia-200 bg-fuchsia-50 dark:border-fuchsia-700/80 dark:bg-fuchsia-950/50',
+  whatsapp: 'border-emerald-200 bg-emerald-50 dark:border-emerald-700/80 dark:bg-emerald-950/50',
+}
+
+function DestinationConnectCard({
+  channel,
+  title,
+  description,
+  actionLabel,
+  actionClassName,
+  onClick,
+  disabled,
+}: {
+  channel: 'facebook' | 'instagram' | 'whatsapp'
+  title: string
+  description: string
+  actionLabel: string
+  actionClassName?: string
+  onClick: () => void
+  disabled?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={clsx(
+        'flex h-full w-full flex-col items-center gap-3 rounded-2xl border border-zinc-200 bg-white px-4 py-6 text-center shadow-sm transition',
+        'hover:border-zinc-300 hover:bg-zinc-50 hover:shadow-md',
+        'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500',
+        'disabled:pointer-events-none disabled:opacity-50',
+        'dark:border-zinc-600 dark:bg-zinc-900 dark:hover:border-zinc-500 dark:hover:bg-zinc-800/80',
+      )}
+    >
+      <span
+        className={clsx(
+          'flex size-14 shrink-0 items-center justify-center rounded-2xl border',
+          destinationIconFrame[channel],
+        )}
+      >
+        <ChannelIcon channel={channel} className="h-9 w-9" colored />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold text-zinc-900 dark:text-white">{title}</p>
+        <p className="mt-1 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">{description}</p>
+      </div>
+      <span className={clsx('text-xs font-medium', actionClassName ?? 'text-zinc-600 dark:text-zinc-300')}>
+        {actionLabel}
+      </span>
+    </button>
+  )
 }
 
 function connectionBadgeColor(status: string): 'lime' | 'red' | 'amber' {
@@ -91,7 +145,7 @@ function ChannelAccountCard({
   return (
     <Card
       className={clsx(
-        'flex flex-col border border-zinc-200 border-l-4 bg-white/95 pl-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg dark:border-zinc-700 dark:bg-zinc-900/90 dark:hover:border-zinc-600 sm:pl-5',
+        'flex flex-col border border-zinc-200/80 border-l-4 bg-white pl-4 shadow-sm transition hover:border-zinc-300 hover:shadow-md dark:border-zinc-700/80 dark:bg-zinc-900/90 dark:hover:border-zinc-600 sm:pl-5',
         accent,
       )}
     >
@@ -325,22 +379,20 @@ function AccountsPageInner() {
   }
 
   return (
-    <>
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <Heading>Channel Accounts</Heading>
-        <Button
-          onClick={() => {
+    <PageShell>
+      <PageHeader
+        title="Channel accounts"
+        description="Connect WhatsApp, Facebook Messenger, and Instagram so customer messages reach your dashboard."
+      >
+        <Button color="emerald" onClick={() => {
             setConnectMode('destination')
             setShowConnect(true)
-          }}
-        >
+          }}>
           Add account
         </Button>
-      </div>
+      </PageHeader>
 
-      <Divider className="mt-6" />
-
-      <div className="mt-6">
+      <div>
         {loading ? (
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {Array.from({ length: 3 }).map((_, i) => (
@@ -394,57 +446,34 @@ function AccountsPageInner() {
 
         <DialogBody className="max-h-[70vh] overflow-y-auto pr-1">
           {connectMode === 'destination' ? (
-            <div className="grid gap-4 sm:grid-cols-2">
-              <button
-                type="button"
+            <div className="grid gap-4 sm:grid-cols-3">
+              <DestinationConnectCard
+                channel="facebook"
+                title="Facebook"
+                description="Messenger for the Facebook Pages you select during Meta sign-in."
+                actionLabel={oauthLoading ? 'Redirecting…' : 'Connect with Meta'}
+                actionClassName="text-blue-600 dark:text-blue-400"
                 disabled={oauthLoading}
-                onClick={handleMetaOAuth}
-                className={clsx(
-                  'flex flex-col items-center gap-3 rounded-2xl bg-white px-4 py-8 text-center shadow-sm ring-1 ring-zinc-950/10 transition hover:bg-zinc-50 disabled:opacity-50 dark:bg-zinc-900 dark:ring-white/10 dark:hover:bg-zinc-800',
-                )}
-              >
-                <div className="flex items-center gap-2">
-                  <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#1877F2]/10">
-                    <ChannelIcon channel="facebook" className="h-9 w-9" colored />
-                  </span>
-                  <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-zinc-100 dark:bg-zinc-800">
-                    <ChannelIcon channel="instagram" className="h-9 w-9" colored />
-                  </span>
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-zinc-900 dark:text-white">
-                    Facebook &amp; Instagram
-                  </p>
-                  <p className="mt-1 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
-                    One Meta sign-in. We connect every Page you select and any Instagram business
-                    accounts linked to those Pages — Messenger and DMs both arrive on the same
-                    webhook.
-                  </p>
-                </div>
-                <span className="text-xs font-medium text-blue-600 dark:text-blue-400">
-                  {oauthLoading ? 'Redirecting…' : 'Connect with Meta'}
-                </span>
-              </button>
-
-              <button
-                type="button"
+                onClick={() => void handleMetaOAuth()}
+              />
+              <DestinationConnectCard
+                channel="instagram"
+                title="Instagram"
+                description="DMs for Instagram business accounts linked to those Pages — same Meta sign-in."
+                actionLabel={oauthLoading ? 'Redirecting…' : 'Connect with Meta'}
+                actionClassName="text-fuchsia-600 dark:text-fuchsia-400"
                 disabled={oauthLoading}
-                onClick={handleWhatsAppOAuth}
-                className="flex flex-col items-center gap-3 rounded-2xl bg-white px-4 py-8 text-center shadow-sm ring-1 ring-zinc-950/10 transition hover:bg-zinc-50 disabled:opacity-50 dark:bg-zinc-900 dark:ring-white/10 dark:hover:bg-zinc-800"
-              >
-                <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#25D366]/10">
-                  <ChannelIcon channel="whatsapp" className="h-9 w-9" colored />
-                </span>
-                <div>
-                  <p className="text-sm font-semibold text-zinc-900 dark:text-white">WhatsApp</p>
-                  <p className="mt-1 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
-                    Cloud API number via Meta embedded signup.
-                  </p>
-                </div>
-                <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
-                  {oauthLoading ? 'Redirecting…' : 'Connect'}
-                </span>
-              </button>
+                onClick={() => void handleMetaOAuth()}
+              />
+              <DestinationConnectCard
+                channel="whatsapp"
+                title="WhatsApp"
+                description="Cloud API number via Meta embedded signup."
+                actionLabel={oauthLoading ? 'Redirecting…' : 'Connect'}
+                actionClassName="text-emerald-700 dark:text-emerald-400"
+                disabled={oauthLoading}
+                onClick={() => void handleWhatsAppOAuth()}
+              />
             </div>
           ) : (
             <FieldGroup>
@@ -515,7 +544,7 @@ function AccountsPageInner() {
           )}
         </DialogActions>
       </Dialog>
-    </>
+    </PageShell>
   )
 }
 

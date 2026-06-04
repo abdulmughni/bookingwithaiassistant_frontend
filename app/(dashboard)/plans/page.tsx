@@ -6,8 +6,9 @@ import clsx from 'clsx'
 import { CheckIcon, StarIcon } from '@heroicons/react/20/solid'
 
 import { Button } from '@/components/button'
-import { Heading, Subheading } from '@/components/heading'
+import { Subheading } from '@/components/heading'
 import { Text } from '@/components/text'
+import { PageHeader, PageShell } from '@/components/dashboard-ui'
 import { useApiToken, usePlans, useSubscription } from '@/lib/hooks'
 import { api, ApiError } from '@/lib/api'
 import type { Plan } from '@/lib/types'
@@ -55,15 +56,12 @@ export default function PlansPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl">
-      <header className="mb-8 text-center">
-        <Heading>Plans &amp; pricing</Heading>
-        <Text className="mt-2 mx-auto max-w-2xl">
-          Pick a tier that fits how many customer messages and voice minutes
-          your team runs each month. You can switch any time — the 30-day
-          quota window resets on every change.
-        </Text>
-      </header>
+    <PageShell className="mx-auto max-w-6xl">
+      <PageHeader
+        centered
+        title="Plans & pricing"
+        description="Pick a tier that fits how many customer messages and voice minutes your team runs each month. You can switch any time — the 30-day quota window resets on every change."
+      />
 
       {plansError && (
         <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-800/60 dark:bg-red-900/20 dark:text-red-200">
@@ -98,7 +96,7 @@ export default function PlansPage() {
         you&apos;re evaluating — payment will be added once you&apos;re ready
         to go live.
       </Text>
-    </div>
+    </PageShell>
   )
 }
 
@@ -128,12 +126,12 @@ function PlanCard({
       className={clsx(
         'relative flex flex-col rounded-2xl border bg-white p-6 shadow-sm transition dark:bg-zinc-900',
         featured
-          ? 'border-indigo-300 ring-1 ring-indigo-200 md:scale-[1.03] dark:border-indigo-700 dark:ring-indigo-900/60'
-          : 'border-zinc-200 dark:border-zinc-800',
+          ? 'border-emerald-400 ring-1 ring-emerald-200/80 md:scale-[1.03] dark:border-emerald-600 dark:ring-emerald-900/60'
+          : 'border-zinc-200/80 dark:border-zinc-700/80',
       )}
     >
       {featured && (
-        <div className="absolute -top-3 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full bg-indigo-600 px-3 py-1 text-xs font-semibold text-white shadow">
+        <div className="absolute -top-3 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full bg-emerald-600 px-3 py-1 text-xs font-semibold text-white shadow">
           <StarIcon className="size-3.5" />
           Most popular
         </div>
@@ -199,7 +197,7 @@ function PlanCard({
         </Button>
       ) : (
         <Button
-          color={featured ? 'indigo' : 'dark/zinc'}
+          color={featured ? 'emerald' : 'dark/zinc'}
           disabled={busy || disabled || subscriptionLoading}
           onClick={onSelect}
           className="w-full"
@@ -221,7 +219,7 @@ function PlanCardSkeleton({ featured = false }: { featured?: boolean }) {
       className={clsx(
         'h-105 animate-pulse rounded-2xl border bg-white p-6 dark:bg-zinc-900',
         featured
-          ? 'border-indigo-200 dark:border-indigo-800/60'
+          ? 'border-emerald-200 dark:border-emerald-800/60'
           : 'border-zinc-200 dark:border-zinc-800',
       )}
     >

@@ -56,7 +56,7 @@ export default function DashboardLayout({
             <SidebarSection>
               <SidebarItem href="/">
                 <span className="flex items-center gap-2">
-                  <span className="flex size-7 items-center justify-center rounded-lg bg-zinc-950 text-white text-xs font-bold dark:bg-white dark:text-zinc-950">
+                  <span className="flex size-7 items-center justify-center rounded-lg bg-linear-to-br from-emerald-600 to-green-600 text-xs font-bold text-white shadow-sm shadow-emerald-500/25">
                     B
                   </span>
                   <SidebarLabel className="text-sm font-semibold">
@@ -129,7 +129,7 @@ export default function DashboardLayout({
       {fullBleedPage ? (
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">{children}</div>
       ) : (
-        <div className="px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+        <div className="min-h-full bg-zinc-50/90 px-4 py-6 sm:px-6 lg:px-8 lg:py-8 dark:bg-zinc-950">
           <JobberReconnectBanner />
           {children}
         </div>

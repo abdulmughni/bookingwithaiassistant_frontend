@@ -10,8 +10,8 @@ import {
   ClockIcon,
   ChatBubbleLeftRightIcon,
 } from '@heroicons/react/24/outline'
-import { Heading } from '@/components/heading'
 import { Button } from '@/components/button'
+import { PageHeader, PageShell } from '@/components/dashboard-ui'
 import { Badge } from '@/components/badge'
 import { Card, CardBody } from '@/components/card'
 import { SourceBadge } from '@/components/channel-icon'
@@ -496,25 +496,18 @@ export default function DashboardPage() {
   }, [upcoming])
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <Heading>Dashboard</Heading>
-          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            Welcome back{user?.firstName ? `, ${user.firstName}` : ''} — here is your
-            booking activity at a glance.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button href="/conversations" outline>
-            Conversations
-          </Button>
-          <Button href="/bookings" color="emerald">
-            View bookings
-          </Button>
-        </div>
-      </div>
+    <PageShell>
+      <PageHeader
+        title="Dashboard"
+        description={`Welcome back${user?.firstName ? `, ${user.firstName}` : ''} — here is your booking activity at a glance.`}
+      >
+        <Button href="/conversations" outline>
+          Conversations
+        </Button>
+        <Button href="/bookings" color="emerald">
+          View bookings
+        </Button>
+      </PageHeader>
 
       {/* KPI cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -583,6 +576,6 @@ export default function DashboardPage() {
           />
         </div>
       </div>
-    </div>
+    </PageShell>
   )
 }

@@ -5,12 +5,11 @@ import {
   ExclamationTriangleIcon,
   SparklesIcon,
 } from '@heroicons/react/24/outline'
-import { Heading } from '@/components/heading'
 import { Button } from '@/components/button'
+import { FilterPanel, PageHeader, PageShell } from '@/components/dashboard-ui'
 import { Badge } from '@/components/badge'
 import { Input } from '@/components/input'
 import { Select } from '@/components/select'
-import { Divider } from '@/components/divider'
 import { Card, CardBody } from '@/components/card'
 import {
   BookingStatusDialog,
@@ -243,34 +242,26 @@ export default function BookingsPage() {
   )
 
   return (
-    <>
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <Heading>Bookings</Heading>
-          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            Click any booking for the full summary, conversation, and call recording when
-            available.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {overdueCount > 0 && (
-            <span className="inline-flex items-center gap-2 rounded-lg bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 ring-1 ring-red-200 dark:bg-red-500/10 dark:text-red-300 dark:ring-red-500/30">
-              <ExclamationTriangleIcon className="h-4 w-4" aria-hidden="true" />
-              {overdueCount} overdue
-            </span>
-          )}
-          {todayCount > 0 && (
-            <span className="inline-flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/30">
-              <SparklesIcon className="h-4 w-4" aria-hidden="true" />
-              {todayCount} today
-            </span>
-          )}
-        </div>
-      </div>
+    <PageShell>
+      <PageHeader
+        title="Bookings"
+        description="Click any booking for the full summary, conversation, and call recording when available."
+      >
+        {overdueCount > 0 && (
+          <span className="inline-flex items-center gap-2 rounded-full bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 ring-1 ring-red-200 dark:bg-red-500/10 dark:text-red-300 dark:ring-red-500/30">
+            <ExclamationTriangleIcon className="h-4 w-4" aria-hidden="true" />
+            {overdueCount} overdue
+          </span>
+        )}
+        {todayCount > 0 && (
+          <span className="inline-flex items-center gap-2 rounded-full bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/30">
+            <SparklesIcon className="h-4 w-4" aria-hidden="true" />
+            {todayCount} today
+          </span>
+        )}
+      </PageHeader>
 
-      <Divider className="mt-6" />
-
-      <div className="mt-6 flex flex-wrap items-end gap-4">
+      <FilterPanel>
         <div className="w-40">
           <Select
             value={statusFilter}
@@ -377,15 +368,15 @@ export default function BookingsPage() {
             List view
           </Button>
         </div>
-      </div>
+      </FilterPanel>
 
-      <div className="mt-6">
+      <div>
         {loading ? (
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {Array.from({ length: 6 }).map((_, i) => (
               <div
                 key={i}
-                className="h-52 animate-pulse rounded-xl border border-zinc-200 bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800"
+                className="h-52 animate-pulse rounded-2xl border border-zinc-200/80 bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800"
               />
             ))}
           </div>
@@ -619,6 +610,6 @@ export default function BookingsPage() {
           await submitAction(activeAction.booking, activeAction.action, note)
         }}
       />
-    </>
+    </PageShell>
   )
 }

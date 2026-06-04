@@ -17,13 +17,12 @@ import {
   SpeakerWaveIcon,
   CalendarDaysIcon,
 } from '@heroicons/react/20/solid'
-import { Heading } from '@/components/heading'
 import { Button } from '@/components/button'
+import { FilterPanel, PageHeader, PageShell } from '@/components/dashboard-ui'
 import { Badge } from '@/components/badge'
 import { Card, CardBody } from '@/components/card'
 import { Input } from '@/components/input'
 import { Select } from '@/components/select'
-import { Divider } from '@/components/divider'
 import {
   Dialog,
   DialogActions,
@@ -292,23 +291,18 @@ export default function CallsPage() {
   }
 
   return (
-    <>
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <Heading>Calls</Heading>
-          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            Voice calls handled by your Vapi assistant. Newest first.
-          </p>
-        </div>
+    <PageShell>
+      <PageHeader
+        title="Calls"
+        description="Voice calls handled by your Vapi assistant. Newest first."
+      >
         <Button outline onClick={refresh} disabled={loading}>
           <ArrowPathIcon data-slot="icon" className={loading ? 'animate-spin' : ''} />
           Refresh
         </Button>
-      </div>
+      </PageHeader>
 
-      <Divider className="mt-6" />
-
-      <div className="mt-6 flex flex-wrap items-end gap-4">
+      <FilterPanel>
         <div className="w-44">
           <Select
             value={directionFilter}
@@ -401,16 +395,16 @@ export default function CallsPage() {
             {total.toLocaleString()} {total === 1 ? 'call' : 'calls'} · {PAGE_SIZE} per page
           </span>
         )}
-      </div>
+      </FilterPanel>
 
-      <div className="mt-6">
+      <div>
         {loading ? (
           viewMode === 'box' ? (
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {Array.from({ length: 6 }).map((_, i) => (
                 <div
                   key={i}
-                  className="h-40 animate-pulse rounded-xl border border-zinc-200 bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800"
+                  className="h-40 animate-pulse rounded-2xl border border-zinc-200/80 bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800"
                 />
               ))}
             </div>
@@ -700,7 +694,7 @@ export default function CallsPage() {
             : undefined
         }
       />
-    </>
+    </PageShell>
   )
 }
 

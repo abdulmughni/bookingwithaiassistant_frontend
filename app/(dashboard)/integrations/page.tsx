@@ -4,11 +4,9 @@ import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import clsx from 'clsx'
 import { ChevronRightIcon } from '@heroicons/react/20/solid'
-import { Heading } from '@/components/heading'
 import { Button } from '@/components/button'
+import { PageHeader, PageShell } from '@/components/dashboard-ui'
 import { Badge } from '@/components/badge'
-import { Divider } from '@/components/divider'
-import { Text } from '@/components/text'
 import {
   Dialog,
   DialogActions,
@@ -358,20 +356,17 @@ function IntegrationsPageInner() {
   }
 
   return (
-    <>
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div className="max-w-xl">
-          <Heading>Integrations</Heading>
-          <Text className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            Connect your field-service CRM so AI bookings land on your live schedule.
-          </Text>
-        </div>
-        <Button onClick={() => setShowConnect(true)}>Connect</Button>
-      </div>
+    <PageShell>
+      <PageHeader
+        title="Integrations"
+        description="Connect your field-service CRM so AI bookings land on your live schedule."
+      >
+        <Button color="emerald" onClick={() => setShowConnect(true)}>
+          Connect
+        </Button>
+      </PageHeader>
 
-      <Divider className="mt-6" />
-
-      <div className="mt-6 max-w-2xl">
+      <div className="max-w-2xl">
         {loading || tenantLoading ? (
           <div className="space-y-3">
             {Array.from({ length: 2 }).map((_, i) => (
@@ -448,7 +443,7 @@ function IntegrationsPageInner() {
           </Button>
         </DialogActions>
       </Dialog>
-    </>
+    </PageShell>
   )
 }
 
