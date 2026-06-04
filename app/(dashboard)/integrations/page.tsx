@@ -25,6 +25,37 @@ import type { Credential, Tenant } from '@/lib/types'
 
 const JOBBER_LOGO = '/images/getjobber-logo.jpg'
 
+/** Logo sized by height only (w-auto) so the frame hugs the image — no side gaps. */
+function JobberLogoFrame({
+  size = 'md',
+  className,
+}: {
+  size?: 'sm' | 'md' | 'lg'
+  className?: string
+}) {
+  const height =
+    size === 'sm'
+      ? 'h-14 sm:h-16'
+      : size === 'lg'
+        ? 'h-20 sm:h-24'
+        : 'h-16 sm:h-[4.5rem]'
+  const rounded = size === 'lg' ? 'rounded-2xl' : 'rounded-xl'
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element -- static brand asset in /public
+    <img
+      src={JOBBER_LOGO}
+      alt="Jobber"
+      className={clsx(
+        'block w-auto shrink-0 border border-zinc-200/90 object-cover dark:border-zinc-600/80',
+        height,
+        rounded,
+        className,
+      )}
+    />
+  )
+}
+
 function integrationLabel(type: string): string {
   switch (type) {
     case 'jobber':
@@ -45,18 +76,9 @@ function IntegrationBrandMark({
   type: string
   size?: 'md' | 'lg'
 }) {
-  const box = size === 'lg' ? 'size-14 p-2' : 'size-11 p-1.5'
   if (type === 'jobber') {
     return (
-      <span
-        className={clsx(
-          'flex shrink-0 items-center justify-center rounded-xl bg-white ring-1 ring-zinc-200/90 dark:bg-zinc-800 dark:ring-zinc-600/80',
-          box,
-        )}
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element -- static brand asset in /public */}
-        <img src={JOBBER_LOGO} alt="Jobber" className="h-full w-full object-contain" />
-      </span>
+      <JobberLogoFrame size={size === 'lg' ? 'lg' : 'md'} />
     )
   }
   const styles: Record<string, string> = {
@@ -229,10 +251,7 @@ function ConnectProviderRow({
       )}
     >
       {logoSrc ? (
-        <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-white p-2 ring-1 ring-zinc-200/90 dark:bg-zinc-800 dark:ring-zinc-600/80">
-          {/* eslint-disable-next-line @next/next/no-img-element -- static brand asset in /public */}
-          <img src={logoSrc} alt="" className="h-full w-full object-contain" />
-        </span>
+        <JobberLogoFrame size="sm" />
       ) : (
         <span
           className={clsx(
@@ -377,10 +396,7 @@ function IntegrationsPageInner() {
         ) : (
           <Card className="border-dashed border-zinc-300/80 bg-zinc-50/50 dark:border-zinc-600 dark:bg-zinc-900/40">
             <CardBody className="py-14 text-center">
-              <div className="mx-auto flex size-16 items-center justify-center rounded-2xl bg-white p-3 ring-1 ring-zinc-200/90 shadow-sm dark:bg-zinc-800 dark:ring-zinc-600">
-                {/* eslint-disable-next-line @next/next/no-img-element -- static brand asset in /public */}
-                <img src={JOBBER_LOGO} alt="Jobber" className="h-full w-full object-contain" />
-              </div>
+              <JobberLogoFrame size="lg" className="mx-auto shadow-sm" />
               <p className="mt-4 text-base font-medium text-zinc-900 dark:text-white">
                 No CRM connected yet
               </p>
