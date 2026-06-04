@@ -23,6 +23,8 @@ import { notifyError, notifySuccess } from '@/lib/notify'
 import { formatDate } from '@/lib/utils'
 import type { Credential, Tenant } from '@/lib/types'
 
+const JOBBER_LOGO = '/images/getjobber-logo.jpg'
+
 function integrationLabel(type: string): string {
   switch (type) {
     case 'jobber':
@@ -36,10 +38,66 @@ function integrationLabel(type: string): string {
   }
 }
 
+function IntegrationBrandMark({
+  type,
+  size = 'md',
+}: {
+  type: string
+  size?: 'md' | 'lg'
+}) {
+  const box = size === 'lg' ? 'size-14 p-2' : 'size-11 p-1.5'
+  if (type === 'jobber') {
+    return (
+      <span
+        className={clsx(
+          'flex shrink-0 items-center justify-center rounded-xl bg-white ring-1 ring-zinc-200/90 dark:bg-zinc-800 dark:ring-zinc-600/80',
+          box,
+        )}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element -- static brand asset in /public */}
+        <img src={JOBBER_LOGO} alt="Jobber" className="h-full w-full object-contain" />
+      </span>
+    )
+  }
+  const styles: Record<string, string> = {
+    hubspot: 'bg-orange-500/15 text-orange-700 ring-orange-500/20 dark:text-orange-300',
+    vapi: 'bg-violet-500/15 text-violet-700 ring-violet-500/20 dark:text-violet-300',
+  }
+  const letter = type === 'hubspot' ? 'H' : type === 'vapi' ? 'V' : '?'
+  return (
+    <span
+      className={clsx(
+        'flex shrink-0 items-center justify-center rounded-xl text-sm font-bold ring-1',
+        size === 'lg' ? 'size-14 text-base' : 'size-11',
+        styles[type] ?? 'bg-zinc-500/10 text-zinc-600 ring-zinc-500/15 dark:text-zinc-300',
+      )}
+    >
+      {letter}
+    </span>
+  )
+}
+
+function JobberIntegrationDescription() {
+  return (
+    <div className="mt-2 space-y-2.5 text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
+      <p>
+        OAuth links your workspace to Jobber. When customers book through Facebook, Instagram,
+        Messenger, or phone, we create or update clients, jobs, and visits on your live Jobber
+        schedule.
+      </p>
+      <ul className="list-disc space-y-1 pl-4 text-[13px] text-zinc-500 dark:text-zinc-400">
+        <li>Availability reflects visits and jobs already on your Jobber calendar</li>
+        <li>Webhooks keep open slots aligned when schedules change in Jobber</li>
+        <li>Disconnect anytime — stored tokens are removed immediately</li>
+      </ul>
+    </div>
+  )
+}
+
 function integrationSummary(type: string): string {
   switch (type) {
     case 'jobber':
-      return 'Syncs AI bookings to your Jobber schedule.'
+      return ''
     case 'hubspot':
       return 'CRM sync for contacts and deals.'
     case 'vapi':
@@ -47,25 +105,6 @@ function integrationSummary(type: string): string {
     default:
       return 'Connected credentials for this workspace.'
   }
-}
-
-function IntegrationAvatar({ type }: { type: string }) {
-  const styles: Record<string, string> = {
-    jobber: 'bg-lime-500/15 text-lime-700 ring-lime-500/20 dark:text-lime-300',
-    hubspot: 'bg-orange-500/15 text-orange-700 ring-orange-500/20 dark:text-orange-300',
-    vapi: 'bg-violet-500/15 text-violet-700 ring-violet-500/20 dark:text-violet-300',
-  }
-  const letter = type === 'jobber' ? 'J' : type === 'hubspot' ? 'H' : type === 'vapi' ? 'V' : '?'
-  return (
-    <span
-      className={clsx(
-        'flex size-11 shrink-0 items-center justify-center rounded-xl text-sm font-bold ring-1',
-        styles[type] ?? 'bg-zinc-500/10 text-zinc-600 ring-zinc-500/15 dark:text-zinc-300',
-      )}
-    >
-      {letter}
-    </span>
-  )
 }
 
 function integrationStatus(
@@ -105,7 +144,7 @@ function IntegrationCard({
     <Card className="overflow-hidden border-zinc-200/80 bg-white shadow-sm transition hover:border-zinc-300 hover:shadow-md dark:border-zinc-700/80 dark:bg-zinc-900/80 dark:hover:border-zinc-600">
       <CardBody className="p-0">
         <div className="flex items-start gap-4 p-5 sm:p-6">
-          <IntegrationAvatar type={cred.integration_type} />
+          <IntegrationBrandMark type={cred.integration_type} />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="text-base font-semibold text-zinc-950 dark:text-white">
@@ -115,9 +154,13 @@ function IntegrationCard({
                 {status.label}
               </Badge>
             </div>
-            <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-              {integrationSummary(cred.integration_type)}
-            </p>
+            {cred.integration_type === 'jobber' ? (
+              <JobberIntegrationDescription />
+            ) : (
+              <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+                {integrationSummary(cred.integration_type)}
+              </p>
+            )}
             <p className="mt-2 text-xs text-zinc-400 dark:text-zinc-500">
               Updated {formatDate(cred.updated_at)}
             </p>
@@ -153,6 +196,7 @@ function ConnectProviderRow({
   title,
   subtitle,
   letter,
+  logoSrc,
   accent,
   badge,
   badgeColor,
@@ -162,7 +206,8 @@ function ConnectProviderRow({
 }: {
   title: string
   subtitle: string
-  letter: string
+  letter?: string
+  logoSrc?: string
   accent: string
   badge: string
   badgeColor: 'lime' | 'zinc'
@@ -183,14 +228,21 @@ function ConnectProviderRow({
         (disabled || loading) && 'pointer-events-none',
       )}
     >
-      <span
-        className={clsx(
-          'flex size-12 shrink-0 items-center justify-center rounded-xl text-base font-bold ring-1',
-          accent,
-        )}
-      >
-        {letter}
-      </span>
+      {logoSrc ? (
+        <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-white p-2 ring-1 ring-zinc-200/90 dark:bg-zinc-800 dark:ring-zinc-600/80">
+          {/* eslint-disable-next-line @next/next/no-img-element -- static brand asset in /public */}
+          <img src={logoSrc} alt="" className="h-full w-full object-contain" />
+        </span>
+      ) : (
+        <span
+          className={clsx(
+            'flex size-12 shrink-0 items-center justify-center rounded-xl text-base font-bold ring-1',
+            accent,
+          )}
+        >
+          {letter}
+        </span>
+      )}
       <div className="min-w-0 flex-1">
         <p
           className={clsx(
@@ -306,7 +358,7 @@ function IntegrationsPageInner() {
             {Array.from({ length: 2 }).map((_, i) => (
               <div
                 key={i}
-                className="h-28 animate-pulse rounded-2xl border border-zinc-950/10 bg-zinc-100 dark:border-white/10 dark:bg-zinc-800"
+                className="h-40 animate-pulse rounded-2xl border border-zinc-950/10 bg-zinc-100 dark:border-white/10 dark:bg-zinc-800"
               />
             ))}
           </div>
@@ -325,8 +377,9 @@ function IntegrationsPageInner() {
         ) : (
           <Card className="border-dashed border-zinc-300/80 bg-zinc-50/50 dark:border-zinc-600 dark:bg-zinc-900/40">
             <CardBody className="py-14 text-center">
-              <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-lime-500/10 text-lg font-bold text-lime-700 ring-1 ring-lime-500/20 dark:text-lime-300">
-                J
+              <div className="mx-auto flex size-16 items-center justify-center rounded-2xl bg-white p-3 ring-1 ring-zinc-200/90 shadow-sm dark:bg-zinc-800 dark:ring-zinc-600">
+                {/* eslint-disable-next-line @next/next/no-img-element -- static brand asset in /public */}
+                <img src={JOBBER_LOGO} alt="Jobber" className="h-full w-full object-contain" />
               </div>
               <p className="mt-4 text-base font-medium text-zinc-900 dark:text-white">
                 No CRM connected yet
@@ -352,8 +405,8 @@ function IntegrationsPageInner() {
           <div className="space-y-3">
             <ConnectProviderRow
               title="Jobber"
-              subtitle="OAuth sign-in · syncs jobs and visits"
-              letter="J"
+              subtitle="OAuth sign-in · syncs jobs, clients, and visits"
+              logoSrc={JOBBER_LOGO}
               accent="bg-lime-500/15 text-lime-700 ring-lime-500/25 dark:text-lime-300"
               badge="Available"
               badgeColor="lime"
