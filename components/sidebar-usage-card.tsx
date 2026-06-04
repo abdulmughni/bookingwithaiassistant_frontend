@@ -1,25 +1,20 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import clsx from 'clsx'
 import {
   ArrowPathIcon,
   ArrowUpRightIcon,
+  ChatBubbleLeftRightIcon,
+  PhoneIcon,
   SparklesIcon,
 } from '@heroicons/react/20/solid'
 
 import { useSubscription, useTenantTimezone } from '@/lib/hooks'
 import type { QuotaState, Subscription } from '@/lib/types'
 
-/**
- * Compact renewal date (e.g. "Jun 11" or "Jun 11, 2027" when the renewal
- * year differs from now). Rendered in the **tenant timezone**.
- */
-function formatRenewalDate(
-  periodEndIso: string | null,
-  timeZone: string,
-): string {
+function formatRenewalDate(periodEndIso: string | null, timeZone: string): string {
   if (!periodEndIso) return ''
   const end = new Date(periodEndIso)
   if (Number.isNaN(end.getTime())) return ''
@@ -38,11 +33,7 @@ function formatRenewalDate(
   return new Intl.DateTimeFormat(undefined, opts).format(end)
 }
 
-/** Long-form date string used in the tooltip (e.g. "Thursday, June 11, 2026"). */
-function formatRenewalLong(
-  periodEndIso: string | null,
-  timeZone: string,
-): string {
+function formatRenewalLong(periodEndIso: string | null, timeZone: string): string {
   if (!periodEndIso) return ''
   const end = new Date(periodEndIso)
   if (Number.isNaN(end.getTime())) return ''
@@ -55,28 +46,54 @@ function formatRenewalLong(
   }).format(end)
 }
 
-/**
- * Compact "what plan am I on / how much have I used" card pinned to the
- * bottom of the dashboard left sidebar.
- *
- * Three render modes:
- *
- *   1. Loading       — slim skeleton (avoids layout shift on first paint).
- *   2. No plan       — single CTA → /plans (matches the "leave them on no
- *                      plan until they pick" policy).
- *   3. Active plan   — plan badge, two usage bars (messages + call mins),
- *                      reset countdown, "Manage plan" link.
- *
- * The colour ramp on the bars exactly mirrors the backend ``quota_state``
- * (see ``api/services/usage.py``): blue under 80%, amber at 80–99%, red
- * at 100%+. The card adds a banner stripe at "blocked" so the operator
- * can't miss that outbound traffic is being refused by the backend gate.
- */
+function stateFromPct(pct: number): QuotaState {
+  if (pct >= 120) return 'blocked'
+  if (pct >= 100) return 'over'
+  if (pct >= 80) return 'warning'
+  return 'ok'
+}
+
+function quotaStatusLabel(state: QuotaState): string {
+  switch (state) {
+    case 'blocked':
+      return 'Blocked'
+    case 'over':
+      return 'Over limit'
+    case 'warning':
+      return 'Almost full'
+    default:
+      return 'On track'
+  }
+}
+
+function barColor(state: QuotaState): string {
+  switch (state) {
+    case 'blocked':
+    case 'over':
+      return 'bg-red-500'
+    case 'warning':
+      return 'bg-amber-500'
+    case 'no_plan':
+      return 'bg-zinc-400'
+    default:
+      return 'bg-brand-500'
+  }
+}
+
+function trackColor(state: QuotaState): string {
+  switch (state) {
+    case 'blocked':
+    case 'over':
+      return 'bg-red-100 dark:bg-red-950/50'
+    case 'warning':
+      return 'bg-amber-100 dark:bg-amber-950/40'
+    default:
+      return 'bg-brand-100 dark:bg-brand-950/40'
+  }
+}
+
 export function SidebarUsageCard() {
   const { data, loading, refetch } = useSubscription()
-  // Local "refreshing" state so we can spin the icon for the duration of the
-  // click — independent of the 60s background poll's loading flag, which
-  // toggles too briefly to register visually.
   const [refreshing, setRefreshing] = useState(false)
 
   const handleRefresh = async () => {
@@ -90,13 +107,7 @@ export function SidebarUsageCard() {
   }
 
   if (loading && !data) {
-    return (
-      <div className="mx-1 mb-1 rounded-xl border border-zinc-200 bg-white/40 p-3 dark:border-zinc-800 dark:bg-zinc-900/40">
-        <div className="h-3 w-20 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
-        <div className="mt-3 h-1.5 w-full animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
-        <div className="mt-2 h-1.5 w-full animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
-      </div>
-    )
+    return <PlanCardSkeleton />
   }
 
   if (!data || data.plan === null || data.usage.quota_state === 'no_plan') {
@@ -112,40 +123,71 @@ export function SidebarUsageCard() {
   )
 }
 
-// ---------------------------------------------------------------------------
-// "No plan" CTA
-// ---------------------------------------------------------------------------
-
-function NoPlanCard() {
+function PlanCardShell({
+  children,
+  className,
+}: {
+  children: ReactNode
+  className?: string
+}) {
   return (
-    <Link
-      href="/plans"
+    <div
       className={clsx(
-        'group mx-1 mb-1 block rounded-xl border border-dashed border-brand-300 bg-brand-50/60 p-3',
-        'transition hover:border-brand-400 hover:bg-brand-50',
-        'dark:border-brand-700/60 dark:bg-brand-500/10 dark:hover:bg-brand-500/15',
+        'mx-1 mb-1 overflow-hidden rounded-2xl border border-zinc-200/90 bg-white shadow-sm dark:border-zinc-700/80 dark:bg-zinc-900/90',
+        className,
       )}
     >
-      <div className="flex items-center gap-2">
-        <span className="flex size-7 items-center justify-center rounded-lg bg-brand-600 text-white shadow-sm">
-          <SparklesIcon className="size-4" />
-        </span>
-        <div className="min-w-0">
-          <p className="text-sm font-semibold text-brand-900 dark:text-brand-200">
-            Choose a plan
-          </p>
-          <p className="truncate text-xs text-brand-700/80 dark:text-brand-300/80">
-            Unlock messaging and voice quotas
-          </p>
-        </div>
-      </div>
-    </Link>
+      {children}
+    </div>
   )
 }
 
-// ---------------------------------------------------------------------------
-// Active plan card
-// ---------------------------------------------------------------------------
+function PlanCardSkeleton() {
+  return (
+    <PlanCardShell>
+      <div className="space-y-3 p-3.5">
+        <div className="h-4 w-24 animate-pulse rounded-md bg-zinc-100 dark:bg-zinc-800" />
+        <div className="h-10 animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-800" />
+        <div className="space-y-2">
+          <div className="h-8 animate-pulse rounded-lg bg-zinc-100 dark:bg-zinc-800" />
+          <div className="h-8 animate-pulse rounded-lg bg-zinc-100 dark:bg-zinc-800" />
+        </div>
+        <div className="h-9 animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-800" />
+      </div>
+    </PlanCardShell>
+  )
+}
+
+function NoPlanCard() {
+  return (
+    <Link href="/plans" className="group mx-1 mb-1 block">
+      <PlanCardShell className="border-dashed border-brand-300/90 bg-linear-to-br from-brand-50/90 to-white transition hover:border-brand-400 hover:shadow-md dark:border-brand-700/50 dark:from-brand-950/40 dark:to-zinc-900/90 dark:hover:border-brand-600">
+        <div className="p-3.5">
+          <div className="flex items-start gap-3">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-linear-to-b from-brand-500 to-brand-700 text-white shadow-sm shadow-brand-500/25">
+              <SparklesIcon className="size-5" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-brand-600 dark:text-brand-400">
+                Subscription
+              </p>
+              <p className="mt-0.5 text-sm font-semibold text-zinc-900 dark:text-white">
+                Choose a plan
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-zinc-600 dark:text-zinc-400">
+                Pick a tier to unlock customer messaging and AI voice minutes for this workspace.
+              </p>
+            </div>
+          </div>
+          <span className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl bg-brand-600 py-2 text-xs font-semibold text-white transition group-hover:bg-brand-700">
+            View plans
+            <ArrowUpRightIcon className="size-3.5" />
+          </span>
+        </div>
+      </PlanCardShell>
+    </Link>
+  )
+}
 
 function ActivePlanCard({
   subscription,
@@ -160,91 +202,91 @@ function ActivePlanCard({
   const tenantTz = useTenantTimezone()
   if (!plan) return <NoPlanCard />
 
-  const state = usage.quota_state
-  const blocked = state === 'blocked'
-  const over = state === 'over'
-  const warning = state === 'warning'
+  const overallState = usage.quota_state
+  const blocked = overallState === 'blocked'
+  const stressed = blocked || overallState === 'over' || overallState === 'warning'
 
   const renewalLabel = formatRenewalDate(period_end, tenantTz)
-  // Long-form date kept on the tooltip so the operator can see the exact
-  // calendar day on hover even when the inline text is just "Jun 11".
   const renewalLongLabel = formatRenewalLong(period_end, tenantTz)
 
   return (
-    <div
+    <PlanCardShell
       className={clsx(
-        'mx-1 mb-1 overflow-hidden rounded-xl border bg-white/70 shadow-sm dark:bg-zinc-900/60',
-        blocked
-          ? 'border-red-300 ring-1 ring-red-200 dark:border-red-700/60 dark:ring-red-800/40'
-          : over
-            ? 'border-red-200 dark:border-red-800/50'
-            : warning
-              ? 'border-amber-200 dark:border-amber-700/40'
-              : 'border-zinc-200 dark:border-zinc-800',
+        blocked && 'border-red-300 dark:border-red-800/60',
+        !blocked && stressed && 'border-amber-200 dark:border-amber-800/50',
       )}
     >
       {blocked && (
-        <div className="bg-red-500 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-white">
-          Quota blocked — upgrade
+        <div className="border-b border-red-200/80 bg-red-50 px-3.5 py-2 text-xs leading-snug text-red-800 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200">
+          <span className="font-semibold">Outbound paused.</span> Usage is over your plan
+          limit — upgrade to resume messages and calls.
         </div>
       )}
 
-      <div className="px-3 py-2.5">
-        {/* Plan name + featured ★ on the left, renewal date + refresh on the right */}
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-1.5 min-w-0">
-            <span className="truncate text-sm font-semibold text-zinc-900 dark:text-white">
-              {plan.name}
-            </span>
-            {plan.is_featured && (
-              <span
-                title="Featured tier"
-                className="text-amber-500 dark:text-amber-400"
-              >
-                ★
+      {!blocked && overallState === 'over' && (
+        <div className="border-b border-amber-200/80 bg-amber-50 px-3.5 py-2 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100">
+          You are over quota. Upgrade soon to avoid blocked sends.
+        </div>
+      )}
+
+      <div className="p-3.5">
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
+          Your plan
+        </p>
+
+        <div className="mt-2 flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="inline-flex max-w-full items-center gap-1.5 rounded-xl bg-brand-50 px-2.5 py-1 ring-1 ring-brand-200/80 dark:bg-brand-950/50 dark:ring-brand-800/60">
+              <span className="truncate text-sm font-semibold text-brand-800 dark:text-brand-200">
+                {plan.name}
               </span>
-            )}
-          </div>
-          <div className="flex shrink-0 items-center gap-1.5">
-            {renewalLabel && (
-              <span
-                title={renewalLongLabel}
-                className="text-[11px] text-zinc-500 dark:text-zinc-400"
-              >
-                Renews {renewalLabel}
-              </span>
-            )}
-            <button
-              type="button"
-              onClick={onRefresh}
-              disabled={refreshing}
-              aria-label="Refresh usage"
-              title="Refresh usage"
-              className={clsx(
-                'rounded-md p-1 text-zinc-400 transition',
-                'hover:bg-zinc-100 hover:text-zinc-700',
-                'dark:hover:bg-zinc-800 dark:hover:text-zinc-200',
-                'disabled:cursor-not-allowed disabled:opacity-60',
+              {plan.is_featured && (
+                <span
+                  title="Popular tier"
+                  className="shrink-0 text-[10px] font-bold text-amber-500"
+                  aria-hidden
+                >
+                  ★
+                </span>
               )}
-            >
-              <ArrowPathIcon
-                className={clsx('size-3.5', refreshing && 'animate-spin')}
-              />
-            </button>
+            </div>
+            {renewalLabel ? (
+              <p
+                className="mt-1.5 text-[11px] text-zinc-500 dark:text-zinc-400"
+                title={renewalLongLabel || undefined}
+              >
+                Quota resets <span className="font-medium text-zinc-700 dark:text-zinc-300">{renewalLabel}</span>
+              </p>
+            ) : (
+              <p className="mt-1.5 text-[11px] text-zinc-500 dark:text-zinc-400">
+                30-day usage window
+              </p>
+            )}
           </div>
+          <button
+            type="button"
+            onClick={onRefresh}
+            disabled={refreshing}
+            aria-label="Refresh usage numbers"
+            title="Refresh usage"
+            className="shrink-0 rounded-lg border border-zinc-200/80 bg-zinc-50 p-1.5 text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-800 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:hover:text-zinc-200"
+          >
+            <ArrowPathIcon className={clsx('size-4', refreshing && 'animate-spin')} />
+          </button>
         </div>
 
-        {/* Bars */}
-        <div className="mt-2.5 space-y-2">
-          <UsageBar
+        <div className="mt-3 space-y-3 rounded-xl bg-zinc-50/80 p-2.5 ring-1 ring-zinc-950/5 dark:bg-zinc-800/40 dark:ring-white/5">
+          <QuotaMeter
+            icon={<ChatBubbleLeftRightIcon className="size-3.5" />}
             label="Messages"
             used={usage.messages_used}
             quota={plan.messages_quota}
             remaining={usage.messages_remaining}
             pct={usage.messages_pct}
           />
-          <UsageBar
-            label="Call mins"
+          <QuotaMeter
+            icon={<PhoneIcon className="size-3.5" />}
+            label="Voice minutes"
             used={usage.call_minutes_used}
             quota={plan.call_minutes_quota}
             remaining={usage.call_minutes_remaining}
@@ -255,33 +297,31 @@ function ActivePlanCard({
         <Link
           href="/plans"
           className={clsx(
-            'mt-2.5 inline-flex items-center gap-1 text-xs font-medium',
-            blocked || over
-              ? 'text-red-700 hover:text-red-800 dark:text-red-300 dark:hover:text-red-200'
+            'mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-semibold transition',
+            blocked || overallState === 'over'
+              ? 'bg-red-600 text-white hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-500'
               : warning
-                ? 'text-amber-700 hover:text-amber-800 dark:text-amber-300 dark:hover:text-amber-200'
-                : 'text-brand-700 hover:text-brand-800 dark:text-brand-300 dark:hover:text-brand-200',
+                ? 'bg-amber-500 text-white hover:bg-amber-600'
+                : 'bg-brand-600 text-white hover:bg-brand-700 dark:bg-brand-600 dark:hover:bg-brand-500',
           )}
         >
-          {blocked || over ? 'Upgrade plan' : 'Manage plan'}
-          <ArrowUpRightIcon className="size-3" />
+          {blocked || overallState === 'over' ? 'Upgrade plan' : 'Manage plan'}
+          <ArrowUpRightIcon className="size-3.5" />
         </Link>
       </div>
-    </div>
+    </PlanCardShell>
   )
 }
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function UsageBar({
+function QuotaMeter({
+  icon,
   label,
   used,
   quota,
   remaining,
   pct,
 }: {
+  icon: ReactNode
   label: string
   used: number
   quota: number
@@ -290,48 +330,56 @@ function UsageBar({
 }) {
   const state = stateFromPct(pct)
   const clamped = Math.min(100, Math.max(0, pct))
+  const displayPct = Math.round(pct)
+
+  const helper =
+    state === 'blocked' || state === 'over'
+      ? `${Math.max(0, used - quota).toLocaleString()} over limit`
+      : `${remaining.toLocaleString()} remaining`
 
   return (
     <div>
-      <div className="mb-0.5 flex items-center justify-between text-[11px] tabular-nums">
-        <span className="text-zinc-500 dark:text-zinc-400">{label}</span>
-        <span className="text-zinc-700 dark:text-zinc-300">
+      <div className="flex items-center justify-between gap-2">
+        <span className="flex items-center gap-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300">
+          <span className="text-brand-600 dark:text-brand-400">{icon}</span>
+          {label}
+        </span>
+        <span
+          className={clsx(
+            'rounded-full px-1.5 py-0.5 text-[10px] font-semibold',
+            state === 'blocked' || state === 'over'
+              ? 'bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300'
+              : state === 'warning'
+                ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300'
+                : 'bg-brand-100 text-brand-700 dark:bg-brand-950/50 dark:text-brand-300',
+          )}
+        >
+          {quotaStatusLabel(state)}
+        </span>
+      </div>
+
+      <div className="mt-1.5 flex items-baseline justify-between gap-2 tabular-nums">
+        <span className="text-sm font-semibold text-zinc-900 dark:text-white">{displayPct}%</span>
+        <span className="text-[10px] text-zinc-500 dark:text-zinc-400">
           {used.toLocaleString()} / {quota.toLocaleString()}
         </span>
       </div>
-      <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+
+      <div
+        className={clsx('mt-1 h-2 w-full overflow-hidden rounded-full', trackColor(state))}
+        role="progressbar"
+        aria-valuenow={clamped}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label={`${label}: ${displayPct}% used`}
+      >
         <div
-          className={clsx('h-full transition-all', barColor(state))}
+          className={clsx('h-full rounded-full transition-all duration-500', barColor(state))}
           style={{ width: `${clamped}%` }}
         />
       </div>
-      <div className="mt-0.5 text-[10.5px] text-zinc-500 dark:text-zinc-500">
-        {state === 'blocked' || state === 'over'
-          ? `Over by ${Math.max(0, used - quota).toLocaleString()}`
-          : `${remaining.toLocaleString()} left`}
-      </div>
+
+      <p className="mt-1 text-[10px] text-zinc-500 dark:text-zinc-400">{helper}</p>
     </div>
   )
-}
-
-function stateFromPct(pct: number): QuotaState {
-  if (pct >= 120) return 'blocked'
-  if (pct >= 100) return 'over'
-  if (pct >= 80) return 'warning'
-  return 'ok'
-}
-
-function barColor(state: QuotaState): string {
-  switch (state) {
-    case 'blocked':
-    case 'over':
-      return 'bg-red-500'
-    case 'warning':
-      return 'bg-amber-500'
-    case 'no_plan':
-      return 'bg-zinc-400'
-    case 'ok':
-    default:
-      return 'bg-brand-500'
-  }
 }
