@@ -1,5 +1,6 @@
 'use client'
 
+import clsx from 'clsx'
 import { useEffect, useState } from 'react'
 import {
   CalendarDaysIcon,
@@ -18,6 +19,7 @@ import { Button } from '@/components/button'
 import { ChannelIcon, SourceBadge, channelLabel } from '@/components/channel-icon'
 import { useApiToken, useTenantTimezone } from '@/lib/hooks'
 import { api } from '@/lib/api'
+import { renderRichText } from '@/lib/rich-text'
 import { formatDateTime, formatRelativeTime, statusColor } from '@/lib/utils'
 import type { Booking, BookingDetails, BookingMessagePreview } from '@/lib/types'
 
@@ -51,24 +53,110 @@ function MetaTile({
   )
 }
 
-function MessageBubble({ message }: { message: BookingMessagePreview }) {
-  const isUser = message.role === 'user'
+function formatBubbleTime(iso: string) {
+  return new Date(iso).toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  })
+}
+
+function bubbleTextForDisplay(message: BookingMessagePreview): string {
+  const raw = (message.content || '').trim()
+  if (!raw) return ''
+
+  const marker = /\n*\[Customer's text]\s*\n/i
+  const match = raw.match(marker)
+  if (match && match.index !== undefined) {
+    const after = raw.slice(match.index + match[0].length).trim()
+    if (after.length > 0) return after
+  }
+  if (/^\[Attachment\b/i.test(raw)) return ''
+  return raw
+}
+
+function MessageBubble({
+  message,
+  customerName,
+}: {
+  message: BookingMessagePreview
+  customerName: string
+}) {
+  const isCustomer = message.role === 'user'
   const isSystem = message.role === 'system' || message.role === 'tool'
-  const text = (message.content || '').trim() || '—'
-  const align = isUser ? 'items-start' : 'items-end'
-  const bubble = isSystem
-    ? 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300'
-    : isUser
-      ? 'bg-white text-zinc-900 ring-1 ring-zinc-200 dark:bg-zinc-800 dark:text-zinc-100 dark:ring-white/10'
-      : 'bg-blue-600 text-white'
+  const bubbleBody = bubbleTextForDisplay(message)
+
+  if (isSystem) {
+    return (
+      <div className="flex justify-center py-1">
+        <span className="rounded-full bg-zinc-200/90 px-3 py-1 text-center text-[11px] text-zinc-600 dark:bg-zinc-700/90 dark:text-zinc-300">
+          {renderRichText(message.content.trim() || '—')}
+        </span>
+      </div>
+    )
+  }
+
+  const linkClassName = isCustomer
+    ? 'underline underline-offset-2 text-sky-700 hover:opacity-80 dark:text-sky-300'
+    : 'underline underline-offset-2 text-white hover:opacity-80'
+
+  const initials = customerName.trim().slice(0, 1).toUpperCase() || 'C'
+
   return (
-    <div className={`flex flex-col gap-1 ${align}`}>
-      <span className="text-[10px] font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
-        {isUser ? 'Customer' : isSystem ? message.role : 'Assistant'} ·{' '}
-        {formatRelativeTime(message.created_at)}
-      </span>
-      <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm leading-relaxed ${bubble}`}>
-        {text}
+    <div
+      className={clsx(
+        'group flex gap-2 py-0.5',
+        isCustomer ? 'justify-start' : 'justify-end',
+      )}
+    >
+      {isCustomer && (
+        <div className="mt-auto shrink-0 pb-1">
+          <div className="flex size-7 items-center justify-center rounded-full bg-zinc-200 text-[9px] font-bold text-zinc-700 ring-1 ring-black/5 dark:bg-zinc-600 dark:text-zinc-100 dark:ring-white/10">
+            {initials}
+          </div>
+        </div>
+      )}
+
+      <div
+        className={clsx(
+          'max-w-[min(100%,26rem)]',
+          !isCustomer && 'flex flex-row-reverse items-end gap-2',
+        )}
+      >
+        <div className="flex items-end gap-1">
+          <div
+            className={clsx(
+              'relative px-3 py-2 text-[15px] leading-snug shadow-sm',
+              isCustomer
+                ? 'rounded-[18px] rounded-bl-md bg-[#e4e6eb] text-zinc-900 dark:bg-zinc-700 dark:text-zinc-100'
+                : 'rounded-[18px] rounded-br-md bg-[#0084ff] text-white',
+            )}
+          >
+            {bubbleBody ? (
+              <p className="whitespace-pre-wrap wrap-break-word">
+                {renderRichText(bubbleBody, { linkClassName })}
+              </p>
+            ) : (
+              <p className="text-zinc-500 italic dark:text-zinc-400">—</p>
+            )}
+            <p
+              className={clsx(
+                'mt-1 text-[11px]',
+                isCustomer ? 'text-zinc-500 dark:text-zinc-400' : 'text-white/80',
+              )}
+            >
+              {formatBubbleTime(message.created_at)}
+            </p>
+          </div>
+
+          {!isCustomer && (
+            <div className="mb-1 size-7 shrink-0 overflow-hidden rounded-full ring-2 ring-white dark:ring-zinc-900">
+              <div className="flex size-full items-center justify-center bg-linear-to-br from-[#0084ff] to-[#0066cc] text-[9px] font-bold text-white">
+                AI
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
@@ -196,14 +284,6 @@ export function BookingDetailsDialog({
           <MetaTile icon={ClockIcon} label="Last update">
             {formatDateTime(data.updated_at, tenantTz)}
           </MetaTile>
-          {(data.crm_job_id || data.crm_contact_id) && (
-            <MetaTile icon={IdentificationIcon} label="CRM">
-              <div className="flex flex-col gap-1 font-mono text-[11px] leading-snug">
-                {data.crm_job_id ? <span>Job: {data.crm_job_id}</span> : null}
-                {data.crm_contact_id ? <span>Contact: {data.crm_contact_id}</span> : null}
-              </div>
-            </MetaTile>
-          )}
         </div>
 
         {/* Operator note + status timestamp */}
@@ -292,9 +372,13 @@ export function BookingDetailsDialog({
                   : 'This booking is not linked to a chat conversation.'}
               </p>
             ) : (
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-1">
                 {messages.map((m) => (
-                  <MessageBubble key={m.id} message={m} />
+                  <MessageBubble
+                    key={m.id}
+                    message={m}
+                    customerName={data.customer_name || 'Customer'}
+                  />
                 ))}
               </div>
             )}
