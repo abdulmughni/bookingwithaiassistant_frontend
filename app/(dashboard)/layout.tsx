@@ -25,6 +25,7 @@ import {
 } from '@/components/organization-gate'
 import { SidebarUsageCard } from '@/components/sidebar-usage-card'
 import { JobberReconnectBanner } from '@/components/jobber-reconnect-banner'
+import { APP_BRAND_NAME } from '@/lib/brand'
 
 export default function DashboardLayout({
   children,
@@ -59,7 +60,7 @@ export default function DashboardLayout({
                     B
                   </span>
                   <SidebarLabel className="text-sm font-semibold">
-                    BookingWithAI
+                    {APP_BRAND_NAME}
                   </SidebarLabel>
                 </span>
               </SidebarItem>
