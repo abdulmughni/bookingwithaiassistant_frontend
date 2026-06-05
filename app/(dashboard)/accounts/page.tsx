@@ -433,7 +433,7 @@ function AccountsPageInner() {
             <DialogTitle>Connect destination</DialogTitle>
             <DialogDescription>
               {connectMode === 'destination'
-                ? 'Connect Facebook Messenger, Instagram, or WhatsApp so you can send and receive customer messages from one dashboard.'
+                ? 'Connect Facebook Messenger or Instagram via Meta sign-in so you can send and receive customer messages from one dashboard.'
                 : 'Enter account details manually (advanced).'}
             </DialogDescription>
           </div>
@@ -446,7 +446,7 @@ function AccountsPageInner() {
 
         <DialogBody className="max-h-[70vh] overflow-y-auto pr-1">
           {connectMode === 'destination' ? (
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2">
               <DestinationConnectCard
                 channel="facebook"
                 title="Facebook"
@@ -464,15 +464,6 @@ function AccountsPageInner() {
                 actionClassName="text-fuchsia-600 dark:text-fuchsia-400"
                 disabled={oauthLoading}
                 onClick={() => void handleMetaOAuth()}
-              />
-              <DestinationConnectCard
-                channel="whatsapp"
-                title="WhatsApp"
-                description="Cloud API number via Meta embedded signup."
-                actionLabel={oauthLoading ? 'Redirecting…' : 'Connect'}
-                actionClassName="text-emerald-700 dark:text-emerald-400"
-                disabled={oauthLoading}
-                onClick={() => void handleWhatsAppOAuth()}
               />
             </div>
           ) : (
