@@ -14,6 +14,16 @@ import {
 
 import { Button } from '@/components/button'
 import { Select } from '@/components/select'
+import {
+  Dialog,
+  DialogActions,
+  DialogBody,
+  DialogDescription,
+  DialogTitle,
+} from '@/components/dialog'
+import { Field, FieldGroup, Label } from '@/components/fieldset'
+import { Input } from '@/components/input'
+import { Textarea } from '@/components/textarea'
 import { ConfirmActionDialog } from '@/components/admin/confirm-action-dialog'
 import { VerifyIdentityDialog } from '@/components/admin/verify-identity-dialog'
 import { ConfirmDeleteDialog } from '@/components/confirm-delete-dialog'
@@ -23,6 +33,7 @@ import {
   formatDate,
   formatDateTime,
   priceLabel,
+  validityLabel,
 } from '@/components/admin/shared'
 import { PageShell, SkeletonBlock, dashCardClass } from '@/components/dashboard-ui'
 import { api, ApiError } from '@/lib/api'
@@ -56,6 +67,13 @@ export default function AdminClientDetailPage() {
   // ----- status & plan confirmation state -----
   const [confirmStatus, setConfirmStatus] = useState<'activate' | 'suspend' | null>(null)
   const [pendingPlanId, setPendingPlanId] = useState<string | null>(null)
+
+  // ----- add-credits modal state -----
+  const [showAddCredits, setShowAddCredits] = useState(false)
+  const [creditMessages, setCreditMessages] = useState('')
+  const [creditMinutes, setCreditMinutes] = useState('')
+  const [creditReason, setCreditReason] = useState('')
+  const [savingCredits, setSavingCredits] = useState(false)
 
   // ----- profile (step-up verified) state -----
   const [profile, setProfile] = useState<AdminTenantProfile | null>(null)
@@ -99,6 +117,34 @@ export default function AdminClientDetailPage() {
     },
     [getToken, tenantId, refetch],
   )
+
+  const submitCredits = useCallback(async () => {
+    const messages = Number.parseInt(creditMessages || '0', 10) || 0
+    const minutes = Number.parseInt(creditMinutes || '0', 10) || 0
+    if (messages === 0 && minutes === 0) {
+      toast.error('Enter a non-zero amount of messages or minutes.')
+      return
+    }
+    setSavingCredits(true)
+    try {
+      const token = await getToken()
+      await api.admin.addCredits(token, tenantId, {
+        messages_delta: messages,
+        call_minutes_delta: minutes,
+        reason: creditReason,
+      })
+      toast.success('Credits added.')
+      setShowAddCredits(false)
+      setCreditMessages('')
+      setCreditMinutes('')
+      setCreditReason('')
+      await refetch()
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Failed to add credits.')
+    } finally {
+      setSavingCredits(false)
+    }
+  }, [creditMessages, creditMinutes, creditReason, getToken, tenantId, refetch])
 
   const fetchProfile = useCallback(
     async (verificationToken: string) => {
@@ -224,7 +270,8 @@ export default function AdminClientDetailPage() {
                   <span className="text-zinc-400">
                     · {priceLabel(tenant.plan.monthly_price_cents)} ·{' '}
                     {tenant.plan.messages_quota.toLocaleString()} msgs ·{' '}
-                    {tenant.plan.call_minutes_quota.toLocaleString()} mins
+                    {tenant.plan.call_minutes_quota.toLocaleString()} mins ·{' '}
+                    {validityLabel(tenant.plan.validity_days)}
                   </span>
                 </>
               ) : (
@@ -233,6 +280,23 @@ export default function AdminClientDetailPage() {
                 </span>
               )}
             </p>
+            {tenant.plan && (
+              <p className="mt-1 text-sm">
+                {tenant.is_expired ? (
+                  <span className="font-medium text-red-600 dark:text-red-400">
+                    Credits expired on {formatDate(tenant.subscription_expires_at)} — inbound traffic
+                    is blocked until renewed.
+                  </span>
+                ) : (
+                  <span className="text-zinc-500">
+                    Credits valid until{' '}
+                    <span className="font-medium text-zinc-700 dark:text-zinc-300">
+                      {formatDate(tenant.subscription_expires_at)}
+                    </span>
+                  </span>
+                )}
+              </p>
+            )}
             <div className="mt-3 max-w-xs">
               <Select
                 aria-label="Assign plan"
@@ -258,9 +322,22 @@ export default function AdminClientDetailPage() {
         {/* Usage + workspace info */}
         <div className="space-y-6">
           <section className={`${dashCardClass} p-5 sm:p-6`}>
-            <h3 className="text-base font-semibold text-zinc-950 dark:text-white">
-              Usage (rolling 30 days)
-            </h3>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h3 className="text-base font-semibold text-zinc-950 dark:text-white">
+                Credits used
+              </h3>
+              <Button
+                outline
+                disabled={!tenant.plan}
+                onClick={() => setShowAddCredits(true)}
+                title={tenant.plan ? undefined : 'Assign a plan before adding credits'}
+              >
+                Add credits
+              </Button>
+            </div>
+            <p className="mt-0.5 text-sm text-zinc-500">
+              Prepaid balance consumed over the pack&apos;s validity window (no monthly reset).
+            </p>
             <div className="mt-4 space-y-4">
               <UsageBar
                 used={tenant.usage.messages_used}
@@ -273,6 +350,36 @@ export default function AdminClientDetailPage() {
                 label="Call minutes"
               />
             </div>
+
+            {tenant.recent_adjustments.length > 0 && (
+              <div className="mt-5 border-t border-zinc-200/80 pt-4 dark:border-zinc-700/80">
+                <p className="text-xs font-medium uppercase tracking-wide text-zinc-400">
+                  Recent top-ups
+                </p>
+                <ul className="mt-2 space-y-2">
+                  {tenant.recent_adjustments.map((a) => (
+                    <li key={a.id} className="flex items-start justify-between gap-3 text-sm">
+                      <div className="min-w-0">
+                        <span className="font-medium text-zinc-700 dark:text-zinc-200">
+                          {[
+                            a.messages_delta ? `${a.messages_delta > 0 ? '+' : ''}${a.messages_delta.toLocaleString()} msgs` : null,
+                            a.call_minutes_delta ? `${a.call_minutes_delta > 0 ? '+' : ''}${a.call_minutes_delta.toLocaleString()} mins` : null,
+                          ]
+                            .filter(Boolean)
+                            .join(' · ')}
+                        </span>
+                        {a.reason && (
+                          <span className="block truncate text-xs text-zinc-500">{a.reason}</span>
+                        )}
+                      </div>
+                      <span className="shrink-0 text-xs text-zinc-400">
+                        {formatDate(a.created_at)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </section>
 
           <section className={`${dashCardClass} p-5 sm:p-6`}>
@@ -409,7 +516,7 @@ export default function AdminClientDetailPage() {
         open={pendingPlanId !== null}
         onClose={() => setPendingPlanId(null)}
         title="Change plan?"
-        description={`This updates the client's quota immediately.`}
+        description="This starts a fresh prepaid pack: it resets their credit balance and validity window to the new plan immediately."
         confirmLabel="Confirm plan change"
         busyLabel="Updating…"
         color="brand"
@@ -427,6 +534,59 @@ export default function AdminClientDetailPage() {
           </span>
         </div>
       </ConfirmActionDialog>
+
+      <Dialog
+        open={showAddCredits}
+        onClose={() => (savingCredits ? null : setShowAddCredits(false))}
+      >
+        <DialogTitle>Add credits</DialogTitle>
+        <DialogDescription>
+          Top up {tenant.name}&apos;s prepaid balance. This bumps their remaining messages and
+          call minutes immediately and is recorded in the audit log. Use negative numbers to
+          deduct.
+        </DialogDescription>
+        <DialogBody>
+          <FieldGroup>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field>
+                <Label>Messages</Label>
+                <Input
+                  type="number"
+                  value={creditMessages}
+                  onChange={(e) => setCreditMessages(e.target.value)}
+                  placeholder="0"
+                />
+              </Field>
+              <Field>
+                <Label>Call minutes</Label>
+                <Input
+                  type="number"
+                  value={creditMinutes}
+                  onChange={(e) => setCreditMinutes(e.target.value)}
+                  placeholder="0"
+                />
+              </Field>
+            </div>
+            <Field>
+              <Label>Reason (optional)</Label>
+              <Textarea
+                rows={2}
+                value={creditReason}
+                onChange={(e) => setCreditReason(e.target.value)}
+                placeholder="e.g. goodwill credit, billing correction…"
+              />
+            </Field>
+          </FieldGroup>
+        </DialogBody>
+        <DialogActions>
+          <Button plain disabled={savingCredits} onClick={() => setShowAddCredits(false)}>
+            Cancel
+          </Button>
+          <Button color="brand" disabled={savingCredits} onClick={submitCredits}>
+            {savingCredits ? 'Adding…' : 'Add credits'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <VerifyIdentityDialog
         open={showVerifyForProfile}

@@ -47,7 +47,6 @@ function formatRenewalLong(periodEndIso: string | null, timeZone: string): strin
 }
 
 function stateFromPct(pct: number): QuotaState {
-  if (pct >= 120) return 'blocked'
   if (pct >= 100) return 'over'
   if (pct >= 80) return 'warning'
   return 'ok'
@@ -55,12 +54,14 @@ function stateFromPct(pct: number): QuotaState {
 
 function quotaStatusLabel(state: QuotaState): string {
   switch (state) {
+    case 'expired':
+      return 'Expired'
     case 'blocked':
       return 'Blocked'
     case 'over':
-      return 'Over limit'
+      return 'Used up'
     case 'warning':
-      return 'Almost full'
+      return 'Almost gone'
     default:
       return 'On track'
   }
@@ -68,6 +69,7 @@ function quotaStatusLabel(state: QuotaState): string {
 
 function barColor(state: QuotaState): string {
   switch (state) {
+    case 'expired':
     case 'blocked':
     case 'over':
       return 'bg-red-500'
@@ -82,6 +84,7 @@ function barColor(state: QuotaState): string {
 
 function trackColor(state: QuotaState): string {
   switch (state) {
+    case 'expired':
     case 'blocked':
     case 'over':
       return 'bg-red-100 dark:bg-red-950/50'
@@ -198,15 +201,20 @@ function ActivePlanCard({
   onRefresh: () => void
   refreshing: boolean
 }) {
-  const { plan, period_end, usage } = subscription
+  const { plan, period_end, usage, is_expired, messages_allowance, call_minutes_allowance } =
+    subscription
   const tenantTz = useTenantTimezone()
   if (!plan) return <NoPlanCard />
 
   const overallState = usage.quota_state
+  const expired = is_expired || overallState === 'expired'
   const blocked = overallState === 'blocked'
   const over = overallState === 'over'
   const warning = overallState === 'warning'
-  const stressed = blocked || over || warning
+  const stressed = expired || blocked || over || warning
+
+  const messagesQuota = messages_allowance || plan.messages_quota
+  const callMinutesQuota = call_minutes_allowance || plan.call_minutes_quota
 
   const renewalLabel = formatRenewalDate(period_end, tenantTz)
   const renewalLongLabel = formatRenewalLong(period_end, tenantTz)
@@ -214,20 +222,21 @@ function ActivePlanCard({
   return (
     <PlanCardShell
       className={clsx(
-        blocked && 'border-red-300 dark:border-red-800/60',
-        !blocked && stressed && 'border-amber-200 dark:border-amber-800/50',
+        (expired || blocked || over) && 'border-red-300 dark:border-red-800/60',
+        !(expired || blocked || over) && stressed && 'border-amber-200 dark:border-amber-800/50',
       )}
     >
-      {blocked && (
+      {expired && (
         <div className="border-b border-red-200/80 bg-red-50 px-3.5 py-2 text-xs leading-snug text-red-800 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200">
-          <span className="font-semibold">Outbound paused.</span> Usage is over your plan
-          limit — upgrade to resume messages and calls.
+          <span className="font-semibold">Credits expired.</span> Contact your administrator to
+          renew this pack and resume messages and calls.
         </div>
       )}
 
-      {!blocked && over && (
-        <div className="border-b border-amber-200/80 bg-amber-50 px-3.5 py-2 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100">
-          You are over quota. Upgrade soon to avoid blocked sends.
+      {!expired && (blocked || over) && (
+        <div className="border-b border-red-200/80 bg-red-50 px-3.5 py-2 text-xs leading-snug text-red-800 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200">
+          <span className="font-semibold">Outbound paused.</span> Your credits are used up —
+          contact your administrator to add more.
         </div>
       )}
 
@@ -252,14 +261,27 @@ function ActivePlanCard({
             </p>
             {renewalLabel ? (
               <p
-                className="mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-400"
+                className={clsx(
+                  'mt-0.5 text-[11px]',
+                  expired
+                    ? 'text-red-600 dark:text-red-400'
+                    : 'text-zinc-500 dark:text-zinc-400',
+                )}
                 title={renewalLongLabel || undefined}
               >
-                Quota resets <span className="font-medium text-zinc-700 dark:text-zinc-300">{renewalLabel}</span>
+                {expired ? 'Expired on ' : 'Credits valid until '}
+                <span
+                  className={clsx(
+                    'font-medium',
+                    expired ? 'text-red-700 dark:text-red-300' : 'text-zinc-700 dark:text-zinc-300',
+                  )}
+                >
+                  {renewalLabel}
+                </span>
               </p>
             ) : (
               <p className="mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-400">
-                30-day usage window
+                Prepaid credit pack
               </p>
             )}
           </div>
@@ -280,7 +302,7 @@ function ActivePlanCard({
             icon={<ChatBubbleLeftRightIcon className="size-3.5" />}
             label="Messages"
             used={usage.messages_used}
-            quota={plan.messages_quota}
+            quota={messagesQuota}
             remaining={usage.messages_remaining}
             pct={usage.messages_pct}
           />
@@ -288,7 +310,7 @@ function ActivePlanCard({
             icon={<PhoneIcon className="size-3.5" />}
             label="Voice minutes"
             used={usage.call_minutes_used}
-            quota={plan.call_minutes_quota}
+            quota={callMinutesQuota}
             remaining={usage.call_minutes_remaining}
             pct={usage.call_minutes_pct}
           />
@@ -298,14 +320,14 @@ function ActivePlanCard({
           href="/plans"
           className={clsx(
             'mt-2.5 inline-flex items-center gap-1 text-xs font-medium transition',
-            blocked || over
+            expired || blocked || over
               ? 'text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300'
               : warning
                 ? 'text-amber-700 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300'
                 : 'text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300',
           )}
         >
-          {blocked || over ? 'Upgrade plan' : 'Manage plan'}
+          Manage plan
           <ArrowUpRightIcon className="size-3" />
         </Link>
       </div>
@@ -334,7 +356,7 @@ function QuotaMeter({
 
   const helper =
     state === 'blocked' || state === 'over'
-      ? `${Math.max(0, used - quota).toLocaleString()} over limit`
+      ? `Used up · ${Math.max(0, used - quota).toLocaleString()} over`
       : `${remaining.toLocaleString()} remaining`
 
   return (

@@ -422,6 +422,33 @@ export const api = {
         `/api/admin/tenants/${encodeURIComponent(tenantId)}/plan`,
         { token, method: 'POST', body: JSON.stringify({ plan_id: planId }) },
       ),
+    addCredits: (
+      token: string,
+      tenantId: string,
+      data: import('./types').AddCreditsBody,
+    ) =>
+      request<import('./types').AdminTenantDetail>(
+        `/api/admin/tenants/${encodeURIComponent(tenantId)}/credits`,
+        { token, method: 'POST', body: JSON.stringify(data) },
+      ),
+    listPlans: (token: string) =>
+      request<import('./types').AdminPlan[]>('/api/admin/plans', { token }),
+    createPlan: (token: string, data: import('./types').PlanWriteBody) =>
+      request<import('./types').AdminPlan>('/api/admin/plans', {
+        token,
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    updatePlan: (token: string, planId: string, data: import('./types').PlanUpdateBody) =>
+      request<import('./types').AdminPlan>(
+        `/api/admin/plans/${encodeURIComponent(planId)}`,
+        { token, method: 'PATCH', body: JSON.stringify(data) },
+      ),
+    deletePlan: (token: string, planId: string) =>
+      request<import('./types').DeletePlanResult>(
+        `/api/admin/plans/${encodeURIComponent(planId)}`,
+        { token, method: 'DELETE' },
+      ),
     listRequests: (token: string, status?: string) => {
       const qs = status ? `?status=${encodeURIComponent(status)}` : ''
       return request<import('./types').AdminPlanChangeRequest[]>(

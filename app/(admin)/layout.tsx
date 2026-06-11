@@ -4,8 +4,8 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 import { useAuth, useUser, UserButton } from '@clerk/nextjs'
 import {
-  ArrowUturnLeftIcon,
   ChartBarSquareIcon,
+  CreditCardIcon,
   InboxArrowDownIcon,
   ShieldCheckIcon,
   UsersIcon,
@@ -29,6 +29,7 @@ import { APP_BRAND_NAME, brandGradientClass } from '@/lib/brand'
 const adminNav = [
   { label: 'Overview', href: '/admin', icon: ChartBarSquareIcon, exact: true },
   { label: 'Clients', href: '/admin/clients', icon: UsersIcon, exact: false },
+  { label: 'Plans', href: '/admin/plans', icon: CreditCardIcon, exact: false },
   { label: 'Plan requests', href: '/admin/requests', icon: InboxArrowDownIcon, exact: false },
 ]
 
@@ -38,6 +39,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const { isAdmin, loading } = useIsAdmin()
   const router = useRouter()
   const pathname = usePathname()
+
+  const adminName =
+    (user ? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() : '') ||
+    user?.primaryEmailAddress?.emailAddress ||
+    'Administrator'
 
   useEffect(() => {
     if (isLoaded && !userId) {
@@ -103,13 +109,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </SidebarSection>
 
             <SidebarSpacer />
-
-            <SidebarSection>
-              <SidebarItem href="/">
-                <ArrowUturnLeftIcon data-slot="icon" />
-                <SidebarLabel>Back to app</SidebarLabel>
-              </SidebarItem>
-            </SidebarSection>
           </SidebarBody>
 
           <SidebarFooter>
@@ -117,10 +116,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <div className="flex items-center gap-3 px-2 py-1.5">
                 <UserButton appearance={{ elements: { avatarBox: 'size-8' } }} />
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-zinc-950 dark:text-white">
-                    {user ? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Admin' : 'Admin'}
+                  <div className="flex items-center gap-2">
+                    <p className="truncate text-sm font-medium text-zinc-950 dark:text-white">
+                      {adminName}
+                    </p>
+                    <span className="inline-flex shrink-0 items-center rounded-md bg-brand-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-700 dark:text-brand-300">
+                      Admin
+                    </span>
+                  </div>
+                  <p className="truncate text-xs text-zinc-500">
+                    {user?.primaryEmailAddress?.emailAddress ?? 'Platform owner'}
                   </p>
-                  <p className="truncate text-xs text-zinc-500">Platform owner</p>
                 </div>
               </div>
             </SidebarSection>

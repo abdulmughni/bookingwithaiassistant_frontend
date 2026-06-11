@@ -390,14 +390,17 @@ export interface VoiceToolsResponse {
 // Plans + subscription (matches api/services/usage.py and api/routes/plans.py)
 // ---------------------------------------------------------------------------
 
-/** A pricing tier shown on the standalone /plans page. */
+/** A prepaid credit pack shown on the standalone /plans page. */
 export interface Plan {
   id: string
   name: string
+  /** One-time price of the credit pack (legacy field name). */
   monthly_price_cents: number
   currency: string
   messages_quota: number
   call_minutes_quota: number
+  /** How long the pack stays usable, in days. */
+  validity_days: number
   features: string[]
   best_for: string
   is_featured: boolean
@@ -407,11 +410,12 @@ export interface Plan {
  * Quota states are computed from the worst-of (messages, call minutes):
  *  - "ok"       — < 80% used
  *  - "warning"  — 80–99%   (amber bar, soft banner)
- *  - "over"     — 100–119% (red bar, grace overage still allowed)
- *  - "blocked"  — ≥ 120%   (outbound traffic rejected by the backend gate)
+ *  - "over"     — ≥ 100%   (pack exhausted, traffic rejected by the gate)
+ *  - "expired"  — validity window lapsed (traffic rejected)
+ *  - "blocked"  — legacy; treated like "over"
  *  - "no_plan"  — tenant has no active subscription
  */
-export type QuotaState = 'ok' | 'warning' | 'over' | 'blocked' | 'no_plan'
+export type QuotaState = 'ok' | 'warning' | 'over' | 'expired' | 'blocked' | 'no_plan'
 
 export interface SubscriptionUsage {
   messages_used: number
@@ -427,8 +431,12 @@ export interface Subscription {
   plan: Plan | null
   /** ISO 8601 UTC; null when the tenant has no active plan yet. */
   period_start: string | null
+  /** = expires_at (end of validity window); null when no plan. */
   period_end: string | null
   usage: SubscriptionUsage
+  messages_allowance: number
+  call_minutes_allowance: number
+  is_expired: boolean
 }
 
 /** Result of POST /api/tenants/me/plan-change-request. */
@@ -455,6 +463,7 @@ export interface AdminPlanInfo {
   monthly_price_cents: number
   messages_quota: number
   call_minutes_quota: number
+  validity_days: number
 }
 
 export interface AdminUsageInfo {
@@ -474,6 +483,9 @@ export interface AdminTenant {
   created_at: string
   plan: AdminPlanInfo | null
   usage: AdminUsageInfo
+  /** ISO 8601 UTC; end of the prepaid validity window (null when no plan). */
+  subscription_expires_at: string | null
+  is_expired: boolean
   bookings_count: number
   conversations_count: number
 }
@@ -504,6 +516,16 @@ export interface AdminOverview {
   recent_requests: AdminPlanChangeRequest[]
 }
 
+/** One manual credit top-up (audit log entry). */
+export interface CreditAdjustment {
+  id: string
+  messages_delta: number
+  call_minutes_delta: number
+  reason: string
+  admin_id: string
+  created_at: string
+}
+
 /** Single-tenant detail (GET /api/admin/tenants/{id}). */
 export interface AdminTenantDetail extends AdminTenant {
   timezone: string
@@ -511,6 +533,54 @@ export interface AdminTenantDetail extends AdminTenant {
   crm_type: string
   channels: string[]
   calls_count: number
+  recent_adjustments: CreditAdjustment[]
+}
+
+/** Full plan row for the admin plans manager (GET /api/admin/plans). */
+export interface AdminPlan {
+  id: string
+  name: string
+  monthly_price_cents: number
+  currency: string
+  messages_quota: number
+  call_minutes_quota: number
+  validity_days: number
+  features: string[]
+  best_for: string
+  is_featured: boolean
+  sort_order: number
+  is_active: boolean
+  subscriber_count: number
+}
+
+/** Body for POST /api/admin/plans (create) — id is derived server-side. */
+export interface PlanWriteBody {
+  name: string
+  monthly_price_cents: number
+  currency: string
+  messages_quota: number
+  call_minutes_quota: number
+  validity_days: number
+  features: string[]
+  best_for: string
+  is_featured: boolean
+  sort_order: number
+  is_active: boolean
+}
+
+/** Body for PATCH /api/admin/plans/{id} (all fields optional). */
+export type PlanUpdateBody = Partial<PlanWriteBody>
+
+/** Body for POST /api/admin/tenants/{id}/credits. */
+export interface AddCreditsBody {
+  messages_delta: number
+  call_minutes_delta: number
+  reason: string
+}
+
+export interface DeletePlanResult {
+  deleted: boolean
+  detail: string
 }
 
 /** Result of POST /api/admin/verify-identity (step-up password check). */

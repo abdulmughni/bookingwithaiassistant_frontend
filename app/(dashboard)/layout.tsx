@@ -1,7 +1,8 @@
 'use client'
 
 import clsx from 'clsx'
-import { usePathname } from 'next/navigation'
+import { useEffect } from 'react'
+import { usePathname, useRouter } from 'next/navigation'
 import { useUser, useClerk, UserButton } from '@clerk/nextjs'
 import { SidebarLayout } from '@/components/sidebar-layout'
 import {
@@ -20,7 +21,6 @@ import { useIsAdmin } from '@/lib/hooks'
 import {
   ArrowRightStartOnRectangleIcon,
   QuestionMarkCircleIcon,
-  ShieldCheckIcon,
 } from '@heroicons/react/20/solid'
 import {
   NavbarOrganizationSwitcher,
@@ -40,12 +40,29 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   const pathname = usePathname()
+  const router = useRouter()
   const { user } = useUser()
   const { signOut } = useClerk()
-  const { isAdmin } = useIsAdmin()
+  const { isAdmin, loading: adminLoading } = useIsAdmin()
 
   const fullBleedPage =
     pathname === '/conversations' || pathname.startsWith('/conversations/')
+
+  // Admins get the dedicated console — bounce them straight there instead of
+  // rendering the client dashboard shell.
+  useEffect(() => {
+    if (!adminLoading && isAdmin) {
+      router.replace('/admin')
+    }
+  }, [adminLoading, isAdmin, router])
+
+  if (adminLoading || isAdmin) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950">
+        <div className="size-8 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-900 dark:border-zinc-700 dark:border-t-white" />
+      </div>
+    )
+  }
 
   return (
     <OrganizationGate>
@@ -102,12 +119,6 @@ export default function DashboardLayout({
             <SidebarSpacer />
 
             <SidebarSection>
-              {isAdmin && (
-                <SidebarItem href="/admin" current={pathname.startsWith('/admin')}>
-                  <ShieldCheckIcon data-slot="icon" />
-                  <SidebarLabel>Admin</SidebarLabel>
-                </SidebarItem>
-              )}
               <SidebarItem href="#">
                 <QuestionMarkCircleIcon data-slot="icon" />
                 <SidebarLabel>Support</SidebarLabel>

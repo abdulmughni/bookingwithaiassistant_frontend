@@ -71,6 +71,17 @@ export function formatDateTime(iso: string | null | undefined): string {
   return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString()
 }
 
+/** One-time price of a prepaid credit pack, e.g. "$199". */
 export function priceLabel(cents: number): string {
-  return `$${(cents / 100).toLocaleString(undefined, { maximumFractionDigits: 2 })}/mo`
+  return `$${(cents / 100).toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+}
+
+/** Human validity window, e.g. "180 days" or "~6 months". */
+export function validityLabel(days: number): string {
+  if (!days || days <= 0) return '—'
+  if (days % 30 === 0) {
+    const months = days / 30
+    return `${days} days (~${months} mo)`
+  }
+  return `${days} days`
 }

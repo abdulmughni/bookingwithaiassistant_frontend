@@ -70,7 +70,7 @@ export default function PlansPage() {
       <PageHeader
         centered
         title="Plans & pricing"
-        description="Pick a tier that fits how many customer messages and voice minutes your team runs each month. Submit a request and an administrator will apply your plan change."
+        description="Each plan is a prepaid credit pack — a bucket of customer messages and voice minutes you use over the pack's validity period. Submit a request and an administrator will apply your plan change."
       />
 
       {plansError && (
@@ -100,8 +100,9 @@ export default function PlansPage() {
       </div>
 
       <Text className="mt-8 text-center text-xs text-zinc-500 dark:text-zinc-400">
-        All plans are billed in USD per 30-day window. Plan changes are applied
-        by an administrator after your request is reviewed.
+        All prices are a one-time charge in USD per credit pack. Credits do not
+        reset monthly — they last until used up or the pack expires. Plan changes
+        are applied by an administrator after your request is reviewed.
       </Text>
 
       <Dialog open={requestPlan !== null} onClose={() => (submitting ? null : setRequestPlan(null))}>
@@ -185,7 +186,7 @@ function PlanCard({
           {formatPrice(plan.monthly_price_cents, plan.currency)}
         </span>
         <span className="ml-1 text-sm text-zinc-500 dark:text-zinc-400">
-          /mo
+          per pack
         </span>
       </div>
 
@@ -195,7 +196,7 @@ function PlanCard({
             {plan.messages_quota.toLocaleString()}
           </span>
           <span className="text-zinc-500 dark:text-zinc-400">
-            outbound messages / month
+            messages included
           </span>
         </div>
         <div className="flex items-center gap-2 text-zinc-700 dark:text-zinc-300">
@@ -203,8 +204,12 @@ function PlanCard({
             {plan.call_minutes_quota.toLocaleString()}
           </span>
           <span className="text-zinc-500 dark:text-zinc-400">
-            voice minutes / month
+            voice minutes included
           </span>
+        </div>
+        <div className="flex items-center gap-2 text-zinc-700 dark:text-zinc-300">
+          <span className="font-semibold tabular-nums">{plan.validity_days}</span>
+          <span className="text-zinc-500 dark:text-zinc-400">days of validity</span>
         </div>
       </div>
 
