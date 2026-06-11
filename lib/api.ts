@@ -393,10 +393,20 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ password }),
       }),
-    tenantProfile: (token: string, tenantId: string, verificationToken: string) =>
+    tenantProfile: (token: string, tenantId: string) =>
       request<import('./types').AdminTenantProfile>(
         `/api/admin/tenants/${encodeURIComponent(tenantId)}/profile`,
-        { token, headers: { 'X-Admin-Verification': verificationToken } },
+        { token },
+      ),
+    openWorkspace: (token: string, tenantId: string, verificationToken: string) =>
+      request<import('./types').OpenWorkspaceResult>(
+        `/api/admin/tenants/${encodeURIComponent(tenantId)}/open-workspace`,
+        {
+          token,
+          method: 'POST',
+          body: JSON.stringify({}),
+          headers: { 'X-Admin-Verification': verificationToken },
+        },
       ),
     deleteTenant: (token: string, tenantId: string, verificationToken: string) =>
       request<import('./types').DeleteTenantResult>(

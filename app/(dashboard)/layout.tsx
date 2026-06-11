@@ -3,7 +3,7 @@
 import clsx from 'clsx'
 import { useEffect } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
-import { useUser, useClerk, UserButton } from '@clerk/nextjs'
+import { useAuth, useUser, useClerk, UserButton } from '@clerk/nextjs'
 import { SidebarLayout } from '@/components/sidebar-layout'
 import {
   Sidebar,
@@ -42,21 +42,23 @@ export default function DashboardLayout({
   const pathname = usePathname()
   const router = useRouter()
   const { user } = useUser()
+  const { actor } = useAuth()
   const { signOut } = useClerk()
   const { isAdmin, loading: adminLoading } = useIsAdmin()
 
   const fullBleedPage =
     pathname === '/conversations' || pathname.startsWith('/conversations/')
 
-  // Admins get the dedicated console — bounce them straight there instead of
-  // rendering the client dashboard shell.
+  // Admins get the dedicated console — unless they are impersonating a client
+  // (Clerk actor session opened from the admin "Open client account" action).
+  const impersonating = Boolean(actor)
   useEffect(() => {
-    if (!adminLoading && isAdmin) {
+    if (!adminLoading && isAdmin && !impersonating) {
       router.replace('/admin')
     }
-  }, [adminLoading, isAdmin, router])
+  }, [adminLoading, isAdmin, impersonating, router])
 
-  if (adminLoading || isAdmin) {
+  if ((adminLoading || isAdmin) && !impersonating) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950">
         <div className="size-8 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-900 dark:border-zinc-700 dark:border-t-white" />

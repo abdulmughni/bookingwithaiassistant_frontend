@@ -534,6 +534,12 @@ export interface AdminTenantDetail extends AdminTenant {
   channels: string[]
   calls_count: number
   recent_adjustments: CreditAdjustment[]
+  members: AdminOrgMember[]
+}
+
+/** Result of POST /api/admin/tenants/{id}/open-workspace (Clerk impersonation URL). */
+export interface OpenWorkspaceResult {
+  url: string
 }
 
 /** Full plan row for the admin plans manager (GET /api/admin/plans). */
