@@ -378,8 +378,35 @@ export const api = {
 
   admin: {
     me: (token: string) => request<import('./types').AdminMe>('/api/admin/me', { token }),
+    overview: (token: string) =>
+      request<import('./types').AdminOverview>('/api/admin/overview', { token }),
     listTenants: (token: string) =>
       request<import('./types').AdminTenant[]>('/api/admin/tenants', { token }),
+    getTenant: (token: string, tenantId: string) =>
+      request<import('./types').AdminTenantDetail>(
+        `/api/admin/tenants/${encodeURIComponent(tenantId)}`,
+        { token },
+      ),
+    verifyIdentity: (token: string, password: string) =>
+      request<import('./types').VerifyIdentityResult>('/api/admin/verify-identity', {
+        token,
+        method: 'POST',
+        body: JSON.stringify({ password }),
+      }),
+    tenantProfile: (token: string, tenantId: string, verificationToken: string) =>
+      request<import('./types').AdminTenantProfile>(
+        `/api/admin/tenants/${encodeURIComponent(tenantId)}/profile`,
+        { token, headers: { 'X-Admin-Verification': verificationToken } },
+      ),
+    deleteTenant: (token: string, tenantId: string, verificationToken: string) =>
+      request<import('./types').DeleteTenantResult>(
+        `/api/admin/tenants/${encodeURIComponent(tenantId)}`,
+        {
+          token,
+          method: 'DELETE',
+          headers: { 'X-Admin-Verification': verificationToken },
+        },
+      ),
     activate: (token: string, tenantId: string) =>
       request<import('./types').AdminTenant>(
         `/api/admin/tenants/${encodeURIComponent(tenantId)}/activate`,

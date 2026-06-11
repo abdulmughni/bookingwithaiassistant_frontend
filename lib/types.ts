@@ -488,3 +488,58 @@ export interface AdminPlanChangeRequest {
   created_at: string
   resolved_at: string | null
 }
+
+/** Platform-wide stats for the admin console Overview page. */
+export interface AdminOverview {
+  tenants_total: number
+  tenants_active: number
+  tenants_pending: number
+  tenants_suspended: number
+  open_plan_requests: number
+  bookings_total: number
+  conversations_total: number
+  calls_total: number
+  messages_30d: number
+  recent_tenants: AdminTenant[]
+  recent_requests: AdminPlanChangeRequest[]
+}
+
+/** Single-tenant detail (GET /api/admin/tenants/{id}). */
+export interface AdminTenantDetail extends AdminTenant {
+  timezone: string
+  industry_type: string
+  crm_type: string
+  channels: string[]
+  calls_count: number
+}
+
+/** Result of POST /api/admin/verify-identity (step-up password check). */
+export interface VerifyIdentityResult {
+  verification_token: string
+  /** Epoch seconds. */
+  expires_at: number
+}
+
+/** One member of a client's Clerk organization (profile view). */
+export interface AdminOrgMember {
+  user_id: string
+  first_name: string
+  last_name: string
+  email: string
+  image_url: string
+  role: string
+  created_at: string | null
+  last_sign_in_at: string | null
+}
+
+export interface AdminTenantProfile {
+  tenant_id: string
+  organization_name: string
+  members: AdminOrgMember[]
+}
+
+export interface DeleteTenantResult {
+  deleted: boolean
+  clerk_org_deleted: boolean
+  detail: string
+}

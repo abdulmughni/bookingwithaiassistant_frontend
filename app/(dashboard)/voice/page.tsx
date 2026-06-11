@@ -52,6 +52,7 @@ import {
 import { useApiData, useApiToken } from '@/lib/hooks'
 import { ApiError, api } from '@/lib/api'
 import { notifyError, notifySuccess } from '@/lib/notify'
+import { ReadOnlyBanner, useReadOnlyAccount } from '@/components/account-status-gate'
 import { formatDateTime } from '@/lib/utils'
 import type {
   VoiceConfig,
@@ -392,6 +393,7 @@ function useHistoryState<T>(initial: T | null) {
 
 export default function VoicePage() {
   const getToken = useApiToken()
+  const { readOnly } = useReadOnlyAccount()
   const { data: config, loading, error, refetch } = useApiData<VoiceConfig>(
     (token) => api.voice.get(token),
     [],
@@ -516,6 +518,10 @@ export default function VoicePage() {
 
   const saveAndSync = async () => {
     if (!form) return
+    if (readOnly) {
+      notifyError('Settings are locked until your account is activated.')
+      return
+    }
     setSyncing(true)
     try {
       const token = await getToken()
@@ -548,6 +554,10 @@ export default function VoicePage() {
   }
 
   const deleteAssistant = async () => {
+    if (readOnly) {
+      notifyError('Settings are locked until your account is activated.')
+      return
+    }
     if (!confirm('Delete the assistant on Vapi? You can re-create it with Sync.')) return
     try {
       const token = await getToken()
@@ -573,6 +583,10 @@ export default function VoicePage() {
   }
 
   const attachPhone = async (id: string) => {
+    if (readOnly) {
+      notifyError('Settings are locked until your account is activated.')
+      return
+    }
     setPendingPhoneId(id)
     try {
       const token = await getToken()
@@ -588,6 +602,10 @@ export default function VoicePage() {
   }
 
   const detachPhone = async (id: string) => {
+    if (readOnly) {
+      notifyError('Settings are locked until your account is activated.')
+      return
+    }
     setPendingPhoneId(id)
     try {
       const token = await getToken()
@@ -648,6 +666,7 @@ export default function VoicePage() {
 
   return (
     <div className="space-y-6">
+      <ReadOnlyBanner />
       {/* ───────── HERO ─────────────────────────────────────────────────
           One glanceable header that carries: branding, status, primary
           action, and the four most-asked-for facts (assistant id, last
@@ -701,7 +720,7 @@ export default function VoicePage() {
                     <ArrowUturnRightIcon className="size-4" />
                   </button>
                 </div>
-                <Button onClick={saveAndSync} disabled={syncing}>
+                <Button onClick={saveAndSync} disabled={syncing || readOnly}>
                   <CloudArrowUpIcon
                     data-slot="icon"
                     className={syncing ? 'animate-spin' : ''}
@@ -866,6 +885,13 @@ export default function VoicePage() {
               </Tab.List>
 
               <Tab.Panels className="mt-6">
+                {/* Read-only accounts can browse every tab, but all form
+                    controls inside are natively disabled via this fieldset
+                    (backend write endpoints also 403). */}
+                <fieldset
+                  disabled={readOnly}
+                  className={clsx('min-w-0', readOnly && 'opacity-60 select-none')}
+                >
                 {/* ============== MODEL =============================== */}
                 <Tab.Panel className="space-y-5">
                   <PanelSection
@@ -1571,6 +1597,7 @@ export default function VoicePage() {
                     </Field>
                   </PanelSection>
                 </Tab.Panel>
+                </fieldset>
               </Tab.Panels>
             </Tab.Group>
 
@@ -1586,12 +1613,12 @@ export default function VoicePage() {
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 {config.assistant_id && (
-                  <Button outline onClick={deleteAssistant}>
+                  <Button outline onClick={deleteAssistant} disabled={readOnly}>
                     <TrashIcon data-slot="icon" />
                     Delete on Vapi
                   </Button>
                 )}
-                <Button onClick={saveAndSync} disabled={syncing}>
+                <Button onClick={saveAndSync} disabled={syncing || readOnly}>
                   <CloudArrowUpIcon
                     data-slot="icon"
                     className={syncing ? 'animate-spin' : ''}
@@ -1688,14 +1715,14 @@ export default function VoicePage() {
                               <Button
                                 outline
                                 onClick={() => detachPhone(p.id)}
-                                disabled={pendingPhoneId === p.id}
+                                disabled={pendingPhoneId === p.id || readOnly}
                               >
                                 Detach
                               </Button>
                             ) : (
                               <Button
                                 onClick={() => attachPhone(p.id)}
-                                disabled={pendingPhoneId === p.id}
+                                disabled={pendingPhoneId === p.id || readOnly}
                               >
                                 Bind
                               </Button>

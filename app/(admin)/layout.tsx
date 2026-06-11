@@ -1,22 +1,40 @@
 'use client'
 
-import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect } from 'react'
-import clsx from 'clsx'
-import { useAuth, UserButton } from '@clerk/nextjs'
-import { ArrowLeftIcon } from '@heroicons/react/20/solid'
+import { useAuth, useUser, UserButton } from '@clerk/nextjs'
+import {
+  ArrowUturnLeftIcon,
+  ChartBarSquareIcon,
+  InboxArrowDownIcon,
+  ShieldCheckIcon,
+  UsersIcon,
+} from '@heroicons/react/20/solid'
 
+import { Navbar, NavbarSpacer } from '@/components/navbar'
+import {
+  Sidebar,
+  SidebarBody,
+  SidebarFooter,
+  SidebarHeader,
+  SidebarItem,
+  SidebarLabel,
+  SidebarSection,
+  SidebarSpacer,
+} from '@/components/sidebar'
+import { SidebarLayout } from '@/components/sidebar-layout'
 import { useIsAdmin } from '@/lib/hooks'
-import { APP_BRAND_NAME, brandLogoClass } from '@/lib/brand'
+import { APP_BRAND_NAME, brandGradientClass } from '@/lib/brand'
 
 const adminNav = [
-  { label: 'Tenants', href: '/admin' },
-  { label: 'Plan requests', href: '/admin/requests' },
+  { label: 'Overview', href: '/admin', icon: ChartBarSquareIcon, exact: true },
+  { label: 'Clients', href: '/admin/clients', icon: UsersIcon, exact: false },
+  { label: 'Plan requests', href: '/admin/requests', icon: InboxArrowDownIcon, exact: false },
 ]
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { isLoaded, userId } = useAuth()
+  const { user } = useUser()
   const { isAdmin, loading } = useIsAdmin()
   const router = useRouter()
   const pathname = usePathname()
@@ -33,65 +51,86 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   if (!isLoaded || loading || !isAdmin) {
     return (
-      <div className="flex min-h-svh items-center justify-center bg-zinc-50 dark:bg-zinc-950">
-        <div className="h-8 w-48 animate-pulse rounded-lg bg-zinc-200 dark:bg-zinc-800" />
+      <div className="flex min-h-svh flex-col items-center justify-center gap-3 bg-zinc-50 dark:bg-zinc-950">
+        <div className={`flex size-12 items-center justify-center rounded-2xl ${brandGradientClass}`}>
+          <ShieldCheckIcon className="size-6 text-white" />
+        </div>
+        <div className="h-4 w-40 animate-pulse rounded-lg bg-zinc-200 dark:bg-zinc-800" />
       </div>
     )
   }
 
   return (
-    <div className="min-h-svh bg-zinc-50 dark:bg-zinc-950">
-      <header className="border-b border-zinc-200/80 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-3">
-            <span
-              className={clsx(
-                'flex size-7 items-center justify-center rounded-lg text-xs font-bold',
-                brandLogoClass,
-              )}
-            >
-              B
-            </span>
-            <span className="text-sm font-semibold text-zinc-950 dark:text-white">
-              {APP_BRAND_NAME} <span className="text-zinc-400">/ Admin</span>
-            </span>
-          </div>
-          <div className="flex items-center gap-4">
-            <Link
-              href="/"
-              className="inline-flex items-center gap-1 text-sm text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
-            >
-              <ArrowLeftIcon className="size-4" />
-              Back to dashboard
-            </Link>
-            <UserButton />
-          </div>
-        </div>
-        <nav className="mx-auto flex max-w-7xl gap-6 px-4 sm:px-6 lg:px-8">
-          {adminNav.map((item) => {
-            const active =
-              item.href === '/admin'
-                ? pathname === '/admin'
-                : pathname.startsWith(item.href)
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={clsx(
-                  'border-b-2 pb-3 text-sm font-medium transition-colors',
-                  active
-                    ? 'border-brand-600 text-brand-700 dark:border-brand-500 dark:text-brand-400'
-                    : 'border-transparent text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300',
-                )}
+    <SidebarLayout
+      navbar={
+        <Navbar>
+          <NavbarSpacer />
+          <UserButton />
+        </Navbar>
+      }
+      sidebar={
+        <Sidebar>
+          <SidebarHeader>
+            <div className="flex items-center gap-3 px-2 py-1.5">
+              <span
+                className={`flex size-9 shrink-0 items-center justify-center rounded-xl text-white shadow-sm shadow-brand-500/30 ${brandGradientClass}`}
               >
-                {item.label}
-              </Link>
-            )
-          })}
-        </nav>
-      </header>
+                <ShieldCheckIcon className="size-5" />
+              </span>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-zinc-950 dark:text-white">
+                  Admin Console
+                </p>
+                <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">
+                  {APP_BRAND_NAME}
+                </p>
+              </div>
+            </div>
+          </SidebarHeader>
 
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">{children}</main>
-    </div>
+          <SidebarBody>
+            <SidebarSection>
+              {adminNav.map((item) => (
+                <SidebarItem
+                  key={item.href}
+                  href={item.href}
+                  current={item.exact ? pathname === item.href : pathname.startsWith(item.href)}
+                >
+                  <item.icon data-slot="icon" />
+                  <SidebarLabel>{item.label}</SidebarLabel>
+                </SidebarItem>
+              ))}
+            </SidebarSection>
+
+            <SidebarSpacer />
+
+            <SidebarSection>
+              <SidebarItem href="/">
+                <ArrowUturnLeftIcon data-slot="icon" />
+                <SidebarLabel>Back to app</SidebarLabel>
+              </SidebarItem>
+            </SidebarSection>
+          </SidebarBody>
+
+          <SidebarFooter>
+            <SidebarSection>
+              <div className="flex items-center gap-3 px-2 py-1.5">
+                <UserButton appearance={{ elements: { avatarBox: 'size-8' } }} />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-zinc-950 dark:text-white">
+                    {user ? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Admin' : 'Admin'}
+                  </p>
+                  <p className="truncate text-xs text-zinc-500">Platform owner</p>
+                </div>
+              </div>
+            </SidebarSection>
+          </SidebarFooter>
+        </Sidebar>
+      }
+    >
+      <div className="min-h-full bg-zinc-50/90 px-4 py-6 sm:px-6 lg:px-8 lg:py-8 dark:bg-zinc-950">
+        {children}
+      </div>
+    </SidebarLayout>
   )
 }

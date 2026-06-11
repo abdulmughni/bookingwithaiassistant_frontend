@@ -1,6 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
+import Link from 'next/link'
 import { toast } from 'sonner'
 
 import { Badge } from '@/components/badge'
@@ -13,9 +14,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/table'
+import { ConfirmActionDialog } from '@/components/admin/confirm-action-dialog'
+import { formatDate, formatDateTime } from '@/components/admin/shared'
 import { PageHeader, PageShell, dashCardClass } from '@/components/dashboard-ui'
 import { api, ApiError } from '@/lib/api'
-import { useApiToken } from '@/lib/hooks'
+import { useApiData, useApiToken } from '@/lib/hooks'
 import type { AdminPlanChangeRequest } from '@/lib/types'
 
 const STATUS_COLOR: Record<AdminPlanChangeRequest['status'], 'amber' | 'green' | 'zinc'> = {
@@ -26,49 +29,40 @@ const STATUS_COLOR: Record<AdminPlanChangeRequest['status'], 'amber' | 'green' |
 
 export default function AdminRequestsPage() {
   const getToken = useApiToken()
-  const [requests, setRequests] = useState<AdminPlanChangeRequest[] | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [busyId, setBusyId] = useState<string | null>(null)
   const [showResolved, setShowResolved] = useState(false)
+  const [confirmAction, setConfirmAction] = useState<{
+    request: AdminPlanChangeRequest
+    status: 'resolved' | 'dismissed'
+  } | null>(null)
 
-  const load = useCallback(async () => {
-    try {
-      const token = await getToken()
-      const rows = await api.admin.listRequests(token, showResolved ? undefined : 'open')
-      setRequests(rows)
-      setError(null)
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to load requests.')
-    }
-  }, [getToken, showResolved])
-
-  useEffect(() => {
-    void load()
-  }, [load])
+  const {
+    data: requests,
+    error,
+    refetch: load,
+  } = useApiData(
+    (token) => api.admin.listRequests(token, showResolved ? undefined : 'open'),
+    [showResolved],
+  )
 
   const resolve = useCallback(
     async (id: string, status: 'resolved' | 'dismissed') => {
-      if (busyId) return
-      setBusyId(id)
       try {
         const token = await getToken()
         await api.admin.resolveRequest(token, id, status)
-        toast.success(`Request ${status}.`)
+        toast.success(status === 'resolved' ? 'Request resolved.' : 'Request dismissed.')
         await load()
       } catch (err) {
         toast.error(err instanceof ApiError ? err.message : 'Action failed.')
-      } finally {
-        setBusyId(null)
       }
     },
-    [busyId, getToken, load],
+    [getToken, load],
   )
 
   return (
     <PageShell>
       <PageHeader
         title="Plan change requests"
-        description="Clients can't switch plans themselves — they submit a request here. Apply the change from the Tenants tab, then resolve the request."
+        description="Clients can't switch plans themselves — they submit a request. Apply the plan from the client's detail page, then resolve the request here."
       >
         <Button outline onClick={() => setShowResolved((v) => !v)}>
           {showResolved ? 'Show open only' : 'Show all'}
@@ -89,7 +83,7 @@ export default function AdminRequestsPage() {
           <Table dense>
             <TableHead>
               <TableRow>
-                <TableHeader>Tenant</TableHeader>
+                <TableHeader>Client</TableHeader>
                 <TableHeader>Requested plan</TableHeader>
                 <TableHeader>Message</TableHeader>
                 <TableHeader>Status</TableHeader>
@@ -100,24 +94,27 @@ export default function AdminRequestsPage() {
             <TableBody>
               {requests === null && (
                 <TableRow>
-                  <TableCell colSpan={6} className="py-8 text-center text-zinc-500">
+                  <TableCell colSpan={6} className="py-10 text-center text-zinc-500">
                     Loading…
                   </TableCell>
                 </TableRow>
               )}
               {requests?.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="py-8 text-center text-zinc-500">
-                    No requests.
+                  <TableCell colSpan={6} className="py-10 text-center text-zinc-500">
+                    {showResolved ? 'No requests yet.' : 'No open requests. All caught up.'}
                   </TableCell>
                 </TableRow>
               )}
               {requests?.map((r) => (
                 <TableRow key={r.id}>
                   <TableCell>
-                    <div className="font-medium text-zinc-950 dark:text-white">
+                    <Link
+                      href={`/admin/clients/${encodeURIComponent(r.tenant_id)}`}
+                      className="font-medium text-zinc-950 hover:text-brand-600 dark:text-white dark:hover:text-brand-400"
+                    >
                       {r.tenant_name ?? r.tenant_id}
-                    </div>
+                    </Link>
                     <div className="font-mono text-xs text-zinc-400">{r.tenant_id}</div>
                   </TableCell>
                   <TableCell>
@@ -129,31 +126,27 @@ export default function AdminRequestsPage() {
                   <TableCell>
                     <Badge color={STATUS_COLOR[r.status]}>{r.status}</Badge>
                   </TableCell>
-                  <TableCell className="text-zinc-500">
-                    {r.created_at ? new Date(r.created_at).toLocaleString() : '—'}
-                  </TableCell>
+                  <TableCell className="text-zinc-500">{formatDateTime(r.created_at)}</TableCell>
                   <TableCell>
                     <div className="flex items-center justify-end gap-2">
                       {r.status === 'open' ? (
                         <>
                           <Button
                             color="green"
-                            disabled={busyId === r.id}
-                            onClick={() => resolve(r.id, 'resolved')}
+                            onClick={() => setConfirmAction({ request: r, status: 'resolved' })}
                           >
                             Resolve
                           </Button>
                           <Button
                             outline
-                            disabled={busyId === r.id}
-                            onClick={() => resolve(r.id, 'dismissed')}
+                            onClick={() => setConfirmAction({ request: r, status: 'dismissed' })}
                           >
                             Dismiss
                           </Button>
                         </>
                       ) : (
                         <span className="text-xs text-zinc-400">
-                          {r.resolved_at ? new Date(r.resolved_at).toLocaleDateString() : ''}
+                          {formatDate(r.resolved_at)}
                         </span>
                       )}
                     </div>
@@ -164,6 +157,33 @@ export default function AdminRequestsPage() {
           </Table>
         </div>
       </div>
+
+      <ConfirmActionDialog
+        open={confirmAction !== null}
+        onClose={() => setConfirmAction(null)}
+        title={
+          confirmAction?.status === 'resolved'
+            ? 'Mark this request as resolved?'
+            : 'Dismiss this request?'
+        }
+        description={
+          confirmAction?.status === 'resolved'
+            ? `Confirm you've already applied the plan change for ${
+                confirmAction?.request.tenant_name ?? 'this client'
+              } from their detail page. The request will be closed.`
+            : `The request from ${
+                confirmAction?.request.tenant_name ?? 'this client'
+              } will be closed without any plan change.`
+        }
+        confirmLabel={confirmAction?.status === 'resolved' ? 'Yes, resolve' : 'Yes, dismiss'}
+        busyLabel="Working…"
+        color={confirmAction?.status === 'resolved' ? 'green' : 'dark/zinc'}
+        onConfirm={async () => {
+          if (confirmAction) {
+            await resolve(confirmAction.request.id, confirmAction.status)
+          }
+        }}
+      />
     </PageShell>
   )
 }

@@ -1,85 +1,29 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
-import { toast } from 'sonner'
-
-import { Badge } from '@/components/badge'
-import { Button } from '@/components/button'
-import { Select } from '@/components/select'
+import Link from 'next/link'
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/table'
-import { PageHeader, PageShell, dashCardClass } from '@/components/dashboard-ui'
-import { api, ApiError } from '@/lib/api'
-import { useApiToken, usePlans } from '@/lib/hooks'
-import type { AccountStatus, AdminTenant, Plan } from '@/lib/types'
+  CalendarDaysIcon,
+  ChatBubbleLeftRightIcon,
+  EnvelopeIcon,
+  PhoneIcon,
+} from '@heroicons/react/20/solid'
 
-const STATUS_COLOR: Record<AccountStatus, 'green' | 'amber' | 'red'> = {
-  active: 'green',
-  pending: 'amber',
-  suspended: 'red',
-}
+import { Button } from '@/components/button'
+import { PageHeader, PageShell, SkeletonBlock, dashCardClass } from '@/components/dashboard-ui'
+import { StatusBadge, formatDate } from '@/components/admin/shared'
+import { api } from '@/lib/api'
+import { useApiData } from '@/lib/hooks'
 
-const STATUS_LABEL: Record<AccountStatus, string> = {
-  active: 'Active',
-  pending: 'Pending',
-  suspended: 'Suspended',
-}
-
-export default function AdminTenantsPage() {
-  const getToken = useApiToken()
-  const { data: plans } = usePlans()
-  const [tenants, setTenants] = useState<AdminTenant[] | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [busyId, setBusyId] = useState<string | null>(null)
-
-  const load = useCallback(async () => {
-    try {
-      const token = await getToken()
-      const rows = await api.admin.listTenants(token)
-      setTenants(rows)
-      setError(null)
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to load tenants.')
-    }
-  }, [getToken])
-
-  useEffect(() => {
-    void load()
-  }, [load])
-
-  const runAction = useCallback(
-    async (id: string, fn: (token: string) => Promise<AdminTenant>, okMsg: string) => {
-      if (busyId) return
-      setBusyId(id)
-      try {
-        const token = await getToken()
-        const updated = await fn(token)
-        setTenants((prev) =>
-          prev ? prev.map((t) => (t.id === id ? updated : t)) : prev,
-        )
-        toast.success(okMsg)
-      } catch (err) {
-        toast.error(err instanceof ApiError ? err.message : 'Action failed.')
-      } finally {
-        setBusyId(null)
-      }
-    },
-    [busyId, getToken],
-  )
+export default function AdminOverviewPage() {
+  const { data, loading, error, refetch } = useApiData((token) => api.admin.overview(token), [])
 
   return (
     <PageShell>
       <PageHeader
-        title="Tenants"
-        description="Activate or suspend client accounts and assign plans. Suspended or pending tenants receive no inbound messages or calls."
+        title="Overview"
+        description="Platform-wide health: client statuses, open plan requests, and activity totals."
       >
-        <Button outline onClick={() => void load()}>
+        <Button outline onClick={() => void refetch()}>
           Refresh
         </Button>
       </PageHeader>
@@ -90,128 +34,204 @@ export default function AdminTenantsPage() {
         </div>
       )}
 
-      <div className={dashCardClass}>
-        <div className="px-2 sm:px-4">
-          <Table dense>
-            <TableHead>
-              <TableRow>
-                <TableHeader>Tenant</TableHeader>
-                <TableHeader>Status</TableHeader>
-                <TableHeader>Plan</TableHeader>
-                <TableHeader>Usage (msgs / mins)</TableHeader>
-                <TableHeader>Bookings</TableHeader>
-                <TableHeader>Convos</TableHeader>
-                <TableHeader className="text-right">Actions</TableHeader>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {tenants === null && (
-                <TableRow>
-                  <TableCell colSpan={7} className="py-8 text-center text-zinc-500">
-                    Loading…
-                  </TableCell>
-                </TableRow>
-              )}
-              {tenants?.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={7} className="py-8 text-center text-zinc-500">
-                    No tenants yet.
-                  </TableCell>
-                </TableRow>
-              )}
-              {tenants?.map((t) => (
-                <TenantRow
-                  key={t.id}
-                  tenant={t}
-                  plans={plans ?? []}
-                  busy={busyId === t.id}
-                  onActivate={() =>
-                    runAction(t.id, (tok) => api.admin.activate(tok, t.id), `${t.name} activated.`)
-                  }
-                  onSuspend={() =>
-                    runAction(t.id, (tok) => api.admin.suspend(tok, t.id), `${t.name} suspended.`)
-                  }
-                  onAssignPlan={(planId) =>
-                    runAction(
-                      t.id,
-                      (tok) => api.admin.assignPlan(tok, t.id, planId),
-                      `Plan updated for ${t.name}.`,
-                    )
-                  }
-                />
-              ))}
-            </TableBody>
-          </Table>
+      {loading || !data ? (
+        <div className="space-y-6">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {[0, 1, 2, 3].map((i) => (
+              <SkeletonBlock key={i} className="h-28" />
+            ))}
+          </div>
+          <SkeletonBlock className="h-64" />
         </div>
-      </div>
+      ) : (
+        <>
+          {/* Client status cards */}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <StatCard label="Total clients" value={data.tenants_total} href="/admin/clients" />
+            <StatCard
+              label="Active"
+              value={data.tenants_active}
+              href="/admin/clients?status=active"
+              accent="text-emerald-600 dark:text-emerald-400"
+            />
+            <StatCard
+              label="Pending activation"
+              value={data.tenants_pending}
+              href="/admin/clients?status=pending"
+              accent="text-amber-600 dark:text-amber-400"
+            />
+            <StatCard
+              label="Suspended"
+              value={data.tenants_suspended}
+              href="/admin/clients?status=suspended"
+              accent="text-red-600 dark:text-red-400"
+            />
+          </div>
+
+          {/* Platform totals */}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <TotalCard
+              icon={<CalendarDaysIcon className="size-5" />}
+              label="Bookings (all time)"
+              value={data.bookings_total}
+            />
+            <TotalCard
+              icon={<ChatBubbleLeftRightIcon className="size-5" />}
+              label="Conversations"
+              value={data.conversations_total}
+            />
+            <TotalCard
+              icon={<PhoneIcon className="size-5" />}
+              label="Calls"
+              value={data.calls_total}
+            />
+            <TotalCard
+              icon={<EnvelopeIcon className="size-5" />}
+              label="Messages (30 days)"
+              value={data.messages_30d}
+            />
+          </div>
+
+          <div className="grid gap-6 lg:grid-cols-2">
+            {/* Recent sign-ups */}
+            <section className={dashCardClass}>
+              <div className="flex items-center justify-between border-b border-zinc-200/80 px-5 py-4 dark:border-zinc-700/80">
+                <h3 className="text-base font-semibold text-zinc-950 dark:text-white">
+                  Recent sign-ups
+                </h3>
+                <Link
+                  href="/admin/clients"
+                  className="text-sm font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400"
+                >
+                  View all
+                </Link>
+              </div>
+              <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                {data.recent_tenants.length === 0 && (
+                  <li className="px-5 py-8 text-center text-sm text-zinc-500">No clients yet.</li>
+                )}
+                {data.recent_tenants.map((t) => (
+                  <li key={t.id}>
+                    <Link
+                      href={`/admin/clients/${encodeURIComponent(t.id)}`}
+                      className="flex items-center justify-between gap-3 px-5 py-3 transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-zinc-950 dark:text-white">
+                          {t.name}
+                        </p>
+                        <p className="text-xs text-zinc-500">
+                          Joined {formatDate(t.created_at)}
+                          {t.plan ? ` · ${t.plan.name}` : ' · No plan'}
+                        </p>
+                      </div>
+                      <StatusBadge status={t.account_status} />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+
+            {/* Open plan requests */}
+            <section className={dashCardClass}>
+              <div className="flex items-center justify-between border-b border-zinc-200/80 px-5 py-4 dark:border-zinc-700/80">
+                <h3 className="text-base font-semibold text-zinc-950 dark:text-white">
+                  Open plan requests
+                  {data.open_plan_requests > 0 && (
+                    <span className="ml-2 inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-500/15 dark:text-amber-400">
+                      {data.open_plan_requests}
+                    </span>
+                  )}
+                </h3>
+                <Link
+                  href="/admin/requests"
+                  className="text-sm font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400"
+                >
+                  Manage
+                </Link>
+              </div>
+              <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                {data.recent_requests.length === 0 && (
+                  <li className="px-5 py-8 text-center text-sm text-zinc-500">
+                    No open requests. All caught up.
+                  </li>
+                )}
+                {data.recent_requests.map((r) => (
+                  <li key={r.id} className="px-5 py-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-zinc-950 dark:text-white">
+                          {r.tenant_name ?? r.tenant_id}
+                        </p>
+                        <p className="truncate text-xs text-zinc-500">
+                          Wants{' '}
+                          <span className="font-medium text-zinc-700 dark:text-zinc-300">
+                            {r.requested_plan_id ?? 'a plan change'}
+                          </span>
+                          {r.message ? ` — “${r.message}”` : ''}
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-xs text-zinc-400">
+                        {formatDate(r.created_at)}
+                      </span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          </div>
+        </>
+      )}
     </PageShell>
   )
 }
 
-function TenantRow({
-  tenant,
-  plans,
-  busy,
-  onActivate,
-  onSuspend,
-  onAssignPlan,
+function StatCard({
+  label,
+  value,
+  href,
+  accent,
 }: {
-  tenant: AdminTenant
-  plans: Plan[]
-  busy: boolean
-  onActivate: () => void
-  onSuspend: () => void
-  onAssignPlan: (planId: string) => void
+  label: string
+  value: number
+  href: string
+  accent?: string
 }) {
-  const usage = tenant.usage
   return (
-    <TableRow>
-      <TableCell>
-        <div className="font-medium text-zinc-950 dark:text-white">{tenant.name}</div>
-        <div className="font-mono text-xs text-zinc-400">{tenant.id}</div>
-      </TableCell>
-      <TableCell>
-        <Badge color={STATUS_COLOR[tenant.account_status]}>
-          {STATUS_LABEL[tenant.account_status]}
-        </Badge>
-      </TableCell>
-      <TableCell>{tenant.plan ? tenant.plan.name : <span className="text-zinc-400">—</span>}</TableCell>
-      <TableCell className="tabular-nums">
-        {usage.messages_used}/{usage.messages_quota} · {usage.call_minutes_used}/
-        {usage.call_minutes_quota}
-      </TableCell>
-      <TableCell className="tabular-nums">{tenant.bookings_count}</TableCell>
-      <TableCell className="tabular-nums">{tenant.conversations_count}</TableCell>
-      <TableCell>
-        <div className="flex items-center justify-end gap-2">
-          <Select
-            aria-label="Assign plan"
-            className="w-36"
-            value={tenant.plan?.id ?? ''}
-            disabled={busy}
-            onChange={(e) => {
-              const v = e.target.value
-              if (v) onAssignPlan(v)
-            }}
-          >
-            <option value="">Assign plan…</option>
-            {plans.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </Select>
-          {tenant.account_status === 'active' ? (
-            <Button color="red" disabled={busy} onClick={onSuspend}>
-              Suspend
-            </Button>
-          ) : (
-            <Button color="green" disabled={busy} onClick={onActivate}>
-              Activate
-            </Button>
-          )}
-        </div>
-      </TableCell>
-    </TableRow>
+    <Link
+      href={href}
+      className={`${dashCardClass} block p-5 transition-shadow hover:shadow-md`}
+    >
+      <p className="text-sm text-zinc-500 dark:text-zinc-400">{label}</p>
+      <p
+        className={`mt-1 text-3xl font-semibold tabular-nums ${accent ?? 'text-zinc-950 dark:text-white'}`}
+      >
+        {value.toLocaleString()}
+      </p>
+    </Link>
+  )
+}
+
+function TotalCard({
+  icon,
+  label,
+  value,
+}: {
+  icon: React.ReactNode
+  label: string
+  value: number
+}) {
+  return (
+    <div className={`${dashCardClass} flex items-center gap-4 p-5`}>
+      <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400">
+        {icon}
+      </span>
+      <div className="min-w-0">
+        <p className="truncate text-sm text-zinc-500 dark:text-zinc-400">{label}</p>
+        <p className="text-xl font-semibold tabular-nums text-zinc-950 dark:text-white">
+          {value.toLocaleString()}
+        </p>
+      </div>
+    </div>
   )
 }

@@ -47,6 +47,42 @@ export function AccountStatusGate({ children }: { children: React.ReactNode }) {
 }
 
 /**
+ * True when the account is NOT active (pending/suspended) — settings, voice,
+ * prompts, and knowledge edits are locked (backend 403s too). While the status
+ * is still loading we report read-only=false so controls don't flicker.
+ */
+export function useReadOnlyAccount(): { readOnly: boolean; status: string | null } {
+  const { status, loading } = useAccountStatus()
+  return {
+    readOnly: !loading && status !== null && status !== 'active',
+    status,
+  }
+}
+
+/**
+ * Banner explaining that settings are locked while the account is not active.
+ * Drop at the top of editable pages (settings, voice).
+ */
+export function ReadOnlyBanner() {
+  const { readOnly, status } = useReadOnlyAccount()
+  if (!readOnly) return null
+
+  return (
+    <div className="mb-4 flex items-start gap-3 rounded-lg border border-amber-300/70 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-700/50 dark:bg-amber-900/20 dark:text-amber-200">
+      <ClockIcon className="mt-0.5 size-5 shrink-0" />
+      <div>
+        <p className="font-semibold">Settings are locked</p>
+        <p className="mt-0.5">
+          {status === 'suspended'
+            ? 'Your account is suspended — settings cannot be changed. Contact support to reactivate.'
+            : 'Settings are locked until an administrator activates your account. You can browse everything in the meantime.'}
+        </p>
+      </div>
+    </div>
+  )
+}
+
+/**
  * Banner shown at the top of the dashboard while a tenant is ``pending`` —
  * they can explore the app, but no inbound traffic is processed until an admin
  * activates the account.

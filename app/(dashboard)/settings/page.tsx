@@ -18,6 +18,27 @@ import { ApiError, api } from '@/lib/api'
 import { notifyError, notifySuccess } from '@/lib/notify'
 import type { Credential, PromptConfig, Tenant, TimezoneChoice } from '@/lib/types'
 import { DocumentsTab } from './documents-tab'
+import { ReadOnlyBanner, useReadOnlyAccount } from '@/components/account-status-gate'
+
+/**
+ * Disables every form control inside (native fieldset semantics) and blocks
+ * pointer interaction when the account is not active. Backend write endpoints
+ * also 403, so this is purely a UX courtesy.
+ */
+function LockWhenReadOnly({
+  readOnly,
+  children,
+}: {
+  readOnly: boolean
+  children: React.ReactNode
+}) {
+  if (!readOnly) return <>{children}</>
+  return (
+    <fieldset disabled className="pointer-events-none min-w-0 select-none opacity-60">
+      {children}
+    </fieldset>
+  )
+}
 
 // ---------------------------------------------------------------------------
 // Tab type
@@ -790,6 +811,7 @@ export default function SettingsPage() {
     (token) => api.credentials.list(token),
   )
 
+  const { readOnly } = useReadOnlyAccount()
   const [activeTab, setActiveTab] = useState<SettingsTab>('tenant')
 
   if (loading || credsLoading) {
@@ -807,6 +829,8 @@ export default function SettingsPage() {
         title="Settings"
         description="Manage your organization profile, knowledge base documents, AI prompts, and assistant behavior."
       />
+
+      <ReadOnlyBanner />
 
       <div className="rounded-2xl border border-zinc-200/80 bg-white px-4 shadow-sm dark:border-zinc-700/80 dark:bg-zinc-900/80 sm:px-6">
         <nav className="-mb-px flex gap-6 border-b border-zinc-200/80 pt-2 dark:border-zinc-700/80" aria-label="Settings tabs">
@@ -834,12 +858,14 @@ export default function SettingsPage() {
         </nav>
       </div>
 
-      {/* Tab content */}
-      {activeTab === 'tenant' && tenant && credentials && (
-        <TenantConfigTab tenant={tenant} credentials={credentials} onSaved={refetch} />
-      )}
-      {activeTab === 'documents' && <DocumentsTab />}
-      {activeTab === 'prompts' && <PromptConfigTab />}
+      {/* Tab content — locked (read-only) until the account is active */}
+      <LockWhenReadOnly readOnly={readOnly}>
+        {activeTab === 'tenant' && tenant && credentials && (
+          <TenantConfigTab tenant={tenant} credentials={credentials} onSaved={refetch} />
+        )}
+        {activeTab === 'documents' && <DocumentsTab />}
+        {activeTab === 'prompts' && <PromptConfigTab />}
+      </LockWhenReadOnly>
     </PageShell>
   )
 }
