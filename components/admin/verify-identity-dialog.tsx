@@ -41,6 +41,7 @@ export function VerifyIdentityDialog({
   onClose,
   onVerified,
   actionLabel = 'continue',
+  requireFreshVerification = false,
 }: {
   open: boolean
   onClose: () => void
@@ -48,6 +49,8 @@ export function VerifyIdentityDialog({
   onVerified: (verificationToken: string) => void
   /** Describes the action being unlocked, e.g. "view this client's profile". */
   actionLabel?: string
+  /** When true, always prompt for password even if a cached token exists. */
+  requireFreshVerification?: boolean
 }) {
   const getToken = useApiToken()
   const [password, setPassword] = useState('')
@@ -61,14 +64,16 @@ export function VerifyIdentityDialog({
       setError(null)
       return
     }
-    // Already verified within the last 10 minutes — skip the prompt.
-    const cached = getVerificationToken()
-    if (cached) {
-      onVerified(cached)
-      onClose()
+    if (!requireFreshVerification) {
+      // Already verified within the last 10 minutes — skip the prompt.
+      const cached = getVerificationToken()
+      if (cached) {
+        onVerified(cached)
+        onClose()
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open])
+  }, [open, requireFreshVerification])
 
   const handleVerify = async () => {
     if (busy || !password.trim()) return

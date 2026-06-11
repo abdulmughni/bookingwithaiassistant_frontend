@@ -182,13 +182,9 @@ export default function AdminClientDetailPage() {
   )
 
   const handleGetClientLogin = useCallback(() => {
-    const cached = getVerificationToken()
-    if (cached) {
-      void fetchClientLogin(cached)
-    } else {
-      setShowVerifyForLogin(true)
-    }
-  }, [fetchClientLogin])
+    clearVerificationToken()
+    setShowVerifyForLogin(true)
+  }, [])
 
   const handleDelete = useCallback(async () => {
     if (!deleteToken) return
@@ -640,12 +636,14 @@ export default function AdminClientDetailPage() {
         open={showVerifyForLogin}
         onClose={() => setShowVerifyForLogin(false)}
         actionLabel="view this client's login credentials"
+        requireFreshVerification
         onVerified={(token) => void fetchClientLogin(token)}
       />
 
       <ClientLoginDialog
         open={showLoginDialog}
         onClose={() => {
+          clearVerificationToken()
           setShowLoginDialog(false)
           setClientCredentials(null)
         }}
