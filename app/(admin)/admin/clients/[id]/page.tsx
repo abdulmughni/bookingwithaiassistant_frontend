@@ -233,6 +233,9 @@ export default function AdminClientDetailPage() {
   const currentPlanName = tenant.plan?.name ?? 'No plan'
   const pendingPlan = plans?.find((p) => p.id === pendingPlanId) ?? null
   const quotaBadge = QUOTA_BADGE[tenant.usage.quota_state] ?? QUOTA_BADGE.no_plan
+  const members = tenant.members ?? []
+  const recentAdjustments = tenant.recent_adjustments ?? []
+  const channels = tenant.channels ?? []
 
   return (
     <PageShell>
@@ -264,7 +267,7 @@ export default function AdminClientDetailPage() {
             <Button
               outline
               className="border-white/20! bg-white/10! text-white! hover:bg-white/20!"
-              disabled={openingWorkspace || tenant.members.length === 0}
+              disabled={openingWorkspace || members.length === 0}
               onClick={handleOpenWorkspace}
             >
               <ArrowTopRightOnSquareIcon />
@@ -423,11 +426,11 @@ export default function AdminClientDetailPage() {
               />
             </div>
 
-            {tenant.recent_adjustments.length > 0 && (
+            {recentAdjustments.length > 0 && (
               <div className="mt-6 border-t border-zinc-200/80 pt-5 dark:border-zinc-700/80">
                 <p className="text-xs font-medium uppercase tracking-wide text-zinc-400">Recent top-ups</p>
                 <ul className="mt-3 space-y-2">
-                  {tenant.recent_adjustments.map((a) => (
+                  {recentAdjustments.map((a) => (
                     <li
                       key={a.id}
                       className="flex items-start justify-between gap-3 rounded-lg bg-zinc-50 px-3 py-2 text-sm dark:bg-zinc-800/50"
@@ -469,8 +472,8 @@ export default function AdminClientDetailPage() {
               <WorkspaceRow
                 label="Channels"
                 value={
-                  tenant.channels.length
-                    ? tenant.channels.map((c) => CHANNEL_LABEL[c] ?? c).join(', ')
+                  channels.length
+                    ? channels.map((c) => CHANNEL_LABEL[c] ?? c).join(', ')
                     : 'None connected'
                 }
               />
@@ -482,7 +485,7 @@ export default function AdminClientDetailPage() {
               <UsersIcon className="size-5 text-zinc-400" />
               <h2 className="text-base font-semibold text-zinc-950 dark:text-white">Team</h2>
               <span className="ml-auto rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
-                {tenant.members.length}
+                {members.length}
               </span>
             </div>
             <p className="mt-1 text-sm text-zinc-500">
@@ -491,12 +494,12 @@ export default function AdminClientDetailPage() {
             </p>
 
             <ul className="mt-4 space-y-3">
-              {tenant.members.length === 0 && (
+              {members.length === 0 && (
                 <li className="rounded-lg border border-dashed border-zinc-200 px-4 py-6 text-center text-sm text-zinc-500 dark:border-zinc-700">
                   No members found in this organization.
                 </li>
               )}
-              {tenant.members.map((m) => (
+              {members.map((m) => (
                 <MemberCard key={m.user_id || m.email} member={m} />
               ))}
             </ul>

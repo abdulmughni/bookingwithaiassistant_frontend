@@ -533,8 +533,9 @@ export interface AdminTenantDetail extends AdminTenant {
   crm_type: string
   channels: string[]
   calls_count: number
-  recent_adjustments: CreditAdjustment[]
-  members: AdminOrgMember[]
+  recent_adjustments?: CreditAdjustment[]
+  /** Organization members; omitted on older API responses — treat as []. */
+  members?: AdminOrgMember[]
 }
 
 /** Result of POST /api/admin/tenants/{id}/open-workspace (Clerk impersonation URL). */
