@@ -8,50 +8,60 @@ import { CheckIcon, StarIcon } from '@heroicons/react/20/solid'
 import { Button } from '@/components/button'
 import { Subheading } from '@/components/heading'
 import { Text } from '@/components/text'
+import { Textarea } from '@/components/textarea'
+import {
+  Dialog,
+  DialogActions,
+  DialogBody,
+  DialogDescription,
+  DialogTitle,
+} from '@/components/dialog'
 import { PageHeader, PageShell } from '@/components/dashboard-ui'
 import { useApiToken, usePlans, useSubscription } from '@/lib/hooks'
 import { api, ApiError } from '@/lib/api'
 import type { Plan } from '@/lib/types'
 
 /**
- * Standalone Plans page.
+ * Standalone Plans page (read-only).
  *
- * Lists the three tiers seeded by ``20260512_plans_subscriptions.sql``. The
- * featured tier (Standard, ``is_featured=true``) gets a ribbon, slightly
- * larger card, and brand-coloured border. Clicking "Choose plan" /
- * "Switch to <Name>" POSTs to the assign endpoint, refreshes both the
- * page state AND the sidebar widget (via the shared subscription hook),
- * and shows a sonner toast.
- *
- * No payment step yet — switching is instant. When billing lands, the
- * call site becomes a Stripe checkout redirect instead of a direct POST.
+ * Lists the three tiers seeded by ``20260512_plans_subscriptions.sql``. Clients
+ * can no longer self-switch plans (no payment integration yet): clicking
+ * "Request this plan" opens a modal that submits a plan-change request for an
+ * admin to review and apply from the admin dashboard.
  */
 export default function PlansPage() {
-  const { data: plans, loading: plansLoading, error: plansError } = usePlans()
-  const {
-    data: subscription,
-    loading: subLoading,
-    refetch: refetchSubscription,
-  } = useSubscription()
+  const { data: plans, loading: plansLoading, error: plansError } = useSubscriptionPlans()
+  const { data: subscription, loading: subLoading } = useSubscription()
   const getToken = useApiToken()
-  const [busyPlanId, setBusyPlanId] = useState<string | null>(null)
+
+  const [requestPlan, setRequestPlan] = useState<Plan | null>(null)
+  const [message, setMessage] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
   const currentPlanId = subscription?.plan?.id ?? null
 
-  const handleSelect = async (plan: Plan) => {
-    if (busyPlanId) return
+  const openRequest = (plan: Plan) => {
     if (plan.id === currentPlanId) return
-    setBusyPlanId(plan.id)
+    setMessage('')
+    setRequestPlan(plan)
+  }
+
+  const submitRequest = async () => {
+    if (!requestPlan || submitting) return
+    setSubmitting(true)
     try {
       const token = await getToken()
-      await api.plans.assign(token, plan.id)
-      await refetchSubscription()
-      toast.success(`You're now on the ${plan.name} plan.`)
+      await api.plans.requestChange(token, {
+        requested_plan_id: requestPlan.id,
+        message,
+      })
+      toast.success('Plan change requested. An admin will review it shortly.')
+      setRequestPlan(null)
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : 'Could not switch plan.'
+      const msg = err instanceof ApiError ? err.message : 'Could not submit request.'
       toast.error(msg)
     } finally {
-      setBusyPlanId(null)
+      setSubmitting(false)
     }
   }
 
@@ -60,7 +70,7 @@ export default function PlansPage() {
       <PageHeader
         centered
         title="Plans & pricing"
-        description="Pick a tier that fits how many customer messages and voice minutes your team runs each month. You can switch any time — the 30-day quota window resets on every change."
+        description="Pick a tier that fits how many customer messages and voice minutes your team runs each month. Submit a request and an administrator will apply your plan change."
       />
 
       {plansError && (
@@ -83,21 +93,49 @@ export default function PlansPage() {
             key={plan.id}
             plan={plan}
             current={plan.id === currentPlanId}
-            busy={busyPlanId === plan.id}
-            disabled={busyPlanId !== null && busyPlanId !== plan.id}
-            onSelect={() => handleSelect(plan)}
+            onSelect={() => openRequest(plan)}
             subscriptionLoading={subLoading}
           />
         ))}
       </div>
 
       <Text className="mt-8 text-center text-xs text-zinc-500 dark:text-zinc-400">
-        All plans are billed in USD per 30-day window. No card required while
-        you&apos;re evaluating — payment will be added once you&apos;re ready
-        to go live.
+        All plans are billed in USD per 30-day window. Plan changes are applied
+        by an administrator after your request is reviewed.
       </Text>
+
+      <Dialog open={requestPlan !== null} onClose={() => (submitting ? null : setRequestPlan(null))}>
+        <DialogTitle>Request plan change</DialogTitle>
+        <DialogDescription>
+          {requestPlan
+            ? `Ask an administrator to switch your workspace to the ${requestPlan.name} plan. Add an optional note below.`
+            : ''}
+        </DialogDescription>
+        <DialogBody>
+          <Textarea
+            rows={4}
+            placeholder="Optional message for the admin (e.g. when you'd like this to take effect)…"
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            disabled={submitting}
+          />
+        </DialogBody>
+        <DialogActions>
+          <Button plain disabled={submitting} onClick={() => setRequestPlan(null)}>
+            Cancel
+          </Button>
+          <Button color="brand" disabled={submitting} onClick={submitRequest}>
+            {submitting ? 'Sending…' : 'Send request'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </PageShell>
   )
+}
+
+/** Thin alias so the page keeps reading clearly; plans come from the catalogue. */
+function useSubscriptionPlans() {
+  return usePlans()
 }
 
 // ---------------------------------------------------------------------------
@@ -107,15 +145,11 @@ export default function PlansPage() {
 function PlanCard({
   plan,
   current,
-  busy,
-  disabled,
   onSelect,
   subscriptionLoading,
 }: {
   plan: Plan
   current: boolean
-  busy: boolean
-  disabled: boolean
   onSelect: () => void
   subscriptionLoading: boolean
 }) {
@@ -198,15 +232,11 @@ function PlanCard({
       ) : (
         <Button
           color={featured ? 'brand' : 'dark/zinc'}
-          disabled={busy || disabled || subscriptionLoading}
+          disabled={subscriptionLoading}
           onClick={onSelect}
           className="w-full"
         >
-          {busy
-            ? 'Switching…'
-            : subscriptionLoading
-              ? 'Loading…'
-              : `Switch to ${plan.name}`}
+          {subscriptionLoading ? 'Loading…' : 'Request this plan'}
         </Button>
       )}
     </div>

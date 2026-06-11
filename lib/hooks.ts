@@ -172,6 +172,67 @@ export function useSubscription({ pollMs = 60000 }: { pollMs?: number } = {}) {
   return { data, loading, error, refetch }
 }
 
+/**
+ * Current tenant's admin-managed lifecycle status ('pending' | 'active' |
+ * 'suspended'). Drives the dashboard suspended/pending gate. Returns
+ * ``status: null`` while loading or on error so callers fail open (render the
+ * dashboard) rather than hard-blocking on a transient hiccup.
+ */
+export function useAccountStatus() {
+  const getToken = useApiToken()
+  const [status, setStatus] = useState<import('./types').AccountStatus | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  const refetch = useCallback(async () => {
+    try {
+      const token = await getToken()
+      const tenant = await api.tenants.me(token)
+      setStatus((tenant.account_status as import('./types').AccountStatus) ?? 'active')
+    } catch {
+      setStatus(null)
+    } finally {
+      setLoading(false)
+    }
+  }, [getToken])
+
+  useEffect(() => {
+    void refetch()
+  }, [refetch])
+
+  return { status, loading, refetch }
+}
+
+/**
+ * Whether the current Clerk user is a platform admin (server-checked against
+ * the ``ADMIN_USER_IDS`` allowlist). Drives the conditional "Admin" nav entry
+ * and the admin route gate. Fails closed: any error → not admin.
+ */
+export function useIsAdmin() {
+  const getToken = useApiToken()
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const token = await getToken()
+        const me = await api.admin.me(token)
+        if (!cancelled) setIsAdmin(Boolean(me?.is_admin))
+      } catch {
+        if (!cancelled) setIsAdmin(false)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [getToken])
+
+  return { isAdmin, loading }
+}
+
 /** Catalogue of pricing tiers (rendered on /plans). Fetches once. */
 export function usePlans() {
   const getToken = useApiToken()

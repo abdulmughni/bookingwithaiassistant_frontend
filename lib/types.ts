@@ -33,9 +33,14 @@ export interface Tenant {
   confidence_threshold: number
   max_turns: number
   is_active: boolean
+  /** Admin-managed lifecycle: 'pending' (awaiting activation), 'active', 'suspended'. */
+  account_status: AccountStatus
   created_at: string
   updated_at: string
 }
+
+/** Tenant lifecycle controlled by platform admins. */
+export type AccountStatus = 'pending' | 'active' | 'suspended'
 
 export interface CrmSettings {
   /** True when Jobber OAuth refresh failed — owner should reconnect. */
@@ -424,4 +429,62 @@ export interface Subscription {
   period_start: string | null
   period_end: string | null
   usage: SubscriptionUsage
+}
+
+/** Result of POST /api/tenants/me/plan-change-request. */
+export interface PlanChangeRequestResult {
+  id: string
+  status: string
+  requested_plan_id: string | null
+  message: string
+  created_at: string
+}
+
+// ---------------------------------------------------------------------------
+// Admin control plane (matches api/routes/admin.py)
+// ---------------------------------------------------------------------------
+
+export interface AdminMe {
+  is_admin: boolean
+  user_id: string
+}
+
+export interface AdminPlanInfo {
+  id: string
+  name: string
+  monthly_price_cents: number
+  messages_quota: number
+  call_minutes_quota: number
+}
+
+export interface AdminUsageInfo {
+  messages_used: number
+  messages_quota: number
+  call_minutes_used: number
+  call_minutes_quota: number
+  quota_state: QuotaState
+}
+
+export interface AdminTenant {
+  id: string
+  name: string
+  slug: string | null
+  account_status: AccountStatus
+  is_active: boolean
+  created_at: string
+  plan: AdminPlanInfo | null
+  usage: AdminUsageInfo
+  bookings_count: number
+  conversations_count: number
+}
+
+export interface AdminPlanChangeRequest {
+  id: string
+  tenant_id: string
+  tenant_name: string | null
+  requested_plan_id: string | null
+  message: string
+  status: 'open' | 'resolved' | 'dismissed'
+  created_at: string
+  resolved_at: string | null
 }

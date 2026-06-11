@@ -16,14 +16,20 @@ import {
 } from '@/components/sidebar'
 import { Navbar, NavbarSpacer } from '@/components/navbar'
 import { mainNavItems } from '@/lib/navigation'
+import { useIsAdmin } from '@/lib/hooks'
 import {
   ArrowRightStartOnRectangleIcon,
   QuestionMarkCircleIcon,
+  ShieldCheckIcon,
 } from '@heroicons/react/20/solid'
 import {
   NavbarOrganizationSwitcher,
   OrganizationGate,
 } from '@/components/organization-gate'
+import {
+  AccountStatusGate,
+  PendingActivationBanner,
+} from '@/components/account-status-gate'
 import { SidebarUsageCard } from '@/components/sidebar-usage-card'
 import { JobberReconnectBanner } from '@/components/jobber-reconnect-banner'
 import { APP_BRAND_NAME, brandLogoClass } from '@/lib/brand'
@@ -36,12 +42,14 @@ export default function DashboardLayout({
   const pathname = usePathname()
   const { user } = useUser()
   const { signOut } = useClerk()
+  const { isAdmin } = useIsAdmin()
 
   const fullBleedPage =
     pathname === '/conversations' || pathname.startsWith('/conversations/')
 
   return (
     <OrganizationGate>
+      <AccountStatusGate>
       <SidebarLayout
       contentViewportLocked={fullBleedPage}
       navbar={
@@ -94,6 +102,12 @@ export default function DashboardLayout({
             <SidebarSpacer />
 
             <SidebarSection>
+              {isAdmin && (
+                <SidebarItem href="/admin" current={pathname.startsWith('/admin')}>
+                  <ShieldCheckIcon data-slot="icon" />
+                  <SidebarLabel>Admin</SidebarLabel>
+                </SidebarItem>
+              )}
               <SidebarItem href="#">
                 <QuestionMarkCircleIcon data-slot="icon" />
                 <SidebarLabel>Support</SidebarLabel>
@@ -136,11 +150,13 @@ export default function DashboardLayout({
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">{children}</div>
       ) : (
         <div className="min-h-full bg-zinc-50/90 px-4 py-6 sm:px-6 lg:px-8 lg:py-8 dark:bg-zinc-950">
+          <PendingActivationBanner />
           <JobberReconnectBanner />
           {children}
         </div>
       )}
     </SidebarLayout>
+    </AccountStatusGate>
     </OrganizationGate>
   )
 }

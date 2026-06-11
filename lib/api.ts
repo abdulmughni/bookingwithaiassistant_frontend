@@ -359,12 +359,54 @@ export const api = {
     list: (token: string) => request<import('./types').Plan[]>('/api/plans', { token }),
     mySubscription: (token: string) =>
       request<import('./types').Subscription>('/api/tenants/me/subscription', { token }),
-    assign: (token: string, planId: string) =>
-      request<import('./types').Subscription>('/api/tenants/me/subscription', {
-        token,
-        method: 'POST',
-        body: JSON.stringify({ plan_id: planId }),
-      }),
+    requestChange: (
+      token: string,
+      data: { requested_plan_id?: string | null; message?: string },
+    ) =>
+      request<import('./types').PlanChangeRequestResult>(
+        '/api/tenants/me/plan-change-request',
+        {
+          token,
+          method: 'POST',
+          body: JSON.stringify({
+            requested_plan_id: data.requested_plan_id ?? null,
+            message: data.message ?? '',
+          }),
+        },
+      ),
+  },
+
+  admin: {
+    me: (token: string) => request<import('./types').AdminMe>('/api/admin/me', { token }),
+    listTenants: (token: string) =>
+      request<import('./types').AdminTenant[]>('/api/admin/tenants', { token }),
+    activate: (token: string, tenantId: string) =>
+      request<import('./types').AdminTenant>(
+        `/api/admin/tenants/${encodeURIComponent(tenantId)}/activate`,
+        { token, method: 'POST', body: JSON.stringify({}) },
+      ),
+    suspend: (token: string, tenantId: string) =>
+      request<import('./types').AdminTenant>(
+        `/api/admin/tenants/${encodeURIComponent(tenantId)}/suspend`,
+        { token, method: 'POST', body: JSON.stringify({}) },
+      ),
+    assignPlan: (token: string, tenantId: string, planId: string) =>
+      request<import('./types').AdminTenant>(
+        `/api/admin/tenants/${encodeURIComponent(tenantId)}/plan`,
+        { token, method: 'POST', body: JSON.stringify({ plan_id: planId }) },
+      ),
+    listRequests: (token: string, status?: string) => {
+      const qs = status ? `?status=${encodeURIComponent(status)}` : ''
+      return request<import('./types').AdminPlanChangeRequest[]>(
+        `/api/admin/plan-change-requests${qs}`,
+        { token },
+      )
+    },
+    resolveRequest: (token: string, requestId: string, status: 'resolved' | 'dismissed' = 'resolved') =>
+      request<import('./types').AdminPlanChangeRequest>(
+        `/api/admin/plan-change-requests/${encodeURIComponent(requestId)}/resolve`,
+        { token, method: 'POST', body: JSON.stringify({ status }) },
+      ),
   },
 
   credentials: {
