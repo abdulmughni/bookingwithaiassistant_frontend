@@ -85,3 +85,18 @@ export function validityLabel(days: number): string {
   }
   return `${days} days`
 }
+
+const INDUSTRY_LABEL: Record<string, string> = {
+  hvac: 'HVAC only',
+  plumbing: 'Plumbing only',
+  electrical: 'Electrical only',
+  field_service: 'Field service (multi-trade)',
+  general: 'Field service (multi-trade)',
+}
+
+/** Human-readable industry label from tenant industry_type slug. */
+export function formatIndustryLabel(raw: string | null | undefined): string {
+  if (!raw) return '—'
+  const key = raw === 'general' ? 'field_service' : raw
+  return INDUSTRY_LABEL[key] ?? raw.replace(/_/g, ' ')
+}

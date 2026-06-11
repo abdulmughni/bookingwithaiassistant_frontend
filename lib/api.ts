@@ -398,9 +398,9 @@ export const api = {
         `/api/admin/tenants/${encodeURIComponent(tenantId)}/profile`,
         { token },
       ),
-    openWorkspace: (token: string, tenantId: string, verificationToken: string) =>
-      request<import('./types').OpenWorkspaceResult>(
-        `/api/admin/tenants/${encodeURIComponent(tenantId)}/open-workspace`,
+    getClientLogin: (token: string, tenantId: string, verificationToken: string) =>
+      request<import('./types').ClientLoginCredentials>(
+        `/api/admin/tenants/${encodeURIComponent(tenantId)}/client-login`,
         {
           token,
           method: 'POST',

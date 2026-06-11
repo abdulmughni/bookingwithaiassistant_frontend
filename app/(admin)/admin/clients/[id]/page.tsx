@@ -33,6 +33,7 @@ import { Field, FieldGroup, Label } from '@/components/fieldset'
 import { Input } from '@/components/input'
 import { Textarea } from '@/components/textarea'
 import { ConfirmActionDialog } from '@/components/admin/confirm-action-dialog'
+import { ClientLoginDialog } from '@/components/admin/client-login-dialog'
 import { VerifyIdentityDialog } from '@/components/admin/verify-identity-dialog'
 import { ConfirmDeleteDialog } from '@/components/confirm-delete-dialog'
 import {
@@ -40,6 +41,7 @@ import {
   UsageBar,
   formatDate,
   formatDateTime,
+  formatIndustryLabel,
   priceLabel,
   validityLabel,
 } from '@/components/admin/shared'
@@ -47,7 +49,7 @@ import { PageShell, SkeletonBlock, dashCardClass } from '@/components/dashboard-
 import { api, ApiError } from '@/lib/api'
 import { clearVerificationToken, getVerificationToken } from '@/lib/admin-verification'
 import { useApiData, useApiToken, usePlans } from '@/lib/hooks'
-import type { AdminOrgMember, QuotaState } from '@/lib/types'
+import type { AdminOrgMember, ClientLoginCredentials, QuotaState } from '@/lib/types'
 
 const CHANNEL_LABEL: Record<string, string> = {
   whatsapp: 'WhatsApp',
@@ -88,8 +90,10 @@ export default function AdminClientDetailPage() {
   const [creditMinutes, setCreditMinutes] = useState('')
   const [creditReason, setCreditReason] = useState('')
   const [savingCredits, setSavingCredits] = useState(false)
-  const [openingWorkspace, setOpeningWorkspace] = useState(false)
-  const [showVerifyForWorkspace, setShowVerifyForWorkspace] = useState(false)
+  const [fetchingLogin, setFetchingLogin] = useState(false)
+  const [showVerifyForLogin, setShowVerifyForLogin] = useState(false)
+  const [clientCredentials, setClientCredentials] = useState<ClientLoginCredentials | null>(null)
+  const [showLoginDialog, setShowLoginDialog] = useState(false)
   const [showVerifyForDelete, setShowVerifyForDelete] = useState(false)
   const [deleteToken, setDeleteToken] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -155,36 +159,36 @@ export default function AdminClientDetailPage() {
     }
   }, [creditMessages, creditMinutes, creditReason, getToken, tenantId, refetch])
 
-  const openClientWorkspace = useCallback(
+  const fetchClientLogin = useCallback(
     async (verificationToken: string) => {
-      setOpeningWorkspace(true)
+      setFetchingLogin(true)
       try {
         const token = await getToken()
-        const result = await api.admin.openWorkspace(token, tenantId, verificationToken)
-        window.open(result.url, '_blank', 'noopener,noreferrer')
-        toast.success('Opening client account in a new tab…')
+        const credentials = await api.admin.getClientLogin(token, tenantId, verificationToken)
+        setClientCredentials(credentials)
+        setShowLoginDialog(true)
       } catch (err) {
         if (err instanceof ApiError && err.status === 403) {
           clearVerificationToken()
-          setShowVerifyForWorkspace(true)
+          setShowVerifyForLogin(true)
         } else {
-          toast.error(err instanceof ApiError ? err.message : 'Could not open client account.')
+          toast.error(err instanceof ApiError ? err.message : 'Could not retrieve client login.')
         }
       } finally {
-        setOpeningWorkspace(false)
+        setFetchingLogin(false)
       }
     },
     [getToken, tenantId],
   )
 
-  const handleOpenWorkspace = useCallback(() => {
+  const handleGetClientLogin = useCallback(() => {
     const cached = getVerificationToken()
     if (cached) {
-      void openClientWorkspace(cached)
+      void fetchClientLogin(cached)
     } else {
-      setShowVerifyForWorkspace(true)
+      setShowVerifyForLogin(true)
     }
-  }, [openClientWorkspace])
+  }, [fetchClientLogin])
 
   const handleDelete = useCallback(async () => {
     if (!deleteToken) return
@@ -242,15 +246,15 @@ export default function AdminClientDetailPage() {
       <BackLink />
 
       {/* Hero */}
-      <header className="overflow-hidden rounded-2xl border border-zinc-200/80 bg-linear-to-br from-zinc-900 via-zinc-900 to-brand-950 p-6 text-white shadow-lg dark:border-zinc-700/80 sm:p-8">
+      <header className="overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-100 p-6 text-zinc-950 shadow-sm dark:border-zinc-700 dark:bg-zinc-800/60 dark:text-zinc-50 sm:p-8">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-3">
               <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{tenant.name}</h1>
               <StatusBadge status={tenant.account_status} />
             </div>
-            <p className="mt-2 font-mono text-sm text-zinc-400">{tenant.id}</p>
-            <p className="mt-1 text-sm text-zinc-400">Joined {formatDate(tenant.created_at)}</p>
+            <p className="mt-2 font-mono text-sm text-zinc-500 dark:text-zinc-400">{tenant.id}</p>
+            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Joined {formatDate(tenant.created_at)}</p>
           </div>
           <div className="flex flex-wrap gap-2">
             {tenant.account_status === 'active' ? (
@@ -264,14 +268,9 @@ export default function AdminClientDetailPage() {
                 Activate
               </Button>
             )}
-            <Button
-              outline
-              className="border-white/20! bg-white/10! text-white! hover:bg-white/20!"
-              disabled={openingWorkspace || members.length === 0}
-              onClick={handleOpenWorkspace}
-            >
+            <Button outline disabled={fetchingLogin} onClick={handleGetClientLogin}>
               <ArrowTopRightOnSquareIcon />
-              {openingWorkspace ? 'Opening…' : 'Open client account'}
+              {fetchingLogin ? 'Loading…' : 'Client login credentials'}
             </Button>
           </div>
         </div>
@@ -377,15 +376,24 @@ export default function AdminClientDetailPage() {
                   </label>
                   <Select
                     aria-label="Assign plan"
-                    value=""
+                    value={pendingPlanId ?? tenant.plan?.id ?? ''}
                     onChange={(e) => {
-                      if (e.target.value) setPendingPlanId(e.target.value)
-                      e.target.value = ''
+                      const nextId = e.target.value
+                      if (!nextId) return
+                      if (nextId !== tenant.plan?.id) {
+                        setPendingPlanId(nextId)
+                      } else {
+                        setPendingPlanId(null)
+                      }
                     }}
                   >
-                    <option value="">{tenant.plan ? 'Select a new plan…' : 'Select a plan…'}</option>
+                    {!tenant.plan ? (
+                      <option value="" disabled>
+                        Select a plan…
+                      </option>
+                    ) : null}
                     {plans?.map((p) => (
-                      <option key={p.id} value={p.id} disabled={p.id === tenant.plan?.id}>
+                      <option key={p.id} value={p.id}>
                         {p.name} — {priceLabel(p.monthly_price_cents)}
                       </option>
                     ))}
@@ -467,7 +475,7 @@ export default function AdminClientDetailPage() {
             <h2 className="text-base font-semibold text-zinc-950 dark:text-white">Workspace</h2>
             <dl className="mt-4 space-y-4">
               <WorkspaceRow label="Timezone" value={tenant.timezone} />
-              <WorkspaceRow label="Industry" value={tenant.industry_type || '—'} />
+              <WorkspaceRow label="Industry" value={formatIndustryLabel(tenant.industry_type)} />
               <WorkspaceRow label="CRM" value={tenant.crm_type === 'none' ? '—' : tenant.crm_type} />
               <WorkspaceRow
                 label="Channels"
@@ -489,8 +497,8 @@ export default function AdminClientDetailPage() {
               </span>
             </div>
             <p className="mt-1 text-sm text-zinc-500">
-              Organization members — always visible here. Use &quot;Open client account&quot; to sign
-              into their dashboard (password required).
+              Organization members — always visible here. Use &quot;Client login credentials&quot; to
+              copy sign-in details for testing in a separate tab.
             </p>
 
             <ul className="mt-4 space-y-3">
@@ -563,7 +571,10 @@ export default function AdminClientDetailPage() {
         busyLabel="Updating…"
         color="brand"
         onConfirm={async () => {
-          if (pendingPlanId) await runAssignPlan(pendingPlanId)
+          if (pendingPlanId) {
+            await runAssignPlan(pendingPlanId)
+            setPendingPlanId(null)
+          }
         }}
       >
         <div className="flex items-center justify-center gap-3 rounded-xl bg-zinc-50 px-4 py-3 text-sm dark:bg-zinc-800/60">
@@ -626,10 +637,20 @@ export default function AdminClientDetailPage() {
       </Dialog>
 
       <VerifyIdentityDialog
-        open={showVerifyForWorkspace}
-        onClose={() => setShowVerifyForWorkspace(false)}
-        actionLabel="open this client's service provider account"
-        onVerified={(token) => void openClientWorkspace(token)}
+        open={showVerifyForLogin}
+        onClose={() => setShowVerifyForLogin(false)}
+        actionLabel="view this client's login credentials"
+        onVerified={(token) => void fetchClientLogin(token)}
+      />
+
+      <ClientLoginDialog
+        open={showLoginDialog}
+        onClose={() => {
+          setShowLoginDialog(false)
+          setClientCredentials(null)
+        }}
+        credentials={clientCredentials}
+        clientName={tenant.name}
       />
 
       <VerifyIdentityDialog
@@ -674,12 +695,14 @@ function HeroStat({
   value: number
 }) {
   return (
-    <div className="rounded-xl bg-white/10 px-4 py-3 ring-1 ring-white/10">
-      <div className="flex items-center gap-2 text-zinc-300">
+    <div className="rounded-xl border border-zinc-200/80 bg-white px-4 py-3 shadow-sm dark:border-zinc-600/80 dark:bg-zinc-900/40">
+      <div className="flex items-center gap-2 text-zinc-500 dark:text-zinc-400">
         {icon}
         <span className="text-xs font-medium uppercase tracking-wide">{label}</span>
       </div>
-      <p className="mt-1 text-2xl font-bold tabular-nums">{value.toLocaleString()}</p>
+      <p className="mt-1 text-2xl font-bold tabular-nums text-zinc-950 dark:text-white">
+        {value.toLocaleString()}
+      </p>
     </div>
   )
 }

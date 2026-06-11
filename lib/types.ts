@@ -538,9 +538,12 @@ export interface AdminTenantDetail extends AdminTenant {
   members?: AdminOrgMember[]
 }
 
-/** Result of POST /api/admin/tenants/{id}/open-workspace (Clerk impersonation URL). */
-export interface OpenWorkspaceResult {
-  url: string
+/** Result of POST /api/admin/tenants/{id}/client-login (one-time credentials). */
+export interface ClientLoginCredentials {
+  username: string
+  password: string
+  display_name: string
+  warning: string
 }
 
 /** Full plan row for the admin plans manager (GET /api/admin/plans). */
