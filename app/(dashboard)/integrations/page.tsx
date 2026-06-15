@@ -15,6 +15,7 @@ import {
   DialogTitle,
 } from '@/components/dialog'
 import { Card, CardBody } from '@/components/card'
+import { JobberConnectingOverlay } from '@/components/jobber-connecting-overlay'
 import { useApiData, useApiToken, useFreshOrgToken } from '@/lib/hooks'
 import { ApiError, api } from '@/lib/api'
 import { notifyError, notifySuccess } from '@/lib/notify'
@@ -379,6 +380,16 @@ function IntegrationsPageInner() {
 
   const handleJobberOAuth = () => void startJobberOAuth()
 
+  const fromJobberMarketplace = isJobberMarketplaceLaunch(searchParams)
+  const showJobberConnecting =
+    jobberOauthLoading ||
+    (fromJobberMarketplace &&
+      !marketplaceKickstartDone &&
+      !jobberMarketplaceOAuthAlreadyStarted() &&
+      (loading ||
+        tenantLoading ||
+        shouldKickstartJobberOAuth(tenant ?? null, credentials ?? null)))
+
   const handleDelete = async (cred: Credential) => {
     try {
       const token = await getToken()
@@ -403,17 +414,15 @@ function IntegrationsPageInner() {
 
   return (
     <PageShell>
+      <JobberConnectingOverlay open={showJobberConnecting} />
+
       <PageHeader
         title="Integrations"
         description="Connect your field-service CRM so AI bookings land on your live schedule."
       >
-        {jobberOauthLoading ? (
-          <span className="text-sm text-zinc-500 dark:text-zinc-400">Connecting to Jobber…</span>
-        ) : (
-          <Button color="brand" onClick={() => setShowConnect(true)}>
-            Connect
-          </Button>
-        )}
+        <Button color="brand" onClick={() => setShowConnect(true)} disabled={showJobberConnecting}>
+          Connect
+        </Button>
       </PageHeader>
 
       <div className="max-w-2xl">
