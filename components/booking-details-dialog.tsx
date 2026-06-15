@@ -13,6 +13,7 @@ import {
   SparklesIcon,
   WrenchScrewdriverIcon,
 } from '@heroicons/react/24/outline'
+import Link from 'next/link'
 import { Dialog, DialogTitle } from '@/components/dialog'
 import { Badge } from '@/components/badge'
 import { Button } from '@/components/button'
@@ -228,6 +229,18 @@ export function BookingDetailsDialog({
           <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
             Booking ID <span className="font-mono">{data.id}</span> · created{' '}
             {formatDateTime(data.created_at, tenantTz)}
+            {data.customer_id ? (
+              <>
+                {' '}
+                ·{' '}
+                <Link
+                  href={`/clients/${encodeURIComponent(data.customer_id)}`}
+                  className="font-medium text-brand-600 hover:underline dark:text-brand-400"
+                >
+                  View client profile
+                </Link>
+              </>
+            ) : null}
           </p>
         </div>
       </div>

@@ -214,6 +214,40 @@ export const api = {
     },
   },
 
+  customers: {
+    list: (token: string, params?: { q?: string; limit?: number; offset?: number }) => {
+      const qs = new URLSearchParams()
+      if (params?.q) qs.set('q', params.q)
+      if (params?.limit) qs.set('limit', String(params.limit))
+      if (params?.offset) qs.set('offset', String(params.offset))
+      const q = qs.toString()
+      return request<import('./types').Customer[]>(`/api/customers${q ? `?${q}` : ''}`, { token })
+    },
+    count: (token: string, q?: string) => {
+      const qs = q ? `?q=${encodeURIComponent(q)}` : ''
+      return request<{ count: number }>(`/api/customers/count${qs}`, { token })
+    },
+    get: (token: string, id: string) =>
+      request<import('./types').CustomerDetail>(`/api/customers/${encodeURIComponent(id)}`, {
+        token,
+      }),
+    update: (
+      token: string,
+      id: string,
+      body: Partial<
+        Pick<
+          import('./types').Customer,
+          'display_name' | 'email' | 'primary_address' | 'notes'
+        > & { phone: string | null }
+      >,
+    ) =>
+      request<import('./types').Customer>(`/api/customers/${encodeURIComponent(id)}`, {
+        token,
+        method: 'PATCH',
+        body: JSON.stringify(body),
+      }),
+  },
+
   oauth: {
     facebookStart: (token: string) =>
       request<{ authorization_url: string }>('/api/oauth/facebook/start', {

@@ -85,6 +85,42 @@ export interface ChannelAccount {
   updated_at: string
 }
 
+/** End-customer profile (tenant CRM Clients page). */
+export interface Customer {
+  id: string
+  display_name: string
+  phone: string | null
+  email: string | null
+  primary_address: string | null
+  jobber_client_id: string | null
+  notes: string | null
+  bookings_count: number
+  last_seen_at: string | null
+  last_booking_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface CustomerChannelIdentity {
+  channel: string
+  channel_account_id: string
+  external_id: string
+}
+
+export interface CustomerBookingSummary {
+  id: string
+  service_type: string
+  status: string
+  selected_slot: string | null
+  chat_summary: string | null
+  created_at: string
+}
+
+export interface CustomerDetail extends Customer {
+  channel_identities: CustomerChannelIdentity[]
+  bookings: CustomerBookingSummary[]
+}
+
 /** Matches GET/PATCH /api/bookings (selected_slot = appointment start). */
 export interface Booking {
   id: string
@@ -92,6 +128,7 @@ export interface Booking {
   conversation_id: string | null
   source_channel: 'whatsapp' | 'facebook' | 'instagram' | 'web' | 'call' | 'api' | string
   source_contact: string | null
+  customer_id: string | null
   customer_name: string
   customer_phone: string
   customer_address: string | null
