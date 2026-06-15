@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useEffect, useState } from 'react'
+import { Suspense, useCallback, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import clsx from 'clsx'
 import { ChevronRightIcon } from '@heroicons/react/20/solid'
@@ -19,6 +19,13 @@ import { useApiData, useApiToken, useFreshOrgToken } from '@/lib/hooks'
 import { ApiError, api } from '@/lib/api'
 import { notifyError, notifySuccess } from '@/lib/notify'
 import { formatDate } from '@/lib/utils'
+import {
+  clearJobberMarketplaceOAuthGuard,
+  isJobberMarketplaceLaunch,
+  jobberMarketplaceOAuthAlreadyStarted,
+  markJobberMarketplaceOAuthStarted,
+  shouldKickstartJobberOAuth,
+} from '@/lib/jobber-oauth'
 import type { Credential, Tenant } from '@/lib/types'
 
 const JOBBER_LOGO = '/images/getjobber-logo.jpg'
@@ -288,6 +295,7 @@ function IntegrationsPageInner() {
   const searchParams = useSearchParams()
   const [showConnect, setShowConnect] = useState(false)
   const [jobberOauthLoading, setJobberOauthLoading] = useState(false)
+  const [marketplaceKickstartDone, setMarketplaceKickstartDone] = useState(false)
   const getToken = useApiToken()
   const getFreshToken = useFreshOrgToken()
 
@@ -302,11 +310,32 @@ function IntegrationsPageInner() {
   const visibleCredentials =
     credentials?.filter((c) => c.integration_type !== 'gcal' && c.integration_type !== 'calcom') ?? []
 
+  const startJobberOAuth = useCallback(async () => {
+    setJobberOauthLoading(true)
+    try {
+      const token = await getFreshToken()
+      if (!token) {
+        notifyError('Select a workspace (organization) before connecting Jobber.')
+        setJobberOauthLoading(false)
+        return false
+      }
+      markJobberMarketplaceOAuthStarted()
+      const { authorization_url } = await api.oauth.jobberStart(token)
+      window.location.assign(authorization_url)
+      return true
+    } catch (e) {
+      notifyError(e instanceof ApiError ? e.message : 'Could not start Jobber connection')
+      setJobberOauthLoading(false)
+      return false
+    }
+  }, [getFreshToken])
+
   useEffect(() => {
     const jobber = searchParams.get('jobber_oauth')
     if (!jobber) return
     const msg = searchParams.get('message')
     if (jobber === 'success') {
+      clearJobberMarketplaceOAuthGuard()
       notifySuccess('Jobber connected.')
       refetchTenant()
       refetch()
@@ -316,22 +345,39 @@ function IntegrationsPageInner() {
     router.replace('/integrations')
   }, [searchParams, router, refetchTenant, refetch])
 
-  const handleJobberOAuth = async () => {
-    setJobberOauthLoading(true)
-    try {
-      const token = await getFreshToken()
-      if (!token) {
-        notifyError('Select a workspace (organization) before connecting Jobber.')
-        setJobberOauthLoading(false)
-        return
-      }
-      const { authorization_url } = await api.oauth.jobberStart(token)
-      window.location.assign(authorization_url)
-    } catch (e) {
-      notifyError(e instanceof ApiError ? e.message : 'Could not start Jobber connection')
-      setJobberOauthLoading(false)
+  useEffect(() => {
+    if (loading || tenantLoading || marketplaceKickstartDone) return
+    if (!isJobberMarketplaceLaunch(searchParams)) return
+    if (jobberMarketplaceOAuthAlreadyStarted()) {
+      setMarketplaceKickstartDone(true)
+      router.replace('/integrations')
+      return
     }
-  }
+    if (!shouldKickstartJobberOAuth(tenant ?? null, credentials)) {
+      setMarketplaceKickstartDone(true)
+      router.replace('/integrations')
+      return
+    }
+
+    setMarketplaceKickstartDone(true)
+    void (async () => {
+      const started = await startJobberOAuth()
+      if (!started) {
+        router.replace('/integrations')
+      }
+    })()
+  }, [
+    loading,
+    tenantLoading,
+    marketplaceKickstartDone,
+    searchParams,
+    tenant,
+    credentials,
+    router,
+    startJobberOAuth,
+  ])
+
+  const handleJobberOAuth = () => void startJobberOAuth()
 
   const handleDelete = async (cred: Credential) => {
     try {
@@ -361,9 +407,13 @@ function IntegrationsPageInner() {
         title="Integrations"
         description="Connect your field-service CRM so AI bookings land on your live schedule."
       >
-        <Button color="brand" onClick={() => setShowConnect(true)}>
-          Connect
-        </Button>
+        {jobberOauthLoading ? (
+          <span className="text-sm text-zinc-500 dark:text-zinc-400">Connecting to Jobber…</span>
+        ) : (
+          <Button color="brand" onClick={() => setShowConnect(true)}>
+            Connect
+          </Button>
+        )}
       </PageHeader>
 
       <div className="max-w-2xl">
