@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { APP_BRAND_NAME } from '@/lib/brand'
 
 const JOBBER_LOGO = '/images/getjobber-logo.jpg'
@@ -22,6 +23,11 @@ function ConnectingPulse() {
 
 export function JobberConnectingOverlay({ open }: { open: boolean }) {
   const [stepIndex, setStepIndex] = useState(0)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
     if (!open) {
@@ -34,17 +40,17 @@ export function JobberConnectingOverlay({ open }: { open: boolean }) {
     return () => window.clearInterval(interval)
   }, [open])
 
-  if (!open) return null
+  if (!open || !mounted) return null
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6"
+      className="fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-6"
       role="status"
       aria-live="polite"
       aria-busy="true"
       aria-label="Connecting to Jobber"
     >
-      <div className="absolute inset-0 bg-zinc-950/40 backdrop-blur-md dark:bg-zinc-950/65" />
+      <div className="absolute inset-0 bg-zinc-950/45 backdrop-blur-md dark:bg-zinc-950/70" />
 
       <div className="relative w-full max-w-md overflow-hidden rounded-3xl border border-white/20 bg-white/95 shadow-2xl shadow-brand-500/10 ring-1 ring-zinc-950/5 dark:border-white/10 dark:bg-zinc-900/95 dark:shadow-black/50 dark:ring-white/10">
         <div className="pointer-events-none absolute -right-16 -top-16 size-48 rounded-full bg-brand-400/20 blur-3xl" />
@@ -52,27 +58,24 @@ export function JobberConnectingOverlay({ open }: { open: boolean }) {
 
         <div className="relative px-8 pb-8 pt-10 text-center">
           <div className="mx-auto flex max-w-xs items-center justify-center gap-4">
-            <div className="relative">
-              <div className="absolute -inset-2 animate-spin rounded-2xl border-2 border-transparent border-t-brand-500/80 border-r-brand-400/40" />
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={JOBBER_LOGO}
-                alt=""
-                className="relative size-16 rounded-2xl border border-zinc-200/90 object-cover shadow-sm dark:border-zinc-600/80"
-              />
-            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={JOBBER_LOGO}
+              alt=""
+              className="size-16 shrink-0 rounded-2xl border border-zinc-200/90 object-cover shadow-sm dark:border-zinc-600/80"
+            />
 
-            <div className="flex flex-col items-center gap-1.5 px-1">
-              <span className="h-px w-10 bg-linear-to-r from-transparent via-brand-400/70 to-transparent" />
-              <div className="flex items-center gap-1">
-                <span className="size-1.5 animate-bounce rounded-full bg-brand-500 [animation-delay:0ms]" />
-                <span className="size-1.5 animate-bounce rounded-full bg-brand-500 [animation-delay:150ms]" />
-                <span className="size-1.5 animate-bounce rounded-full bg-brand-500 [animation-delay:300ms]" />
+            <div className="flex min-w-[4.5rem] flex-col items-center gap-2 px-1">
+              <span className="jobber-connect-line h-px w-12 bg-linear-to-r from-transparent via-brand-500/80 to-transparent" />
+              <div className="flex items-center gap-1.5">
+                <span className="jobber-connect-dot size-2 rounded-full bg-brand-500" />
+                <span className="jobber-connect-dot size-2 rounded-full bg-brand-500" />
+                <span className="jobber-connect-dot size-2 rounded-full bg-brand-500" />
               </div>
-              <span className="h-px w-10 bg-linear-to-r from-transparent via-brand-400/70 to-transparent" />
+              <span className="jobber-connect-line h-px w-12 bg-linear-to-r from-transparent via-brand-500/80 to-transparent [animation-delay:0.55s]" />
             </div>
 
-            <div className="relative flex size-16 items-center justify-center rounded-2xl bg-linear-to-br from-brand-500 to-brand-700 text-sm font-bold text-white shadow-lg shadow-brand-500/30">
+            <div className="flex size-16 shrink-0 items-center justify-center rounded-2xl bg-linear-to-br from-brand-500 to-brand-700 text-sm font-bold text-white shadow-lg shadow-brand-500/30">
               BL
             </div>
           </div>
@@ -107,6 +110,7 @@ export function JobberConnectingOverlay({ open }: { open: boolean }) {
           <div className="jobber-connect-progress h-full w-1/3 rounded-full bg-linear-to-r from-brand-500 to-brand-400" />
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
