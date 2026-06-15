@@ -239,7 +239,7 @@ export function BookingDetailsDialog({
             <SparklesIcon className="h-4 w-4" aria-hidden="true" />
             Booking summary
           </div>
-          <p className="mt-2 text-sm leading-relaxed text-zinc-800 dark:text-zinc-200">
+          <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-zinc-800 dark:text-zinc-200">
             {loading && !data.chat_summary ? (
               <span className="text-zinc-500 dark:text-zinc-400">Building summary…</span>
             ) : data.chat_summary && data.chat_summary.trim() ? (
