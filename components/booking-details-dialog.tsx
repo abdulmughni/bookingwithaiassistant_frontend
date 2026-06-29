@@ -234,7 +234,7 @@ export function BookingDetailsDialog({
                 {' '}
                 ·{' '}
                 <Link
-                  href={`/clients/${encodeURIComponent(data.customer_id)}`}
+                  href={`/clients?client=${encodeURIComponent(data.customer_id)}`}
                   className="font-medium text-brand-600 hover:underline dark:text-brand-400"
                 >
                   View client profile
@@ -325,18 +325,6 @@ export function BookingDetailsDialog({
                 {formatDateTime(data.status_changed_at, tenantTz)}
               </p>
             )}
-          </section>
-        )}
-
-        {/* Booking notes (free-form) */}
-        {data.notes && (
-          <section className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-white/10 dark:bg-zinc-900/40">
-            <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-              Booking notes
-            </div>
-            <p className="mt-2 whitespace-pre-wrap text-sm text-zinc-800 dark:text-zinc-200">
-              {data.notes}
-            </p>
           </section>
         )}
 
