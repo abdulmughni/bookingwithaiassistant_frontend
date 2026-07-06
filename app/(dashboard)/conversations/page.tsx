@@ -36,7 +36,7 @@ const CHANNEL_TABS: { id: ChannelTab; label: string }[] = [
   { id: 'all', label: 'All messages' },
   { id: 'facebook', label: 'Messenger' },
   { id: 'instagram', label: 'Instagram' },
-  { id: 'whatsapp', label: 'WhatsApp' },
+  // { id: 'whatsapp', label: 'WhatsApp' },
 ]
 
 function channelTabLabel(channel: string): string {
@@ -1197,7 +1197,7 @@ export default function ConversationsPage() {
                 Select a conversation
               </p>
               <p className="max-w-xs text-xs text-zinc-400 dark:text-zinc-500">
-                Choose a chat from the inbox. Filter by Messenger, Instagram, or WhatsApp using the
+                Choose a chat from the inbox. Filter by Messenger or Instagram using the
                 tabs above.
               </p>
             </div>
