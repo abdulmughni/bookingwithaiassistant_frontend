@@ -78,6 +78,8 @@ export interface ChannelAccount {
   verify_token: string
   /** True when a Page token is stored server-side; raw token is never returned. */
   has_access_token?: boolean
+  /** When false, inbound messages are stored but AI auto-replies are off. */
+  ai_enabled?: boolean
   connection_status: 'verified' | 'pending' | 'error' | string
   connection_message: string | null
   last_verified_at: string | null

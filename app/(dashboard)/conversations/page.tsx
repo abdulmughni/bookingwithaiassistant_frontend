@@ -8,6 +8,7 @@ import {
   PaperAirplaneIcon,
   PaperClipIcon,
   FaceSmileIcon,
+  Cog6ToothIcon,
 } from '@heroicons/react/24/outline'
 import {
   ChatBubbleLeftRightIcon,
@@ -18,8 +19,16 @@ import { useApiToken } from '@/lib/hooks'
 import { api, ApiError } from '@/lib/api'
 import { ChannelIcon } from '@/components/channel-icon'
 import { ConversationBookingsDrawer } from '@/components/conversation-bookings-drawer'
+import {
+  Dialog,
+  DialogBody,
+  DialogDescription,
+  DialogTitle,
+} from '@/components/dialog'
+import { Description, Label } from '@/components/fieldset'
+import { Switch, SwitchField } from '@/components/switch'
 import { renderRichText } from '../../../lib/rich-text'
-import type { Conversation, Message, MessageAttachment } from '@/lib/types'
+import type { ChannelAccount, Conversation, Message, MessageAttachment } from '@/lib/types'
 
 type ChannelTab = 'all' | 'facebook' | 'instagram' | 'whatsapp'
 
@@ -535,6 +544,11 @@ export default function ConversationsPage() {
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
+  const [channelSettingsOpen, setChannelSettingsOpen] = useState(false)
+  const [channelSettings, setChannelSettings] = useState<ChannelAccount | null>(null)
+  const [channelSettingsLoading, setChannelSettingsLoading] = useState(false)
+  const [channelSettingsSaving, setChannelSettingsSaving] = useState(false)
+  const [channelSettingsError, setChannelSettingsError] = useState<string | null>(null)
 
   const listScrollRef = useRef<HTMLDivElement | null>(null)
   const listSentinelRef = useRef<HTMLDivElement | null>(null)
@@ -551,6 +565,9 @@ export default function ConversationsPage() {
   useEffect(() => {
     setDraft('')
     setSendError(null)
+    setChannelSettingsOpen(false)
+    setChannelSettings(null)
+    setChannelSettingsError(null)
   }, [selectedId])
 
   const fetchConversations = useCallback(
@@ -642,6 +659,53 @@ export default function ConversationsPage() {
   const composeDisabled =
     !selected || selected.channel === 'web' || messagesLoading || sending
   const canSend = !composeDisabled && draft.trim().length > 0
+
+  const loadChannelSettings = useCallback(async () => {
+    if (!selected) return
+    const accountId = selected.channel_account_id || selected.account_id
+    setChannelSettingsLoading(true)
+    setChannelSettingsError(null)
+    try {
+      const token = await getToken()
+      const account = await api.channels.get(token, selected.channel, accountId)
+      setChannelSettings(account)
+    } catch (err) {
+      setChannelSettings(null)
+      setChannelSettingsError(
+        err instanceof ApiError ? err.message : 'Could not load channel settings.',
+      )
+    } finally {
+      setChannelSettingsLoading(false)
+    }
+  }, [getToken, selected])
+
+  useEffect(() => {
+    if (!channelSettingsOpen || !selected) return
+    void loadChannelSettings()
+  }, [channelSettingsOpen, loadChannelSettings, selected])
+
+  const handleAiToggle = useCallback(
+    async (enabled: boolean) => {
+      if (!selected) return
+      const accountId = selected.channel_account_id || selected.account_id
+      setChannelSettingsSaving(true)
+      setChannelSettingsError(null)
+      try {
+        const token = await getToken()
+        const updated = await api.channels.update(token, selected.channel, accountId, {
+          ai_enabled: enabled,
+        })
+        setChannelSettings(updated)
+      } catch (err) {
+        setChannelSettingsError(
+          err instanceof ApiError ? err.message : 'Could not update AI setting.',
+        )
+      } finally {
+        setChannelSettingsSaving(false)
+      }
+    },
+    [getToken, selected],
+  )
 
   const handleSendMessage = useCallback(async () => {
     if (!selectedId || !selected || composeDisabled) return
@@ -952,8 +1016,58 @@ export default function ConversationsPage() {
                     <CalendarSolidIcon className="size-4" aria-hidden="true" />
                     Bookings
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setChannelSettingsOpen(true)}
+                    aria-label="Channel settings"
+                    className="inline-flex size-9 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-600 transition hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                    title="Channel settings"
+                  >
+                    <Cog6ToothIcon className="size-5" aria-hidden="true" />
+                  </button>
                 </div>
               </header>
+
+              <Dialog
+                open={channelSettingsOpen}
+                onClose={() => {
+                  if (!channelSettingsSaving) setChannelSettingsOpen(false)
+                }}
+                size="sm"
+              >
+                <DialogTitle>Channel settings</DialogTitle>
+                <DialogDescription>
+                  {selected.channel_account_label
+                    ? `${channelTabLabel(selected.channel)} · ${selected.channel_account_label}`
+                    : channelTabLabel(selected.channel)}
+                </DialogDescription>
+                <DialogBody>
+                  {channelSettingsLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <div className="size-8 animate-spin rounded-full border-2 border-sky-500 border-t-transparent" />
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <SwitchField>
+                        <Label>AI auto-reply</Label>
+                        <Description>
+                          When on, incoming messages on this account get an AI response.
+                          When off, messages are saved but not answered automatically.
+                        </Description>
+                        <Switch
+                          color="sky"
+                          checked={channelSettings?.ai_enabled !== false}
+                          disabled={channelSettingsSaving || !channelSettings}
+                          onChange={(checked) => void handleAiToggle(checked)}
+                        />
+                      </SwitchField>
+                      {channelSettingsError ? (
+                        <p className="text-sm text-red-600 dark:text-red-400">{channelSettingsError}</p>
+                      ) : null}
+                    </div>
+                  )}
+                </DialogBody>
+              </Dialog>
 
               <div
                 ref={threadScrollRef}
