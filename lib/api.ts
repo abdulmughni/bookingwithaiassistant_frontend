@@ -212,6 +212,12 @@ export const api = {
         { token },
       )
     },
+    send: (token: string, conversationId: string, content: string) =>
+      request<import('./types').Message>(`/api/conversations/${conversationId}/messages`, {
+        method: 'POST',
+        token,
+        body: JSON.stringify({ content }),
+      }),
   },
 
   customers: {

@@ -15,7 +15,7 @@ import {
 } from '@heroicons/react/24/solid'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useApiToken } from '@/lib/hooks'
-import { api } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
 import { ChannelIcon } from '@/components/channel-icon'
 import { ConversationBookingsDrawer } from '@/components/conversation-bookings-drawer'
 import { renderRichText } from '../../../lib/rich-text'
@@ -532,6 +532,9 @@ export default function ConversationsPage() {
   const [messagesLoadingMore, setMessagesLoadingMore] = useState(false)
   const [messagesHasMore, setMessagesHasMore] = useState(false)
   const [messagesOffset, setMessagesOffset] = useState(0)
+  const [draft, setDraft] = useState('')
+  const [sending, setSending] = useState(false)
+  const [sendError, setSendError] = useState<string | null>(null)
 
   const listScrollRef = useRef<HTMLDivElement | null>(null)
   const listSentinelRef = useRef<HTMLDivElement | null>(null)
@@ -544,6 +547,11 @@ export default function ConversationsPage() {
     const t = setTimeout(() => setDebouncedQuery(query.trim()), 320)
     return () => clearTimeout(t)
   }, [query])
+
+  useEffect(() => {
+    setDraft('')
+    setSendError(null)
+  }, [selectedId])
 
   const fetchConversations = useCallback(
     async (opts?: { reset?: boolean }) => {
@@ -631,6 +639,50 @@ export default function ConversationsPage() {
   const selected = conversations.find((c) => c.id === selectedId)
   const displayName = selected ? conversationDisplayName(selected) : 'Conversation'
   const customerThreadName = selected ? conversationDisplayName(selected) : 'Customer'
+  const composeDisabled =
+    !selected || selected.channel === 'web' || messagesLoading || sending
+  const canSend = !composeDisabled && draft.trim().length > 0
+
+  const handleSendMessage = useCallback(async () => {
+    if (!selectedId || !selected || composeDisabled) return
+    const text = draft.trim()
+    if (!text) return
+
+    setSending(true)
+    setSendError(null)
+    try {
+      const token = await getToken()
+      const sent = await api.conversations.send(token, selectedId, text)
+      setMessages((prev) => [...prev, sent])
+      setDraft('')
+      const preview = text.length > 200 ? `${text.slice(0, 199)}…` : text
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === selectedId
+            ? {
+                ...c,
+                last_message_preview: preview,
+                last_message_role: 'assistant',
+                last_message_at: sent.created_at,
+                updated_at: sent.created_at,
+              }
+            : c,
+        ),
+      )
+      setTimeout(() => {
+        const box = threadScrollRef.current
+        if (box) box.scrollTop = box.scrollHeight
+      }, 0)
+    } catch (err) {
+      setSendError(
+        err instanceof ApiError
+          ? err.message
+          : 'Could not send message. Please try again.',
+      )
+    } finally {
+      setSending(false)
+    }
+  }, [composeDisabled, draft, getToken, selected, selectedId])
 
   const loadMessages = async (convId: string) => {
     setSelectedId(convId)
@@ -956,35 +1008,61 @@ export default function ConversationsPage() {
               </div>
 
               <footer className="shrink-0 border-t border-zinc-200 bg-white px-3 py-3 dark:border-zinc-800 dark:bg-zinc-900">
+                {sendError ? (
+                  <p className="mx-auto mb-2 max-w-3xl text-center text-xs text-red-600 dark:text-red-400">
+                    {sendError}
+                  </p>
+                ) : null}
                 <div className="mx-auto flex max-w-3xl items-end gap-2">
                   <div className="flex min-w-0 flex-1 items-end gap-2 rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1.5 dark:border-zinc-700 dark:bg-zinc-800">
                     <input
                       type="text"
-                      readOnly
-                      placeholder="Aa"
-                      className="min-h-10 min-w-0 flex-1 border-0 bg-transparent py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-0 dark:text-white"
-                      aria-label="Message input (read-only)"
+                      value={draft}
+                      onChange={(e) => {
+                        setDraft(e.target.value)
+                        if (sendError) setSendError(null)
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault()
+                          void handleSendMessage()
+                        }
+                      }}
+                      disabled={composeDisabled}
+                      placeholder={
+                        selected?.channel === 'web'
+                          ? 'Web chat cannot receive pushed replies'
+                          : 'Aa'
+                      }
+                      className="min-h-10 min-w-0 flex-1 border-0 bg-transparent py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60 dark:text-white"
+                      aria-label="Message input"
                     />
                     <div className="flex shrink-0 items-center gap-0.5 pb-1">
                       <button
                         type="button"
-                        className="rounded-full p-2 text-zinc-500 transition hover:bg-zinc-200/80 dark:hover:bg-zinc-700"
-                        aria-label="Emoji"
+                        disabled
+                        className="rounded-full p-2 text-zinc-500 opacity-40"
+                        aria-label="Emoji (coming soon)"
                       >
                         <FaceSmileIcon className="size-5" />
                       </button>
                       <button
                         type="button"
-                        className="rounded-full p-2 text-zinc-500 transition hover:bg-zinc-200/80 dark:hover:bg-zinc-700"
-                        aria-label="Attach file"
+                        disabled
+                        className="rounded-full p-2 text-zinc-500 opacity-40"
+                        aria-label="Attach file (coming soon)"
                       >
                         <PaperClipIcon className="size-5" />
                       </button>
                       <button
                         type="button"
-                        disabled
-                        className="ml-1 flex size-9 items-center justify-center rounded-full bg-[#0084ff] text-white opacity-50 shadow-sm"
-                        aria-label="Send (coming soon)"
+                        onClick={() => void handleSendMessage()}
+                        disabled={!canSend}
+                        className={clsx(
+                          'ml-1 flex size-9 items-center justify-center rounded-full bg-[#0084ff] text-white shadow-sm transition',
+                          !canSend && 'opacity-50',
+                        )}
+                        aria-label="Send message"
                       >
                         <PaperAirplaneIcon className="size-4 -rotate-45" />
                       </button>
