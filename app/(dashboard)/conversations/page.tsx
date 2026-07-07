@@ -31,6 +31,9 @@ import { Switch, SwitchField } from '@/components/switch'
 import { renderRichText } from '../../../lib/rich-text'
 import type { ChannelAccount, Conversation, Message, MessageAttachment } from '@/lib/types'
 
+/** Local-only message state for optimistic dashboard sends. */
+type ChatMessage = Message & { sendStatus?: 'sending' | 'failed' }
+
 type ChannelTab = 'all' | 'facebook' | 'instagram' | 'whatsapp'
 
 const CHANNEL_TABS: { id: ChannelTab; label: string }[] = [
@@ -358,12 +361,14 @@ function MessageBubble({
   customerAvatarUrl,
   customerSeed,
   channel,
+  sendStatus,
 }: {
   message: Message
   customerName: string
   customerAvatarUrl?: string | null
   customerSeed: string
   channel: string
+  sendStatus?: 'sending' | 'failed'
 }) {
   const isCustomer = message.role === 'user'
   const isSystem = message.role === 'system'
@@ -429,12 +434,31 @@ function MessageBubble({
         )}
       >
         <div className="flex items-end gap-1">
+          {isOutgoing && sendStatus === 'sending' && (
+            <div
+              className="mb-2 flex size-5 shrink-0 items-center justify-center"
+              aria-label="Sending"
+            >
+              <div className="size-4 animate-spin rounded-full border-2 border-zinc-300/80 border-t-zinc-500 dark:border-zinc-600 dark:border-t-zinc-300" />
+            </div>
+          )}
+          {isOutgoing && sendStatus === 'failed' && (
+            <div
+              className="mb-2 flex size-5 shrink-0 items-center justify-center text-red-500"
+              title="Failed to send"
+              aria-label="Failed to send"
+            >
+              <span className="text-sm font-bold leading-none">!</span>
+            </div>
+          )}
           <div
             className={clsx(
-              'relative px-3 py-2 text-[15px] leading-snug shadow-sm',
+              'relative px-3 py-2 text-[15px] leading-snug shadow-sm transition-opacity',
               isCustomer
                 ? 'rounded-[18px] rounded-bl-md bg-[#e4e6eb] text-zinc-900 dark:bg-zinc-700 dark:text-zinc-100'
                 : 'rounded-[18px] rounded-br-md bg-[#0084ff] text-white',
+              sendStatus === 'sending' && 'opacity-90',
+              sendStatus === 'failed' && 'ring-2 ring-red-400/60',
             )}
           >
             {showMessengerMedia ? (
@@ -454,7 +478,13 @@ function MessageBubble({
                 isCustomer ? 'text-zinc-500 dark:text-zinc-400' : 'text-white/80',
               )}
             >
-              {formatBubbleTime(message.created_at)}
+              {sendStatus === 'sending' ? (
+                'Sending…'
+              ) : sendStatus === 'failed' ? (
+                <span className="text-red-200">Couldn&apos;t send</span>
+              ) : (
+                formatBubbleTime(message.created_at)
+              )}
             </p>
           </div>
 
@@ -481,13 +511,13 @@ function MessagesWithDividers({
   customerSeed,
   channel,
 }: {
-  messages: Message[]
+  messages: ChatMessage[]
   customerName: string
   customerAvatarUrl?: string | null
   customerSeed: string
   channel: string
 }) {
-  type Block = { type: 'divider'; label: string } | { type: 'msg'; message: Message }
+  type Block = { type: 'divider'; label: string } | { type: 'msg'; message: ChatMessage }
   const blocks: Block[] = []
 
   let lastDay: Date | null = null
@@ -511,6 +541,7 @@ function MessagesWithDividers({
           <MessageBubble
             key={b.message.id}
             message={b.message}
+            sendStatus={b.message.sendStatus}
             customerName={customerName}
             customerAvatarUrl={customerAvatarUrl}
             customerSeed={customerSeed}
@@ -537,13 +568,12 @@ export default function ConversationsPage() {
   const [debouncedQuery, setDebouncedQuery] = useState('')
   const [channelTab, setChannelTab] = useState<ChannelTab>('all')
   const [bookingsDrawerOpen, setBookingsDrawerOpen] = useState(false)
-  const [messages, setMessages] = useState<Message[]>([])
+  const [messages, setMessages] = useState<ChatMessage[]>([])
   const [messagesLoading, setMessagesLoading] = useState(false)
   const [messagesLoadingMore, setMessagesLoadingMore] = useState(false)
   const [messagesHasMore, setMessagesHasMore] = useState(false)
   const [messagesOffset, setMessagesOffset] = useState(0)
   const [draft, setDraft] = useState('')
-  const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
   const [channelSettingsOpen, setChannelSettingsOpen] = useState(false)
   const [channelSettings, setChannelSettings] = useState<ChannelAccount | null>(null)
@@ -557,6 +587,8 @@ export default function ConversationsPage() {
    *  successful page recreates the callback and retriggers the tab/search effect. */
   const conversationsOffsetRef = useRef(0)
   const threadScrollRef = useRef<HTMLDivElement | null>(null)
+  /** Message ids appended locally after a dashboard send — skip the WS echo. */
+  const locallySentMessageIdsRef = useRef<Set<string>>(new Set())
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedQuery(query.trim()), 320)
@@ -657,8 +689,7 @@ export default function ConversationsPage() {
   const selected = conversations.find((c) => c.id === selectedId)
   const displayName = selected ? conversationDisplayName(selected) : 'Conversation'
   const customerThreadName = selected ? conversationDisplayName(selected) : 'Customer'
-  const composeDisabled =
-    !selected || selected.channel === 'web' || messagesLoading || sending
+  const composeDisabled = !selected || selected.channel === 'web' || messagesLoading
   const canSend = !composeDisabled && draft.trim().length > 0
 
   const loadChannelSettings = useCallback(async () => {
@@ -713,14 +744,51 @@ export default function ConversationsPage() {
     const text = draft.trim()
     if (!text) return
 
-    setSending(true)
+    const tempId = `pending-${crypto.randomUUID()}`
+    const now = new Date().toISOString()
+    const preview = text.length > 200 ? `${text.slice(0, 199)}…` : text
+
+    // Optimistic UI — clear input and show the bubble immediately (Messenger-style).
+    setDraft('')
     setSendError(null)
+    const optimistic: ChatMessage = {
+      id: tempId,
+      conversation_id: selectedId,
+      role: 'assistant',
+      content: text,
+      channel_message_id: null,
+      created_at: now,
+      attachments: [],
+      sendStatus: 'sending',
+    }
+    setMessages((prev) => [...prev, optimistic])
+    setConversations((prev) =>
+      prev.map((c) =>
+        c.id === selectedId
+          ? {
+              ...c,
+              last_message_preview: preview,
+              last_message_role: 'assistant',
+              last_message_at: now,
+              updated_at: now,
+            }
+          : c,
+      ),
+    )
+    setTimeout(() => {
+      const box = threadScrollRef.current
+      if (box) box.scrollTop = box.scrollHeight
+    }, 0)
+
     try {
       const token = await getToken()
       const sent = await api.conversations.send(token, selectedId, text)
-      setMessages((prev) => [...prev, sent])
-      setDraft('')
-      const preview = text.length > 200 ? `${text.slice(0, 199)}…` : text
+      locallySentMessageIdsRef.current.add(sent.id)
+      setMessages((prev) => {
+        const withoutPending = prev.filter((m) => m.id !== tempId)
+        if (withoutPending.some((m) => m.id === sent.id)) return withoutPending
+        return [...withoutPending, sent]
+      })
       setConversations((prev) =>
         prev.map((c) =>
           c.id === selectedId
@@ -734,18 +802,15 @@ export default function ConversationsPage() {
             : c,
         ),
       )
-      setTimeout(() => {
-        const box = threadScrollRef.current
-        if (box) box.scrollTop = box.scrollHeight
-      }, 0)
     } catch (err) {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === tempId ? { ...m, sendStatus: 'failed' } : m)),
+      )
       setSendError(
         err instanceof ApiError
           ? err.message
           : 'Could not send message. Please try again.',
       )
-    } finally {
-      setSending(false)
     }
   }, [composeDisabled, draft, getToken, selected, selectedId])
 
@@ -830,30 +895,35 @@ export default function ConversationsPage() {
     // conversation_id = "<tenant>|<channel>|<account>|<customer>"
     const eventChannel = convId.split('|')[1] || ''
 
-    // Append to the currently open thread (dedupe by id).
+    // Live thread updates: inbound customer messages (webhook) and AI replies.
+    // Dashboard sends are appended locally — ignore their WS echo.
     if (convId === selectedId && event.id) {
-      const incoming: Message = {
-        id: event.id,
-        conversation_id: convId,
-        role: (event.role as Message['role']) ?? 'user',
-        content: event.content ?? '',
-        channel_message_id: null,
-        created_at: event.created_at,
-        attachments: [],
-      }
-      setMessages((prev) => {
-        if (prev.some((m) => m.id === incoming.id)) return prev
-        return [...prev, incoming]
-      })
-      const box = threadScrollRef.current
-      const nearBottom = box
-        ? box.scrollHeight - box.scrollTop - box.clientHeight < 160
-        : true
-      if (nearBottom) {
-        setTimeout(() => {
-          const cur = threadScrollRef.current
-          if (cur) cur.scrollTop = cur.scrollHeight
-        }, 0)
+      if (locallySentMessageIdsRef.current.has(event.id)) {
+        locallySentMessageIdsRef.current.delete(event.id)
+      } else if (event.role === 'user' || event.role === 'assistant') {
+        const incoming: Message = {
+          id: event.id,
+          conversation_id: convId,
+          role: (event.role as Message['role']) ?? 'user',
+          content: event.content ?? '',
+          channel_message_id: null,
+          created_at: event.created_at,
+          attachments: [],
+        }
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === incoming.id)) return prev
+          return [...prev, incoming]
+        })
+        const box = threadScrollRef.current
+        const nearBottom = box
+          ? box.scrollHeight - box.scrollTop - box.clientHeight < 160
+          : true
+        if (nearBottom) {
+          setTimeout(() => {
+            const cur = threadScrollRef.current
+            if (cur) cur.scrollTop = cur.scrollHeight
+          }, 0)
+        }
       }
     }
 
