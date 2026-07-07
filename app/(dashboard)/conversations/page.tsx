@@ -16,6 +16,7 @@ import {
 } from '@heroicons/react/24/solid'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useApiToken } from '@/lib/hooks'
+import { useRealtimeEvent } from '@/lib/realtime'
 import { api, ApiError } from '@/lib/api'
 import { ChannelIcon } from '@/components/channel-icon'
 import { ConversationBookingsDrawer } from '@/components/conversation-bookings-drawer'
@@ -820,6 +821,70 @@ export default function ConversationsPage() {
     if (selectedId) void loadMessages(selectedId)
   }
 
+  // Live updates: append to the open thread + reorder the inbox on new messages.
+  useRealtimeEvent((event) => {
+    if (event.type !== 'message.created') return
+    const convId = event.conversation_id
+    if (!convId) return
+
+    // conversation_id = "<tenant>|<channel>|<account>|<customer>"
+    const eventChannel = convId.split('|')[1] || ''
+
+    // Append to the currently open thread (dedupe by id).
+    if (convId === selectedId && event.id) {
+      const incoming: Message = {
+        id: event.id,
+        conversation_id: convId,
+        role: (event.role as Message['role']) ?? 'user',
+        content: event.content ?? '',
+        channel_message_id: null,
+        created_at: event.created_at,
+        attachments: [],
+      }
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === incoming.id)) return prev
+        return [...prev, incoming]
+      })
+      const box = threadScrollRef.current
+      const nearBottom = box
+        ? box.scrollHeight - box.scrollTop - box.clientHeight < 160
+        : true
+      if (nearBottom) {
+        setTimeout(() => {
+          const cur = threadScrollRef.current
+          if (cur) cur.scrollTop = cur.scrollHeight
+        }, 0)
+      }
+    }
+
+    // Update + reorder the inbox row (respect the active channel filter).
+    if (channelTab !== 'all' && eventChannel && eventChannel !== channelTab) return
+
+    const preview =
+      event.content && event.content.length > 200
+        ? `${event.content.slice(0, 199)}…`
+        : event.content ?? ''
+
+    setConversations((prev) => {
+      const idx = prev.findIndex((c) => c.id === convId)
+      if (idx === -1) {
+        // Not loaded yet: only pull it in when no search filter is narrowing the list.
+        if (!debouncedQuery) void fetchConversations({ reset: true })
+        return prev
+      }
+      const updated: Conversation = {
+        ...prev[idx],
+        last_message_preview: preview,
+        last_message_role: event.role ?? prev[idx].last_message_role ?? null,
+        last_message_at: event.created_at,
+        updated_at: event.created_at,
+      }
+      const next = [...prev]
+      next.splice(idx, 1)
+      return [updated, ...next]
+    })
+  })
+
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-white dark:bg-zinc-950">
       {/* Channel tabs — Meta Business Suite style */}
@@ -1005,7 +1070,7 @@ export default function ConversationsPage() {
                     </p>
                   </div>
                 </div>
-                <div className="flex shrink-0 items-center gap-2">
+                <div className="flex shrink-0 items-center gap-2 lg:mr-14">
                   <button
                     type="button"
                     onClick={() => setBookingsDrawerOpen(true)}

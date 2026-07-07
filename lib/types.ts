@@ -247,6 +247,61 @@ export interface MessagesPage {
   next_offset: number | null
 }
 
+// ---------------------------------------------------------------------------
+// Notifications (dashboard bell — bookings only for v1)
+// ---------------------------------------------------------------------------
+
+export interface Notification {
+  id: string
+  type: string
+  booking_id: string | null
+  title: string
+  body: string
+  is_read: boolean
+  created_at: string
+}
+
+export interface NotificationList {
+  items: Notification[]
+  unread_count: number
+}
+
+// ---------------------------------------------------------------------------
+// Realtime WebSocket events (server -> client)
+// ---------------------------------------------------------------------------
+
+export interface MessageCreatedEvent {
+  type: 'message.created'
+  id: string | null
+  conversation_id: string
+  role: 'user' | 'assistant' | 'system' | 'tool'
+  content: string
+  created_at: string
+}
+
+export interface BookingCreatedEvent {
+  type: 'booking.created'
+  id: string
+  customer_name: string
+  service_type: string
+  selected_slot: string | null
+  source_channel: string | null
+  created_at: string
+  /** Persisted notification row, attached so the bell updates without a refetch. */
+  notification?: Notification
+}
+
+/** Control frames the socket also emits (ignored by feature code). */
+export interface RealtimeControlEvent {
+  type: 'connected' | 'ping'
+  [key: string]: unknown
+}
+
+export type RealtimeEvent =
+  | MessageCreatedEvent
+  | BookingCreatedEvent
+  | RealtimeControlEvent
+
 export interface Credential {
   ref: string
   integration_type: string

@@ -32,6 +32,8 @@ import {
 } from '@/components/account-status-gate'
 import { SidebarUsageCard } from '@/components/sidebar-usage-card'
 import { JobberReconnectBanner } from '@/components/jobber-reconnect-banner'
+import { NotificationBell } from '@/components/notification-bell'
+import { RealtimeProvider } from '@/lib/realtime'
 import { APP_BRAND_NAME, brandLogoClass } from '@/lib/brand'
 
 export default function DashboardLayout({
@@ -69,11 +71,14 @@ export default function DashboardLayout({
   return (
     <OrganizationGate>
       <AccountStatusGate>
+      <RealtimeProvider>
       <SidebarLayout
       contentViewportLocked={fullBleedPage}
+      desktopHeader={<NotificationBell />}
       navbar={
         <Navbar>
           <NavbarSpacer />
+          <NotificationBell />
           <NavbarOrganizationSwitcher />
           <UserButton />
         </Navbar>
@@ -169,6 +174,7 @@ export default function DashboardLayout({
         </div>
       )}
     </SidebarLayout>
+    </RealtimeProvider>
     </AccountStatusGate>
     </OrganizationGate>
   )

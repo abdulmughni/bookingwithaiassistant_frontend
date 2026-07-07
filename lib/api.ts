@@ -220,6 +220,26 @@ export const api = {
       }),
   },
 
+  notifications: {
+    list: (
+      token: string,
+      params?: { limit?: number; unreadOnly?: boolean },
+    ) => {
+      const qs = new URLSearchParams()
+      if (params?.limit) qs.set('limit', String(params.limit))
+      if (params?.unreadOnly) qs.set('unread_only', 'true')
+      const q = qs.toString()
+      return request<import('./types').NotificationList>(
+        `/api/notifications${q ? `?${q}` : ''}`,
+        { token },
+      )
+    },
+    markRead: (token: string, id: string) =>
+      request<null>(`/api/notifications/${id}/read`, { method: 'POST', token }),
+    markAllRead: (token: string) =>
+      request<null>('/api/notifications/read-all', { method: 'POST', token }),
+  },
+
   customers: {
     list: (token: string, params?: { q?: string; limit?: number; offset?: number }) => {
       const qs = new URLSearchParams()

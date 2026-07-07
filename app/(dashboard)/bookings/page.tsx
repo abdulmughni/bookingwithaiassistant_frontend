@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
   ExclamationTriangleIcon,
   SparklesIcon,
@@ -122,7 +123,7 @@ interface ActiveActionState {
   action: BookingAction
 }
 
-export default function BookingsPage() {
+function BookingsPageInner() {
   const [statusFilter, setStatusFilter] = useState('')
   const [phoneSearch, setPhoneSearch] = useState('')
   const [scheduleDateFrom, setScheduleDateFrom] = useState('')
@@ -132,11 +133,55 @@ export default function BookingsPage() {
   const [activeAction, setActiveAction] = useState<ActiveActionState | null>(null)
   const getToken = useApiToken()
   const tenantTz = useTenantTimezone()
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const deepLinkedRef = useRef<string | null>(null)
 
   const { data: bookings, loading, refetch } = useApiData<Booking[]>(
     (token) => api.bookings.list(token, statusFilter ? { status: statusFilter } : undefined),
     [statusFilter],
   )
+
+  // Deep link: /bookings?booking=<id> opens the details dialog (from the bell).
+  useEffect(() => {
+    const id = (searchParams.get('booking') || '').trim()
+    if (!id || deepLinkedRef.current === id) return
+
+    let cancelled = false
+    const resolveAndOpen = async () => {
+      const found = (bookings ?? []).find((b) => b.id === id)
+      if (found) {
+        if (!cancelled) {
+          deepLinkedRef.current = id
+          setSelectedBooking(found)
+        }
+        return
+      }
+      try {
+        const token = await getToken()
+        const b = await api.bookings.get(token, id)
+        if (!cancelled) {
+          deepLinkedRef.current = id
+          setSelectedBooking(b)
+        }
+      } catch {
+        // Booking may be gone or cross-tenant; leave the page as-is.
+      }
+    }
+
+    void resolveAndOpen()
+    return () => {
+      cancelled = true
+    }
+  }, [searchParams, bookings, getToken])
+
+  const closeDetails = () => {
+    setSelectedBooking(null)
+    if (searchParams.get('booking')) {
+      deepLinkedRef.current = null
+      router.replace('/bookings', { scroll: false })
+    }
+  }
 
   const submitAction = async (booking: Booking, action: BookingAction, note: string) => {
     try {
@@ -597,7 +642,7 @@ export default function BookingsPage() {
       <BookingDetailsDialog
         open={selectedBooking !== null}
         booking={selectedBooking}
-        onClose={() => setSelectedBooking(null)}
+        onClose={closeDetails}
       />
 
       <BookingStatusDialog
@@ -611,5 +656,13 @@ export default function BookingsPage() {
         }}
       />
     </PageShell>
+  )
+}
+
+export default function BookingsPage() {
+  return (
+    <Suspense fallback={null}>
+      <BookingsPageInner />
+    </Suspense>
   )
 }

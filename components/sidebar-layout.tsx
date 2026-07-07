@@ -49,10 +49,13 @@ export function SidebarLayout({
   navbar,
   sidebar,
   children,
+  desktopHeader,
   contentViewportLocked = false,
 }: React.PropsWithChildren<{
   navbar: React.ReactNode
   sidebar: React.ReactNode
+  /** Right-aligned region floated at the top of the content area on lg+ (mobile uses the navbar). */
+  desktopHeader?: React.ReactNode
   /** When true, shell is exactly one viewport tall and does not scroll — children must scroll internally (e.g. chat messages). */
   contentViewportLocked?: boolean
 }>) {
@@ -69,6 +72,11 @@ export function SidebarLayout({
     >
       {/* Sidebar on desktop */}
       <div className="fixed inset-y-0 left-0 w-64 max-lg:hidden">{sidebar}</div>
+
+      {/* Desktop top-right header region (e.g. notification bell) */}
+      {desktopHeader ? (
+        <div className="fixed right-4 top-2.5 z-40 hidden lg:block">{desktopHeader}</div>
+      ) : null}
 
       {/* Sidebar on mobile */}
       <MobileSidebar open={showSidebar} close={() => setShowSidebar(false)}>
