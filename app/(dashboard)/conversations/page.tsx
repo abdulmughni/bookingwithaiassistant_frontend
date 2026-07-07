@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import clsx from 'clsx'
 import {
   ArrowPathIcon,
+  ChevronDownIcon,
   MagnifyingGlassIcon,
   PaperAirplaneIcon,
   PaperClipIcon,
@@ -32,7 +33,21 @@ import { renderRichText } from '../../../lib/rich-text'
 import type { ChannelAccount, Conversation, Message, MessageAttachment } from '@/lib/types'
 
 /** Local-only message state for optimistic dashboard sends. */
-type ChatMessage = Message & { sendStatus?: 'sending' | 'failed' }
+type ChatMessage = Message & { sendStatus?: 'sending' | 'failed'; sentByMe?: boolean }
+
+const THREAD_NEAR_BOTTOM_PX = 120
+
+function threadIsNearBottom(el: HTMLElement) {
+  return el.scrollHeight - el.scrollTop - el.clientHeight < THREAD_NEAR_BOTTOM_PX
+}
+
+function scrollThreadContainerToBottom(
+  el: HTMLElement | null,
+  behavior: ScrollBehavior = 'auto',
+) {
+  if (!el) return
+  el.scrollTo({ top: el.scrollHeight, behavior })
+}
 
 type ChannelTab = 'all' | 'facebook' | 'instagram' | 'whatsapp'
 
@@ -361,7 +376,7 @@ function MessageBubble({
   customerAvatarUrl,
   customerSeed,
   channel,
-  sendStatus,
+  sentByMe,
 }: {
   message: Message
   customerName: string
@@ -369,6 +384,7 @@ function MessageBubble({
   customerSeed: string
   channel: string
   sendStatus?: 'sending' | 'failed'
+  sentByMe?: boolean
 }) {
   const isCustomer = message.role === 'user'
   const isSystem = message.role === 'system'
@@ -494,7 +510,7 @@ function MessageBubble({
                 className="flex size-full items-center justify-center text-[9px] font-bold text-white"
                 style={{ background: 'linear-gradient(135deg, #0084ff, #0066cc)' }}
               >
-                AI
+                {sentByMe ? 'Me' : 'AI'}
               </div>
             </div>
           )}
@@ -542,6 +558,7 @@ function MessagesWithDividers({
             key={b.message.id}
             message={b.message}
             sendStatus={b.message.sendStatus}
+            sentByMe={b.message.sentByMe}
             customerName={customerName}
             customerAvatarUrl={customerAvatarUrl}
             customerSeed={customerSeed}
@@ -589,6 +606,10 @@ export default function ConversationsPage() {
   const threadScrollRef = useRef<HTMLDivElement | null>(null)
   /** Message ids appended locally after a dashboard send — skip the WS echo. */
   const locallySentMessageIdsRef = useRef<Set<string>>(new Set())
+  /** When true, new messages auto-scroll the thread to the latest bubble. */
+  const stickToBottomRef = useRef(true)
+  const prevMessageCountRef = useRef(0)
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false)
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedQuery(query.trim()), 320)
@@ -601,7 +622,44 @@ export default function ConversationsPage() {
     setChannelSettingsOpen(false)
     setChannelSettings(null)
     setChannelSettingsError(null)
+    stickToBottomRef.current = true
+    setShowScrollToBottom(false)
+    prevMessageCountRef.current = 0
   }, [selectedId])
+
+  const scrollThreadToBottom = useCallback((behavior: ScrollBehavior = 'auto') => {
+    scrollThreadContainerToBottom(threadScrollRef.current, behavior)
+    stickToBottomRef.current = true
+    setShowScrollToBottom(false)
+  }, [])
+
+  // Snap to the latest message after a thread finishes loading.
+  useEffect(() => {
+    if (messagesLoading || !selectedId) return
+    const outer = requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        scrollThreadContainerToBottom(threadScrollRef.current, 'auto')
+        stickToBottomRef.current = true
+        setShowScrollToBottom(false)
+      })
+    })
+    return () => cancelAnimationFrame(outer)
+  }, [selectedId, messagesLoading])
+
+  // Auto-follow while the user is already at the bottom (send + live inbound).
+  useEffect(() => {
+    if (messagesLoading) {
+      prevMessageCountRef.current = 0
+      return
+    }
+    const count = messages.length
+    if (count > prevMessageCountRef.current && stickToBottomRef.current) {
+      requestAnimationFrame(() => {
+        scrollThreadContainerToBottom(threadScrollRef.current, 'auto')
+      })
+    }
+    prevMessageCountRef.current = count
+  }, [messages, messagesLoading])
 
   const fetchConversations = useCallback(
     async (opts?: { reset?: boolean }) => {
@@ -760,6 +818,7 @@ export default function ConversationsPage() {
       created_at: now,
       attachments: [],
       sendStatus: 'sending',
+      sentByMe: true,
     }
     setMessages((prev) => [...prev, optimistic])
     setConversations((prev) =>
@@ -775,10 +834,6 @@ export default function ConversationsPage() {
           : c,
       ),
     )
-    setTimeout(() => {
-      const box = threadScrollRef.current
-      if (box) box.scrollTop = box.scrollHeight
-    }, 0)
 
     try {
       const token = await getToken()
@@ -787,7 +842,7 @@ export default function ConversationsPage() {
       setMessages((prev) => {
         const withoutPending = prev.filter((m) => m.id !== tempId)
         if (withoutPending.some((m) => m.id === sent.id)) return withoutPending
-        return [...withoutPending, sent]
+        return [...withoutPending, { ...sent, sentByMe: true }]
       })
       setConversations((prev) =>
         prev.map((c) =>
@@ -835,11 +890,6 @@ export default function ConversationsPage() {
       setMessages([])
     } finally {
       setMessagesLoading(false)
-      // After initial load, snap to bottom like messaging apps.
-      setTimeout(() => {
-        const box = threadScrollRef.current
-        if (box) box.scrollTop = box.scrollHeight
-      }, 0)
     }
   }
 
@@ -879,6 +929,17 @@ export default function ConversationsPage() {
     selectedId,
   ])
 
+  const handleThreadScroll = useCallback(
+    (e: React.UIEvent<HTMLDivElement>) => {
+      const el = e.currentTarget
+      if (el.scrollTop < 72) void loadOlderMessages()
+      const near = threadIsNearBottom(el)
+      stickToBottomRef.current = near
+      setShowScrollToBottom(!near)
+    },
+    [loadOlderMessages],
+  )
+
   const refreshList = async () => {
     conversationsOffsetRef.current = 0
     setConversationsHasMore(true)
@@ -914,16 +975,6 @@ export default function ConversationsPage() {
           if (prev.some((m) => m.id === incoming.id)) return prev
           return [...prev, incoming]
         })
-        const box = threadScrollRef.current
-        const nearBottom = box
-          ? box.scrollHeight - box.scrollTop - box.clientHeight < 160
-          : true
-        if (nearBottom) {
-          setTimeout(() => {
-            const cur = threadScrollRef.current
-            if (cur) cur.scrollTop = cur.scrollHeight
-          }, 0)
-        }
       }
     }
 
@@ -1204,17 +1255,15 @@ export default function ConversationsPage() {
                 </DialogBody>
               </Dialog>
 
-              <div
-                ref={threadScrollRef}
-                className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain bg-[#f0f2f5] px-3 py-4 dark:bg-zinc-950 md:px-6"
-                role="log"
-                aria-live="polite"
-                aria-relevant="additions"
-                onScroll={(e) => {
-                  const el = e.currentTarget
-                  if (el.scrollTop < 72) void loadOlderMessages()
-                }}
-              >
+              <div className="relative min-h-0 flex-1">
+                <div
+                  ref={threadScrollRef}
+                  className="h-full min-h-0 overflow-y-auto overscroll-y-contain bg-[#f0f2f5] px-3 py-4 dark:bg-zinc-950 md:px-6"
+                  role="log"
+                  aria-live="polite"
+                  aria-relevant="additions"
+                  onScroll={handleThreadScroll}
+                >
                 {!messagesLoading && messagesHasMore && (
                   <div className="mx-auto mb-3 max-w-3xl text-center">
                     {messagesLoadingMore ? (
@@ -1253,6 +1302,24 @@ export default function ConversationsPage() {
                   <div className="flex min-h-48 items-center justify-center py-12 text-sm text-zinc-500">
                     No messages in this conversation
                   </div>
+                )}
+                </div>
+
+                {showScrollToBottom && !messagesLoading && (
+                  <button
+                    type="button"
+                    onClick={() => scrollThreadToBottom('smooth')}
+                    aria-label="Scroll to latest messages"
+                    className={clsx(
+                      'absolute bottom-4 right-4 z-10 flex size-11 items-center justify-center',
+                      'rounded-full bg-white text-zinc-700 shadow-lg ring-1 ring-black/10',
+                      'transition hover:bg-zinc-50 hover:shadow-xl active:scale-95',
+                      'dark:bg-zinc-800 dark:text-zinc-100 dark:ring-white/10 dark:hover:bg-zinc-700',
+                      'md:right-6',
+                    )}
+                  >
+                    <ChevronDownIcon className="size-5" aria-hidden="true" />
+                  </button>
                 )}
               </div>
 
