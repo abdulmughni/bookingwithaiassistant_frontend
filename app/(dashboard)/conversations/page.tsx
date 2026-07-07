@@ -53,13 +53,13 @@ type ChannelTab = 'all' | 'facebook' | 'instagram' | 'whatsapp'
 
 const CHANNEL_TABS: { id: ChannelTab; label: string }[] = [
   { id: 'all', label: 'All messages' },
-  { id: 'facebook', label: 'Messenger' },
+  { id: 'facebook', label: 'Facebook Page' },
   { id: 'instagram', label: 'Instagram' },
   // { id: 'whatsapp', label: 'WhatsApp' },
 ]
 
 function channelTabLabel(channel: string): string {
-  if (channel === 'facebook') return 'Messenger'
+  if (channel === 'facebook') return 'Facebook Page'
   if (channel === 'instagram') return 'Instagram'
   if (channel === 'whatsapp') return 'WhatsApp'
   return channel
@@ -203,7 +203,7 @@ function ChannelBadgeOverlay({ channel }: { channel: string }) {
   const c = (channel || '').toLowerCase()
   if (c === 'facebook' || c === 'instagram' || c === 'whatsapp') {
     return (
-      <span className={common} title={c === 'facebook' ? 'Messenger' : c.charAt(0).toUpperCase() + c.slice(1)}>
+      <span className={common} title={c === 'facebook' ? 'Facebook Page' : c.charAt(0).toUpperCase() + c.slice(1)}>
         <ChannelIcon channel={c} className="size-full" />
       </span>
     )
@@ -1396,7 +1396,7 @@ export default function ConversationsPage() {
                 Select a conversation
               </p>
               <p className="max-w-xs text-xs text-zinc-400 dark:text-zinc-500">
-                Choose a chat from the inbox. Filter by Messenger or Instagram using the
+                Choose a chat from the inbox. Filter by Facebook Page or Instagram using the
                 tabs above.
               </p>
             </div>

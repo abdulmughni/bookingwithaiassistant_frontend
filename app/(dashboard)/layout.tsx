@@ -125,12 +125,12 @@ export default function DashboardLayout({
 
             <SidebarSpacer />
 
-            <SidebarSection>
+            {/* <SidebarSection>
               <SidebarItem href="#">
                 <QuestionMarkCircleIcon data-slot="icon" />
                 <SidebarLabel>Support</SidebarLabel>
               </SidebarItem>
-            </SidebarSection>
+            </SidebarSection> */}
           </SidebarBody>
 
           <SidebarFooter>
