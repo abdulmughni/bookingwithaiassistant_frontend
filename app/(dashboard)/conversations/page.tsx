@@ -376,6 +376,7 @@ function MessageBubble({
   customerAvatarUrl,
   customerSeed,
   channel,
+  sendStatus,
   sentByMe,
 }: {
   message: Message
