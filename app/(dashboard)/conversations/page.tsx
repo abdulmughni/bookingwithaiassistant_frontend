@@ -33,7 +33,7 @@ import { renderRichText } from '../../../lib/rich-text'
 import type { ChannelAccount, Conversation, Message, MessageAttachment } from '@/lib/types'
 
 /** Local-only message state for optimistic dashboard sends. */
-type ChatMessage = Message & { sendStatus?: 'sending' | 'failed'; sentByMe?: boolean }
+type ChatMessage = Message & { sendStatus?: 'sending' | 'failed' }
 
 const THREAD_NEAR_BOTTOM_PX = 120
 
@@ -377,7 +377,6 @@ function MessageBubble({
   customerSeed,
   channel,
   sendStatus,
-  sentByMe,
 }: {
   message: Message
   customerName: string
@@ -385,7 +384,6 @@ function MessageBubble({
   customerSeed: string
   channel: string
   sendStatus?: 'sending' | 'failed'
-  sentByMe?: boolean
 }) {
   const isCustomer = message.role === 'user'
   const isSystem = message.role === 'system'
@@ -511,7 +509,7 @@ function MessageBubble({
                 className="flex size-full items-center justify-center text-[9px] font-bold text-white"
                 style={{ background: 'linear-gradient(135deg, #0084ff, #0066cc)' }}
               >
-                {sentByMe ? 'Me' : 'AI'}
+                ME
               </div>
             </div>
           )}
@@ -559,7 +557,6 @@ function MessagesWithDividers({
             key={b.message.id}
             message={b.message}
             sendStatus={b.message.sendStatus}
-            sentByMe={b.message.sentByMe}
             customerName={customerName}
             customerAvatarUrl={customerAvatarUrl}
             customerSeed={customerSeed}
@@ -819,7 +816,6 @@ export default function ConversationsPage() {
       created_at: now,
       attachments: [],
       sendStatus: 'sending',
-      sentByMe: true,
     }
     setMessages((prev) => [...prev, optimistic])
     setConversations((prev) =>
@@ -843,7 +839,7 @@ export default function ConversationsPage() {
       setMessages((prev) => {
         const withoutPending = prev.filter((m) => m.id !== tempId)
         if (withoutPending.some((m) => m.id === sent.id)) return withoutPending
-        return [...withoutPending, { ...sent, sentByMe: true }]
+        return [...withoutPending, sent]
       })
       setConversations((prev) =>
         prev.map((c) =>
