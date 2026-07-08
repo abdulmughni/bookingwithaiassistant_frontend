@@ -946,6 +946,20 @@ export default function ConversationsPage() {
 
   // Live updates: append to the open thread + reorder the inbox on new messages.
   useRealtimeEvent((event) => {
+    if (event.type === 'message.deleted') {
+      const convId = event.conversation_id
+      if (!convId) return
+
+      if (convId === selectedId && event.id) {
+        setMessages((prev) => prev.filter((m) => m.id !== event.id))
+      }
+
+      const eventChannel = convId.split('|')[1] || ''
+      if (channelTab !== 'all' && eventChannel && eventChannel !== channelTab) return
+      void fetchConversations({ reset: true })
+      return
+    }
+
     if (event.type !== 'message.created') return
     const convId = event.conversation_id
     if (!convId) return

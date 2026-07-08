@@ -276,7 +276,15 @@ export interface MessageCreatedEvent {
   conversation_id: string
   role: 'user' | 'assistant' | 'system' | 'tool'
   content: string
+  channel_message_id?: string | null
   created_at: string
+}
+
+export interface MessageDeletedEvent {
+  type: 'message.deleted'
+  id: string | null
+  conversation_id: string
+  channel_message_id?: string | null
 }
 
 export interface BookingCreatedEvent {
@@ -299,6 +307,7 @@ export interface RealtimeControlEvent {
 
 export type RealtimeEvent =
   | MessageCreatedEvent
+  | MessageDeletedEvent
   | BookingCreatedEvent
   | RealtimeControlEvent
 
