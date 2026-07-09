@@ -5,11 +5,13 @@ import clsx from 'clsx'
 import {
   ArrowPathIcon,
   ChevronDownIcon,
+  EllipsisVerticalIcon,
   MagnifyingGlassIcon,
   PaperAirplaneIcon,
   PaperClipIcon,
   FaceSmileIcon,
   Cog6ToothIcon,
+  TrashIcon,
 } from '@heroicons/react/24/outline'
 import {
   ChatBubbleLeftRightIcon,
@@ -19,8 +21,17 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import { useApiToken } from '@/lib/hooks'
 import { useRealtimeEvent } from '@/lib/realtime'
 import { api, ApiError } from '@/lib/api'
+import { notifyError, notifySuccess } from '@/lib/notify'
 import { ChannelIcon } from '@/components/channel-icon'
+import { ConfirmDeleteDialog } from '@/components/confirm-delete-dialog'
 import { ConversationBookingsDrawer } from '@/components/conversation-bookings-drawer'
+import {
+  Dropdown,
+  DropdownButton,
+  DropdownItem,
+  DropdownLabel,
+  DropdownMenu,
+} from '@/components/dropdown'
 import {
   Dialog,
   DialogBody,
@@ -595,6 +606,8 @@ export default function ConversationsPage() {
   const [channelSettingsLoading, setChannelSettingsLoading] = useState(false)
   const [channelSettingsSaving, setChannelSettingsSaving] = useState(false)
   const [channelSettingsError, setChannelSettingsError] = useState<string | null>(null)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [deletingConversation, setDeletingConversation] = useState(false)
 
   const listScrollRef = useRef<HTMLDivElement | null>(null)
   const listSentinelRef = useRef<HTMLDivElement | null>(null)
@@ -944,6 +957,29 @@ export default function ConversationsPage() {
     if (selectedId) void loadMessages(selectedId)
   }
 
+  const confirmDeleteConversation = async () => {
+    if (!selected) return
+    const conversationId = selected.id
+    setDeletingConversation(true)
+    try {
+      const token = await getToken()
+      await api.conversations.remove(token, conversationId)
+      notifySuccess('Conversation deleted')
+      setDeleteDialogOpen(false)
+      setBookingsDrawerOpen(false)
+      setChannelSettingsOpen(false)
+      setConversations((prev) => prev.filter((c) => c.id !== conversationId))
+      if (selectedId === conversationId) {
+        setSelectedId(null)
+        setMessages([])
+      }
+    } catch (err) {
+      notifyError(err instanceof ApiError ? err.message : 'Could not delete conversation.')
+    } finally {
+      setDeletingConversation(false)
+    }
+  }
+
   // Live updates: append to the open thread + reorder the inbox on new messages.
   useRealtimeEvent((event) => {
     if (event.type === 'message.deleted') {
@@ -1222,6 +1258,26 @@ export default function ConversationsPage() {
                   >
                     <Cog6ToothIcon className="size-5" aria-hidden="true" />
                   </button>
+                  <Dropdown>
+                    <DropdownButton
+                      as="button"
+                      type="button"
+                      aria-label="Conversation options"
+                      className="inline-flex size-9 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-600 transition hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                      title="More options"
+                    >
+                      <EllipsisVerticalIcon className="size-5" aria-hidden="true" />
+                    </DropdownButton>
+                    <DropdownMenu anchor="bottom end">
+                      <DropdownItem
+                        onClick={() => setDeleteDialogOpen(true)}
+                        className="text-red-600 data-focus:bg-red-600 data-focus:text-white dark:text-red-400 dark:data-focus:bg-red-600 dark:data-focus:text-white"
+                      >
+                        <TrashIcon data-slot="icon" className="text-red-600 group-data-focus:text-white dark:text-red-400" />
+                        <DropdownLabel>Delete</DropdownLabel>
+                      </DropdownItem>
+                    </DropdownMenu>
+                  </Dropdown>
                 </div>
               </header>
 
@@ -1424,6 +1480,16 @@ export default function ConversationsPage() {
         conversationId={selected?.id ?? null}
         customerName={selected ? displayName : ''}
         channel={selected?.channel}
+      />
+
+      <ConfirmDeleteDialog
+        open={deleteDialogOpen}
+        onClose={() => (deletingConversation ? null : setDeleteDialogOpen(false))}
+        onConfirm={confirmDeleteConversation}
+        busy={deletingConversation}
+        title="Delete this conversation?"
+        description="This permanently deletes the conversation and all of its messages and attachments. Bookings linked to this chat are kept. To confirm, delete:"
+        itemLabel={selected ? displayName : undefined}
       />
     </div>
   )

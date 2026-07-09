@@ -218,6 +218,8 @@ export const api = {
         token,
         body: JSON.stringify({ content }),
       }),
+    remove: (token: string, conversationId: string) =>
+      requestDelete(token, `/api/conversations/${encodeURIComponent(conversationId)}`),
   },
 
   notifications: {
