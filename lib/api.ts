@@ -449,6 +449,66 @@ export const api = {
         `/api/admin/tenants/${encodeURIComponent(tenantId)}`,
         { token },
       ),
+    dismissAlert: (token: string, tenantId: string, ruleKey: string) =>
+      request<void>('/api/admin/alerts/dismiss', {
+        token,
+        method: 'POST',
+        body: JSON.stringify({ tenant_id: tenantId, rule_key: ruleKey }),
+      }),
+    getTenantFunnel: (
+      token: string,
+      tenantId: string,
+      period: 'week' | 'month' | 'all' = 'month',
+    ) =>
+      request<import('./types').AdminFunnel>(
+        `/api/admin/tenants/${encodeURIComponent(tenantId)}/funnel?period=${period}`,
+        { token },
+      ),
+    listTenantBookings: (token: string, tenantId: string) =>
+      request<import('./types').AdminBookingRow[]>(
+        `/api/admin/tenants/${encodeURIComponent(tenantId)}/bookings`,
+        { token },
+      ),
+    updateTenantBooking: (
+      token: string,
+      tenantId: string,
+      bookingId: string,
+      data: { status?: string; estimated_value?: number | null },
+    ) =>
+      request<{ id: string; status: string; estimated_value: number | null }>(
+        `/api/admin/tenants/${encodeURIComponent(tenantId)}/bookings/${encodeURIComponent(bookingId)}`,
+        { token, method: 'PATCH', body: JSON.stringify(data) },
+      ),
+    listTenantConversations: (
+      token: string,
+      tenantId: string,
+      params?: { flagged_only?: boolean },
+    ) => {
+      const qs = params?.flagged_only ? '?flagged_only=true' : ''
+      return request<import('./types').AdminConversationRow[]>(
+        `/api/admin/tenants/${encodeURIComponent(tenantId)}/conversations${qs}`,
+        { token },
+      )
+    },
+    flagTenantConversation: (
+      token: string,
+      tenantId: string,
+      conversationId: string,
+      flagged: boolean,
+    ) =>
+      request<{ id: string; flagged: boolean }>(
+        `/api/admin/tenants/${encodeURIComponent(tenantId)}/conversations/${encodeURIComponent(conversationId)}/flag`,
+        { token, method: 'PATCH', body: JSON.stringify({ flagged }) },
+      ),
+    setTenantChannelAi: (
+      token: string,
+      tenantId: string,
+      data: { channel: string; account_id: string; ai_enabled: boolean },
+    ) =>
+      request<{ channel: string; account_id: string; ai_enabled: boolean }>(
+        `/api/admin/tenants/${encodeURIComponent(tenantId)}/channels/ai`,
+        { token, method: 'PATCH', body: JSON.stringify(data) },
+      ),
     verifyIdentity: (token: string, password: string) =>
       request<import('./types').VerifyIdentityResult>('/api/admin/verify-identity', {
         token,

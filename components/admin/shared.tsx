@@ -37,7 +37,7 @@ export function UsageBar({
   const tone =
     quota <= 0
       ? 'bg-zinc-300 dark:bg-zinc-600'
-      : pct >= 100
+      : pct >= 95
         ? 'bg-red-500'
         : pct >= 80
           ? 'bg-amber-500'

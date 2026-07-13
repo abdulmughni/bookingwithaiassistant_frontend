@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import clsx from 'clsx'
@@ -13,6 +13,7 @@ import {
   CheckCircleIcon,
   ClockIcon,
   CreditCardIcon,
+  FlagIcon,
   NoSymbolIcon,
   PhoneIcon,
   UserCircleIcon,
@@ -35,6 +36,11 @@ import { Textarea } from '@/components/textarea'
 import { ConfirmActionDialog } from '@/components/admin/confirm-action-dialog'
 import { ClientLoginDialog } from '@/components/admin/client-login-dialog'
 import { VerifyIdentityDialog } from '@/components/admin/verify-identity-dialog'
+import {
+  BOOKING_STATUS_OPTIONS,
+  FunnelBlock,
+  HealthDot,
+} from '@/components/admin/ops'
 import { ConfirmDeleteDialog } from '@/components/confirm-delete-dialog'
 import {
   StatusBadge,
@@ -49,7 +55,14 @@ import { PageShell, SkeletonBlock, dashCardClass } from '@/components/dashboard-
 import { api, ApiError } from '@/lib/api'
 import { clearVerificationToken, getVerificationToken } from '@/lib/admin-verification'
 import { useApiData, useApiToken, usePlans } from '@/lib/hooks'
-import type { AdminOrgMember, ClientLoginCredentials, QuotaState } from '@/lib/types'
+import type {
+  AdminBookingRow,
+  AdminConversationRow,
+  AdminFunnel,
+  AdminOrgMember,
+  ClientLoginCredentials,
+  QuotaState,
+} from '@/lib/types'
 
 const CHANNEL_LABEL: Record<string, string> = {
   whatsapp: 'WhatsApp',
@@ -97,6 +110,38 @@ export default function AdminClientDetailPage() {
   const [showVerifyForDelete, setShowVerifyForDelete] = useState(false)
   const [deleteToken, setDeleteToken] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [funnelPeriod, setFunnelPeriod] = useState<'week' | 'month' | 'all'>('month')
+  const [funnel, setFunnel] = useState<AdminFunnel | null>(null)
+  const [detailTab, setDetailTab] = useState<'bookings' | 'conversations'>('bookings')
+  const [bookings, setBookings] = useState<AdminBookingRow[]>([])
+  const [conversations, setConversations] = useState<AdminConversationRow[]>([])
+  const [flaggedOnly, setFlaggedOnly] = useState(false)
+  const [opsLoading, setOpsLoading] = useState(false)
+
+  const loadOpsLists = useCallback(async () => {
+    setOpsLoading(true)
+    try {
+      const token = await getToken()
+      const [b, c, f] = await Promise.all([
+        api.admin.listTenantBookings(token, tenantId),
+        api.admin.listTenantConversations(token, tenantId, {
+          flagged_only: flaggedOnly,
+        }),
+        api.admin.getTenantFunnel(token, tenantId, funnelPeriod),
+      ])
+      setBookings(b)
+      setConversations(c)
+      setFunnel(f)
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Failed to load bookings/conversations.')
+    } finally {
+      setOpsLoading(false)
+    }
+  }, [getToken, tenantId, flaggedOnly, funnelPeriod])
+
+  useEffect(() => {
+    void loadOpsLists()
+  }, [loadOpsLists])
 
   const runStatusChange = useCallback(
     async (action: 'activate' | 'suspend') => {
@@ -246,11 +291,16 @@ export default function AdminClientDetailPage() {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-3">
+              <HealthDot health={tenant.health ?? 'green'} size="md" />
               <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{tenant.name}</h1>
               <StatusBadge status={tenant.account_status} />
             </div>
             <p className="mt-2 font-mono text-sm text-zinc-500 dark:text-zinc-400">{tenant.id}</p>
-            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Joined {formatDate(tenant.created_at)}</p>
+            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+              Joined {formatDate(tenant.created_at)}
+              {tenant.activated_at ? ` · Activated ${formatDate(tenant.activated_at)}` : ''}
+              {tenant.industry_type ? ` · ${formatIndustryLabel(tenant.industry_type)}` : ''}
+            </p>
           </div>
           <div className="flex flex-wrap gap-2">
             {tenant.account_status === 'active' ? (
@@ -281,6 +331,56 @@ export default function AdminClientDetailPage() {
           <HeroStat icon={<PhoneIcon className="size-5" />} label="Calls" value={tenant.calls_count} />
         </div>
       </header>
+
+      <FunnelBlock
+        funnel={funnel ?? tenant.funnel}
+        period={funnelPeriod}
+        onPeriodChange={setFunnelPeriod}
+      />
+
+      {/* AI channel toggles */}
+      {(tenant.channel_accounts?.length ?? 0) > 0 && (
+        <section className={`${dashCardClass} p-5`}>
+          <h2 className="text-sm font-semibold text-zinc-950 dark:text-white">Channel AI</h2>
+          <ul className="mt-3 divide-y divide-zinc-100 dark:divide-zinc-800">
+            {tenant.channel_accounts!.map((ch) => (
+              <li
+                key={`${ch.channel}:${ch.account_id}`}
+                className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm"
+              >
+                <span className="text-zinc-700 dark:text-zinc-300">
+                  {CHANNEL_LABEL[ch.channel] ?? ch.channel}
+                  {ch.label ? ` · ${ch.label}` : ''}
+                  {ch.connection_status === 'error' ? (
+                    <span className="ml-2 text-xs text-red-600">connection error</span>
+                  ) : null}
+                </span>
+                <label className="inline-flex items-center gap-2">
+                  <span className="text-xs text-zinc-500">AI</span>
+                  <input
+                    type="checkbox"
+                    checked={ch.ai_enabled}
+                    onChange={async (e) => {
+                      try {
+                        const token = await getToken()
+                        await api.admin.setTenantChannelAi(token, tenantId, {
+                          channel: ch.channel,
+                          account_id: ch.account_id,
+                          ai_enabled: e.target.checked,
+                        })
+                        toast.success('AI setting updated')
+                        await refetch()
+                      } catch (err) {
+                        toast.error(err instanceof ApiError ? err.message : 'Update failed')
+                      }
+                    }}
+                  />
+                </label>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <div className="grid items-start gap-6 lg:grid-cols-3">
         {/* Plan + credits — primary column */}
@@ -429,6 +529,13 @@ export default function AdminClientDetailPage() {
                 label="Call minutes"
               />
             </div>
+            {tenant.burn_rate?.before_cycle_end ? (
+              <p className="mt-3 text-sm font-medium text-red-600 dark:text-red-400">
+                At this pace, minutes run out ~
+                {formatDate(tenant.burn_rate.runs_out_at)} (before cycle end{' '}
+                {formatDate(tenant.burn_rate.period_end)})
+              </p>
+            ) : null}
 
             {recentAdjustments.length > 0 && (
               <div className="mt-6 border-t border-zinc-200/80 pt-5 dark:border-zinc-700/80">
@@ -510,6 +617,209 @@ export default function AdminClientDetailPage() {
           </section>
         </div>
       </div>
+
+      {/* Bookings / Conversations */}
+      <section className={`${dashCardClass} overflow-hidden`}>
+        <div className="flex flex-wrap items-center gap-2 border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
+          <button
+            type="button"
+            onClick={() => setDetailTab('bookings')}
+            className={clsx(
+              'rounded-lg px-3 py-1.5 text-sm font-medium',
+              detailTab === 'bookings'
+                ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900'
+                : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800',
+            )}
+          >
+            Bookings
+          </button>
+          <button
+            type="button"
+            onClick={() => setDetailTab('conversations')}
+            className={clsx(
+              'rounded-lg px-3 py-1.5 text-sm font-medium',
+              detailTab === 'conversations'
+                ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900'
+                : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800',
+            )}
+          >
+            Conversations
+          </button>
+          {detailTab === 'conversations' && (
+            <label className="ml-auto flex items-center gap-2 text-xs text-zinc-500">
+              <input
+                type="checkbox"
+                checked={flaggedOnly}
+                onChange={(e) => setFlaggedOnly(e.target.checked)}
+              />
+              Flagged only
+            </label>
+          )}
+        </div>
+        <div className="p-4">
+          {opsLoading ? (
+            <p className="text-sm text-zinc-500">Loading…</p>
+          ) : detailTab === 'bookings' ? (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[40rem] text-left text-sm">
+                <thead className="text-xs uppercase text-zinc-400">
+                  <tr>
+                    <th className="py-2 pr-3">Customer</th>
+                    <th className="py-2 pr-3">Service</th>
+                    <th className="py-2 pr-3">Channel</th>
+                    <th className="py-2 pr-3">Outcome</th>
+                    <th className="py-2 pr-3">Est. value</th>
+                    <th className="py-2">Slot</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                  {bookings.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="py-8 text-center text-zinc-500">
+                        No bookings.
+                      </td>
+                    </tr>
+                  )}
+                  {bookings.map((b) => (
+                    <tr key={b.id}>
+                      <td className="py-2 pr-3 font-medium">{b.customer_name}</td>
+                      <td className="py-2 pr-3 text-zinc-600 dark:text-zinc-300">{b.service_type}</td>
+                      <td className="py-2 pr-3 capitalize">{b.source_channel}</td>
+                      <td className="py-2 pr-3">
+                        <select
+                          className="rounded border border-zinc-200 bg-white px-2 py-1 text-xs dark:border-zinc-700 dark:bg-zinc-900"
+                          value={b.status}
+                          onChange={async (e) => {
+                            try {
+                              const token = await getToken()
+                              await api.admin.updateTenantBooking(token, tenantId, b.id, {
+                                status: e.target.value,
+                              })
+                              toast.success('Booking updated')
+                              await loadOpsLists()
+                            } catch (err) {
+                              toast.error(err instanceof ApiError ? err.message : 'Update failed')
+                            }
+                          }}
+                        >
+                          {BOOKING_STATUS_OPTIONS.map((o) => (
+                            <option key={o.value} value={o.value}>
+                              {o.label}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="py-2 pr-3">
+                        <input
+                          type="number"
+                          step="0.01"
+                          className="w-24 rounded border border-zinc-200 bg-white px-2 py-1 text-xs dark:border-zinc-700 dark:bg-zinc-900"
+                          defaultValue={b.estimated_value ?? ''}
+                          placeholder="—"
+                          onBlur={async (e) => {
+                            const raw = e.target.value.trim()
+                            const val = raw === '' ? null : Number(raw)
+                            if (val === b.estimated_value) return
+                            if (raw !== '' && Number.isNaN(val as number)) return
+                            try {
+                              const token = await getToken()
+                              await api.admin.updateTenantBooking(token, tenantId, b.id, {
+                                estimated_value: val,
+                              })
+                              toast.success('Value saved')
+                              await loadOpsLists()
+                            } catch (err) {
+                              toast.error(err instanceof ApiError ? err.message : 'Save failed')
+                            }
+                          }}
+                        />
+                      </td>
+                      <td className="py-2 text-xs text-zinc-500">
+                        {b.selected_slot ? formatDateTime(b.selected_slot) : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
+              {conversations.length === 0 && (
+                <li className="py-8 text-center text-sm text-zinc-500">No conversations.</li>
+              )}
+              {conversations.map((c) => (
+                <li key={c.id} className="flex flex-wrap items-center gap-3 py-3 text-sm">
+                  <span className="min-w-0 flex-1 truncate font-medium">
+                    {c.customer_label_name || c.customer_display_name || c.id}
+                  </span>
+                  <Badge
+                    color={
+                      c.outcome === 'BOOKED'
+                        ? 'green'
+                        : c.outcome === 'ESCALATED'
+                          ? 'amber'
+                          : 'zinc'
+                    }
+                  >
+                    {c.outcome}
+                  </Badge>
+                  <span className="text-xs capitalize text-zinc-400">{c.channel}</span>
+                  <button
+                    type="button"
+                    title={c.flagged ? 'Unflag' : 'Flag for review'}
+                    className={clsx(
+                      'rounded p-1',
+                      c.flagged
+                        ? 'text-amber-600'
+                        : 'text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200',
+                    )}
+                    onClick={async () => {
+                      try {
+                        const token = await getToken()
+                        await api.admin.flagTenantConversation(
+                          token,
+                          tenantId,
+                          c.id,
+                          !c.flagged,
+                        )
+                        await loadOpsLists()
+                      } catch (err) {
+                        toast.error(err instanceof ApiError ? err.message : 'Flag failed')
+                      }
+                    }}
+                  >
+                    <FlagIcon className="size-4" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </section>
+
+      {/* Alert history */}
+      <section className={`${dashCardClass} p-5`}>
+        <h2 className="text-sm font-semibold text-zinc-950 dark:text-white">Alert history</h2>
+        <ul className="mt-3 space-y-2 text-sm">
+          {(tenant.open_alerts ?? []).map((a) => (
+            <li key={`open-${a.rule_key}`} className="flex items-center gap-2">
+              <HealthDot health={a.severity} />
+              <span className="text-zinc-700 dark:text-zinc-300">{a.reason}</span>
+              <span className="text-xs text-zinc-400">open</span>
+            </li>
+          ))}
+          {(tenant.alert_history ?? []).map((h, i) => (
+            <li key={`hist-${h.rule_key}-${i}`} className="flex items-center gap-2 text-zinc-500">
+              <span className="font-mono text-xs">{h.rule_key}</span>
+              <span>dismissed {formatDateTime(h.dismissed_at)}</span>
+            </li>
+          ))}
+          {(tenant.open_alerts ?? []).length === 0 &&
+            (tenant.alert_history ?? []).length === 0 && (
+              <li className="text-zinc-500">No alerts for this client.</li>
+            )}
+        </ul>
+      </section>
 
       {/* Danger zone */}
       <section className="rounded-2xl border border-red-200 bg-red-50/50 p-5 sm:p-6 dark:border-red-900/50 dark:bg-red-950/20">

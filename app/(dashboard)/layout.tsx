@@ -32,6 +32,7 @@ import {
 } from '@/components/account-status-gate'
 import { SidebarUsageCard } from '@/components/sidebar-usage-card'
 import { JobberReconnectBanner } from '@/components/jobber-reconnect-banner'
+import { ClientOpsBanners } from '@/components/client-ops-banners'
 import { NotificationBell } from '@/components/notification-bell'
 import { RealtimeProvider } from '@/lib/realtime'
 import { APP_BRAND_NAME, brandLogoClass } from '@/lib/brand'
@@ -170,6 +171,7 @@ export default function DashboardLayout({
         <div className="min-h-full bg-zinc-50/90 px-4 py-6 sm:px-6 lg:px-8 lg:py-8 dark:bg-zinc-950">
           <PendingActivationBanner />
           <JobberReconnectBanner />
+          <ClientOpsBanners />
           {children}
         </div>
       )}

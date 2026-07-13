@@ -584,6 +584,7 @@ export interface AdminTenant {
   account_status: AccountStatus
   is_active: boolean
   created_at: string
+  activated_at?: string | null
   plan: AdminPlanInfo | null
   usage: AdminUsageInfo
   /** ISO 8601 UTC; end of the prepaid validity window (null when no plan). */
@@ -591,6 +592,32 @@ export interface AdminTenant {
   is_expired: boolean
   bookings_count: number
   conversations_count: number
+  health?: 'red' | 'yellow' | 'green'
+  last_activity_at?: string | null
+  bookings_this_month?: number
+  industry_type?: string | null
+}
+
+export interface AdminAlert {
+  tenant_id: string
+  tenant_name: string
+  rule_key: string
+  severity: 'red' | 'yellow'
+  reason: string
+  since: string
+}
+
+export interface AdminFunnel {
+  conversations: number
+  booking_intent: number
+  booked: number
+  completed: number
+  conv_to_intent_pct: number | null
+  intent_to_booked_pct: number | null
+  booked_to_completed_pct: number | null
+  booking_conversion_pct: number | null
+  company_avg_conversion_pct: number | null
+  period: string
 }
 
 export interface AdminPlanChangeRequest {
@@ -617,6 +644,9 @@ export interface AdminOverview {
   messages_30d: number
   recent_tenants: AdminTenant[]
   recent_requests: AdminPlanChangeRequest[]
+  alerts?: AdminAlert[]
+  funnel?: AdminFunnel | null
+  recovered_value_this_month?: number
 }
 
 /** One manual credit top-up (audit log entry). */
@@ -629,6 +659,40 @@ export interface CreditAdjustment {
   created_at: string
 }
 
+export interface AdminChannelAccountRow {
+  channel: string
+  account_id: string
+  label: string
+  is_active: boolean
+  ai_enabled: boolean
+  connection_status: string
+}
+
+export interface AdminBookingRow {
+  id: string
+  customer_name: string
+  service_type: string
+  status: string
+  source_channel: string
+  selected_slot: string | null
+  estimated_value: number | null
+  created_at: string | null
+}
+
+export interface AdminConversationRow {
+  id: string
+  channel: string
+  customer_display_name: string | null
+  customer_label_name: string | null
+  booking_status: string
+  intent_category: string | null
+  escalation_flag: boolean
+  flagged: boolean
+  outcome: 'BOOKED' | 'NO BOOKING' | 'ESCALATED'
+  updated_at: string | null
+  created_at: string | null
+}
+
 /** Single-tenant detail (GET /api/admin/tenants/{id}). */
 export interface AdminTenantDetail extends AdminTenant {
   timezone: string
@@ -639,6 +703,21 @@ export interface AdminTenantDetail extends AdminTenant {
   recent_adjustments?: CreditAdjustment[]
   /** Organization members; omitted on older API responses — treat as []. */
   members?: AdminOrgMember[]
+  funnel?: AdminFunnel | null
+  burn_rate?: {
+    runs_out_at: string
+    before_cycle_end: boolean
+    period_end: string
+    daily_burn_minutes: number
+  } | null
+  open_alerts?: AdminAlert[]
+  alert_history?: Array<{
+    rule_key: string
+    dismissed_by: string
+    dismissed_at: string
+    status: string
+  }>
+  channel_accounts?: AdminChannelAccountRow[]
 }
 
 /** Result of POST /api/admin/tenants/{id}/client-login (one-time credentials). */

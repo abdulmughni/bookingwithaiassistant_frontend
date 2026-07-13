@@ -1,7 +1,9 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import {
+  BanknotesIcon,
   CalendarDaysIcon,
   ChatBubbleLeftRightIcon,
   EnvelopeIcon,
@@ -10,18 +12,36 @@ import {
 
 import { Button } from '@/components/button'
 import { PageHeader, PageShell, SkeletonBlock, dashCardClass } from '@/components/dashboard-ui'
+import { AdminAlertPanel, FunnelBlock, HealthDot } from '@/components/admin/ops'
 import { StatusBadge, formatDate } from '@/components/admin/shared'
-import { api } from '@/lib/api'
-import { useApiData } from '@/lib/hooks'
+import { api, ApiError } from '@/lib/api'
+import { useApiData, useApiToken } from '@/lib/hooks'
+import type { AdminAlert } from '@/lib/types'
 
 export default function AdminOverviewPage() {
+  const getToken = useApiToken()
   const { data, loading, error, refetch } = useApiData((token) => api.admin.overview(token), [])
+  const [dismissingKey, setDismissingKey] = useState<string | null>(null)
+
+  const handleDismiss = async (alert: AdminAlert) => {
+    const key = `${alert.tenant_id}:${alert.rule_key}`
+    setDismissingKey(key)
+    try {
+      const token = await getToken()
+      await api.admin.dismissAlert(token, alert.tenant_id, alert.rule_key)
+      await refetch()
+    } catch (e) {
+      console.error(e instanceof ApiError ? e.message : e)
+    } finally {
+      setDismissingKey(null)
+    }
+  }
 
   return (
     <PageShell>
       <PageHeader
         title="Overview"
-        description="Platform-wide health: client statuses, open plan requests, and activity totals."
+        description="Platform-wide health: alerts, client statuses, and funnel."
       >
         <Button outline onClick={() => void refetch()}>
           Refresh
@@ -36,6 +56,7 @@ export default function AdminOverviewPage() {
 
       {loading || !data ? (
         <div className="space-y-6">
+          <SkeletonBlock className="h-24" />
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {[0, 1, 2, 3].map((i) => (
               <SkeletonBlock key={i} className="h-28" />
@@ -45,7 +66,12 @@ export default function AdminOverviewPage() {
         </div>
       ) : (
         <>
-          {/* Client status cards */}
+          <AdminAlertPanel
+            alerts={data.alerts ?? []}
+            onDismiss={handleDismiss}
+            dismissingKey={dismissingKey}
+          />
+
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <StatCard label="Total clients" value={data.tenants_total} href="/admin/clients" />
             <StatCard
@@ -68,8 +94,7 @@ export default function AdminOverviewPage() {
             />
           </div>
 
-          {/* Platform totals */}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
             <TotalCard
               icon={<CalendarDaysIcon className="size-5" />}
               label="Bookings (all time)"
@@ -90,10 +115,17 @@ export default function AdminOverviewPage() {
               label="Messages (30 days)"
               value={data.messages_30d}
             />
+            <TotalCard
+              icon={<BanknotesIcon className="size-5" />}
+              label="$ recovered this month"
+              value={data.recovered_value_this_month ?? 0}
+              money
+            />
           </div>
 
+          <FunnelBlock funnel={data.funnel} title="Company funnel (this month)" />
+
           <div className="grid gap-6 lg:grid-cols-2">
-            {/* Recent sign-ups */}
             <section className={dashCardClass}>
               <div className="flex items-center justify-between border-b border-zinc-200/80 px-5 py-4 dark:border-zinc-700/80">
                 <h3 className="text-base font-semibold text-zinc-950 dark:text-white">
@@ -116,14 +148,17 @@ export default function AdminOverviewPage() {
                       href={`/admin/clients/${encodeURIComponent(t.id)}`}
                       className="flex items-center justify-between gap-3 px-5 py-3 transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
                     >
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-zinc-950 dark:text-white">
-                          {t.name}
-                        </p>
-                        <p className="text-xs text-zinc-500">
-                          Joined {formatDate(t.created_at)}
-                          {t.plan ? ` · ${t.plan.name}` : ' · No plan'}
-                        </p>
+                      <div className="flex min-w-0 items-center gap-2">
+                        <HealthDot health={t.health ?? 'green'} />
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium text-zinc-950 dark:text-white">
+                            {t.name}
+                          </p>
+                          <p className="text-xs text-zinc-500">
+                            Joined {formatDate(t.created_at)}
+                            {t.plan ? ` · ${t.plan.name}` : ' · No plan'}
+                          </p>
+                        </div>
                       </div>
                       <StatusBadge status={t.account_status} />
                     </Link>
@@ -132,7 +167,6 @@ export default function AdminOverviewPage() {
               </ul>
             </section>
 
-            {/* Open plan requests */}
             <section className={dashCardClass}>
               <div className="flex items-center justify-between border-b border-zinc-200/80 px-5 py-4 dark:border-zinc-700/80">
                 <h3 className="text-base font-semibold text-zinc-950 dark:text-white">
@@ -216,10 +250,12 @@ function TotalCard({
   icon,
   label,
   value,
+  money,
 }: {
   icon: React.ReactNode
   label: string
   value: number
+  money?: boolean
 }) {
   return (
     <div className={`${dashCardClass} flex items-center gap-4 p-5`}>
@@ -229,7 +265,9 @@ function TotalCard({
       <div className="min-w-0">
         <p className="truncate text-sm text-zinc-500 dark:text-zinc-400">{label}</p>
         <p className="text-xl font-semibold tabular-nums text-zinc-950 dark:text-white">
-          {value.toLocaleString()}
+          {money
+            ? `$${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+            : value.toLocaleString()}
         </p>
       </div>
     </div>
