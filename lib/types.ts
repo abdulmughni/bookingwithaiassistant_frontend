@@ -711,12 +711,6 @@ export interface AdminTenantDetail extends AdminTenant {
     daily_burn_minutes: number
   } | null
   open_alerts?: AdminAlert[]
-  alert_history?: Array<{
-    rule_key: string
-    dismissed_by: string
-    dismissed_at: string
-    status: string
-  }>
   channel_accounts?: AdminChannelAccountRow[]
 }
 

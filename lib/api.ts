@@ -449,12 +449,6 @@ export const api = {
         `/api/admin/tenants/${encodeURIComponent(tenantId)}`,
         { token },
       ),
-    dismissAlert: (token: string, tenantId: string, ruleKey: string) =>
-      request<void>('/api/admin/alerts/dismiss', {
-        token,
-        method: 'POST',
-        body: JSON.stringify({ tenant_id: tenantId, rule_key: ruleKey }),
-      }),
     getTenantFunnel: (
       token: string,
       tenantId: string,

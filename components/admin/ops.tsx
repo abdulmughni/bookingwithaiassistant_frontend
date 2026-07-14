@@ -43,11 +43,9 @@ function formatSince(iso: string): string {
 export function AdminAlertPanel({
   alerts,
   onDismiss,
-  dismissingKey,
 }: {
   alerts: AdminAlert[]
   onDismiss?: (alert: AdminAlert) => void
-  dismissingKey?: string | null
 }) {
   if (!alerts.length) {
     return (
@@ -63,6 +61,9 @@ export function AdminAlertPanel({
         <h2 className="text-sm font-semibold text-zinc-900 dark:text-white">
           Needs action today ({alerts.length})
         </h2>
+        <p className="mt-0.5 text-xs text-zinc-500">
+          Dismiss hides here for this session only — still visible on the client page.
+        </p>
       </header>
       <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
         {alerts.map((a) => {
@@ -88,11 +89,10 @@ export function AdminAlertPanel({
               {onDismiss ? (
                 <button
                   type="button"
-                  disabled={dismissingKey === key}
                   onClick={() => onDismiss(a)}
-                  className="shrink-0 rounded-md px-2 py-1 text-xs font-medium text-zinc-500 hover:bg-zinc-100 disabled:opacity-50 dark:hover:bg-zinc-800"
+                  className="shrink-0 rounded-md px-2 py-1 text-xs font-medium text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"
                 >
-                  {dismissingKey === key ? '…' : 'Dismiss'}
+                  Dismiss
                 </button>
               ) : null}
             </li>

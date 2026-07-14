@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import {
   BanknotesIcon,
@@ -14,27 +14,30 @@ import { Button } from '@/components/button'
 import { PageHeader, PageShell, SkeletonBlock, dashCardClass } from '@/components/dashboard-ui'
 import { AdminAlertPanel, FunnelBlock, HealthDot } from '@/components/admin/ops'
 import { StatusBadge, formatDate } from '@/components/admin/shared'
-import { api, ApiError } from '@/lib/api'
-import { useApiData, useApiToken } from '@/lib/hooks'
+import { api } from '@/lib/api'
+import { useApiData } from '@/lib/hooks'
 import type { AdminAlert } from '@/lib/types'
 
-export default function AdminOverviewPage() {
-  const getToken = useApiToken()
-  const { data, loading, error, refetch } = useApiData((token) => api.admin.overview(token), [])
-  const [dismissingKey, setDismissingKey] = useState<string | null>(null)
+/** Session-only dashboard dismiss keys (not persisted). */
+function alertKey(a: Pick<AdminAlert, 'tenant_id' | 'rule_key'>) {
+  return `${a.tenant_id}:${a.rule_key}`
+}
 
-  const handleDismiss = async (alert: AdminAlert) => {
-    const key = `${alert.tenant_id}:${alert.rule_key}`
-    setDismissingKey(key)
-    try {
-      const token = await getToken()
-      await api.admin.dismissAlert(token, alert.tenant_id, alert.rule_key)
-      await refetch()
-    } catch (e) {
-      console.error(e instanceof ApiError ? e.message : e)
-    } finally {
-      setDismissingKey(null)
-    }
+export default function AdminOverviewPage() {
+  const { data, loading, error, refetch } = useApiData((token) => api.admin.overview(token), [])
+  const [sessionDismissed, setSessionDismissed] = useState<Set<string>>(() => new Set())
+
+  const visibleAlerts = useMemo(() => {
+    const all = data?.alerts ?? []
+    return all.filter((a) => !sessionDismissed.has(alertKey(a)))
+  }, [data?.alerts, sessionDismissed])
+
+  const handleDismiss = (alert: AdminAlert) => {
+    setSessionDismissed((prev) => {
+      const next = new Set(prev)
+      next.add(alertKey(alert))
+      return next
+    })
   }
 
   return (
@@ -66,11 +69,7 @@ export default function AdminOverviewPage() {
         </div>
       ) : (
         <>
-          <AdminAlertPanel
-            alerts={data.alerts ?? []}
-            onDismiss={handleDismiss}
-            dismissingKey={dismissingKey}
-          />
+          <AdminAlertPanel alerts={visibleAlerts} onDismiss={handleDismiss} />
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <StatCard label="Total clients" value={data.tenants_total} href="/admin/clients" />
