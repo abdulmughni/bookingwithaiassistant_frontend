@@ -411,6 +411,8 @@ export default function VoicePage() {
   const [phones, setPhones] = useState<VoicePhoneNumber[] | null>(null)
   const [phonesLoading, setPhonesLoading] = useState(false)
   const [pendingPhoneId, setPendingPhoneId] = useState<string | null>(null)
+  const [freeAreaCode, setFreeAreaCode] = useState('')
+  const [creatingFree, setCreatingFree] = useState(false)
 
   // Tools panel — populated once the API key is configured. Refetched after
   // every successful Save & sync so newly-bound tool ids are reflected
@@ -579,6 +581,31 @@ export default function VoicePage() {
       notifyError(e instanceof ApiError ? e.message : 'Failed to load phone numbers')
     } finally {
       setPhonesLoading(false)
+    }
+  }
+
+  const createFreeNumber = async () => {
+    if (readOnly) {
+      notifyError('Settings are locked until your account is activated.')
+      return
+    }
+    const areaCode = freeAreaCode.replace(/\D/g, '')
+    if (areaCode.length !== 3) {
+      notifyError('Enter a valid 3-digit US area code (e.g. 415).')
+      return
+    }
+    setCreatingFree(true)
+    try {
+      const token = await getToken()
+      await api.voice.createFreeNumber(token, areaCode)
+      notifySuccess('Free test number created and connected.')
+      setFreeAreaCode('')
+      refetch()
+      loadPhones()
+    } catch (e) {
+      notifyError(e instanceof ApiError ? e.message : 'Could not create a free number')
+    } finally {
+      setCreatingFree(false)
     }
   }
 
@@ -1661,6 +1688,39 @@ export default function VoicePage() {
               </Button>
             </div>
 
+            {/* Free Vapi test number — quick way to get a working number without
+                buying one. US-only, limited quantity, meant for testing. */}
+            <div className="mt-5 rounded-xl border border-sky-200 bg-sky-50/50 p-4 dark:border-sky-900/50 dark:bg-sky-950/20">
+              <div className="flex flex-wrap items-end gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                    Get a free test number
+                  </p>
+                  <Text className="mt-0.5 text-xs">
+                    Vapi provides free US numbers for testing (call limits apply). Enter a US
+                    area code and we&apos;ll create one and connect it to your assistant.
+                  </Text>
+                </div>
+                <div className="flex items-end gap-2">
+                  <Field>
+                    <Label className="sr-only">US area code</Label>
+                    <Input
+                      value={freeAreaCode}
+                      onChange={(e) => setFreeAreaCode(e.target.value)}
+                      placeholder="415"
+                      inputMode="numeric"
+                      maxLength={3}
+                      className="w-24"
+                    />
+                  </Field>
+                  <Button onClick={createFreeNumber} disabled={creatingFree || readOnly}>
+                    <PhoneIcon data-slot="icon" className={creatingFree ? 'animate-pulse' : ''} />
+                    {creatingFree ? 'Creating…' : 'Create free number'}
+                  </Button>
+                </div>
+              </div>
+            </div>
+
             {phones === null ? (
               <div className="mt-5 rounded-xl border border-dashed border-zinc-300 bg-zinc-50/40 px-4 py-10 text-center text-sm text-zinc-500 dark:border-zinc-700 dark:bg-zinc-900/40">
                 Click <em>Load</em> to fetch the phone numbers in your Vapi account.
@@ -1684,9 +1744,12 @@ export default function VoicePage() {
                   </TableHead>
                   <TableBody>
                     {phones.map((p) => {
-                      const boundToUs = p.assistant_id === config.assistant_id
+                      // Numbers now bind via the Server URL pattern (no static
+                      // assistant), so our number is identified by the stored
+                      // phone_number_id, not by assistant_id.
+                      const boundToUs = p.id === config.phone_number_id
                       const boundToOther =
-                        p.assistant_id && p.assistant_id !== config.assistant_id
+                        !boundToUs && Boolean(p.assistant_id)
                       return (
                         <TableRow key={p.id}>
                           <TableCell className="font-medium tabular-nums">

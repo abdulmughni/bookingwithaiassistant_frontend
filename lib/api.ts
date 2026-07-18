@@ -403,6 +403,12 @@ export const api = {
       request<import('./types').VoiceConfig>('/api/voice/assistant', { token, method: 'DELETE' }),
     listPhoneNumbers: (token: string) =>
       request<import('./types').VoicePhoneNumber[]>('/api/voice/phone-numbers', { token }),
+    createFreeNumber: (token: string, areaCode: string, name?: string) =>
+      request<import('./types').VoiceConfig>('/api/voice/phone-numbers/free', {
+        token,
+        method: 'POST',
+        body: JSON.stringify({ area_code: areaCode, name: name ?? '' }),
+      }),
     attachPhoneNumber: (token: string, phoneId: string) =>
       request<import('./types').VoiceConfig>(
         `/api/voice/phone-numbers/${encodeURIComponent(phoneId)}/attach`,
