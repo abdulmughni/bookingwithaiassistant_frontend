@@ -413,6 +413,7 @@ export default function VoicePage() {
   const [pendingPhoneId, setPendingPhoneId] = useState<string | null>(null)
   const [freeAreaCode, setFreeAreaCode] = useState('')
   const [creatingFree, setCreatingFree] = useState(false)
+  const [selectedFreeId, setSelectedFreeId] = useState('')
 
   // Tools panel — populated once the API key is configured. Refetched after
   // every successful Save & sync so newly-bound tool ids are reflected
@@ -571,7 +572,7 @@ export default function VoicePage() {
     }
   }
 
-  const loadPhones = async () => {
+  const loadPhones = useCallback(async () => {
     setPhonesLoading(true)
     try {
       const token = await getToken()
@@ -582,7 +583,16 @@ export default function VoicePage() {
     } finally {
       setPhonesLoading(false)
     }
-  }
+  }, [getToken])
+
+  // Auto-load the numbers once the assistant exists so the "pick an existing
+  // free number" dropdown is populated without a manual click.
+  useEffect(() => {
+    if (platformReady && config?.assistant_id && phones === null) {
+      void loadPhones()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [platformReady, config?.assistant_id])
 
   const createFreeNumber = async () => {
     if (readOnly) {
@@ -618,7 +628,8 @@ export default function VoicePage() {
     try {
       const token = await getToken()
       await api.voice.attachPhoneNumber(token, id)
-      notifySuccess('Phone number bound to assistant.')
+      notifySuccess('Phone number connected.')
+      setSelectedFreeId('')
       refetch()
       loadPhones()
     } catch (e) {
@@ -690,6 +701,16 @@ export default function VoicePage() {
   }
 
   if (!config) return null
+
+  // Free Vapi numbers already in the account that nobody has claimed yet
+  // (no assistant and no server URL bound).
+  const availableFreeNumbers = (phones ?? []).filter(
+    (p) =>
+      (p.provider || '').toLowerCase() === 'vapi' &&
+      !p.assistant_id &&
+      !p.server_url &&
+      p.id !== config.phone_number_id,
+  )
 
   return (
     <div className="space-y-6">
@@ -1719,6 +1740,39 @@ export default function VoicePage() {
                   </Button>
                 </div>
               </div>
+
+              {/* Pick an existing free number already in the account instead of
+                  creating a new one. Only unclaimed Vapi numbers are listed. */}
+              {availableFreeNumbers.length > 0 && (
+                <div className="mt-4 border-t border-sky-200/70 pt-4 dark:border-sky-900/50">
+                  <p className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                    Or connect an existing free number
+                  </p>
+                  <div className="mt-2 flex flex-wrap items-end gap-2">
+                    <Field className="min-w-56 flex-1">
+                      <Label className="sr-only">Available free numbers</Label>
+                      <Select
+                        value={selectedFreeId}
+                        onChange={(e) => setSelectedFreeId(e.target.value)}
+                      >
+                        <option value="">Select a free number…</option>
+                        {availableFreeNumbers.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.number || p.id}
+                            {p.name ? ` · ${p.name}` : ''}
+                          </option>
+                        ))}
+                      </Select>
+                    </Field>
+                    <Button
+                      onClick={() => selectedFreeId && attachPhone(selectedFreeId)}
+                      disabled={!selectedFreeId || pendingPhoneId === selectedFreeId || readOnly}
+                    >
+                      {pendingPhoneId === selectedFreeId ? 'Connecting…' : 'Connect'}
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
 
             {phones === null ? (

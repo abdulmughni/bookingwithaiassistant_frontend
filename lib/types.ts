@@ -451,6 +451,8 @@ export interface VoicePhoneNumber {
   name: string
   provider: string
   assistant_id: string | null
+  /** Server URL bound onto the number; null when the number is unclaimed. */
+  server_url?: string | null
 }
 
 export interface VoiceSyncResponse {
