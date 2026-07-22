@@ -387,6 +387,11 @@ export const api = {
       request<import('./types').CallLogDetail>(`/api/calls/${encodeURIComponent(id)}`, { token }),
     remove: (token: string, id: string) =>
       requestDelete(token, `/api/calls/${encodeURIComponent(id)}`),
+    stats: (token: string, period: 'week' | 'month' = 'week') =>
+      request<import('./types').CallStats>(
+        `/api/calls/stats?period=${encodeURIComponent(period)}`,
+        { token },
+      ),
   },
 
   voice: {

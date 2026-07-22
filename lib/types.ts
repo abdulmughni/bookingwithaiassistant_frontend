@@ -399,6 +399,44 @@ export interface CallLogsPage {
   next_offset: number | null
 }
 
+/** Period block inside GET /api/calls/stats. */
+export interface CallStatsPeriodBlock {
+  jobs_booked: number
+  estimated_value: number
+  calls_answered: number
+  after_hours_calls: number
+  unbooked_calls: number
+  booked_calls: number
+  conversion_pct: number | null
+}
+
+/** One-screen call value report from GET /api/calls/stats. */
+export interface CallStats {
+  period: 'week' | 'month'
+  timezone: string
+  current_start: string
+  current_end: string
+  previous_start: string
+  previous_end: string
+  avg_job_value_fallback: number
+  current: CallStatsPeriodBlock
+  previous: CallStatsPeriodBlock
+  deltas: {
+    jobs_booked: number | null
+    estimated_value: number | null
+    calls_answered: number | null
+    after_hours_calls: number | null
+    unbooked_calls: number | null
+    conversion_pct: number | null
+  }
+  peak_hours: { hour: number; count: number }[]
+  bookings_by_status: {
+    upcoming: number
+    completed: number
+    no_show: number
+  }
+}
+
 /** Editable voice settings stored locally in tenants.voice_settings. */
 export interface VoiceSettings {
   system_prompt: string
