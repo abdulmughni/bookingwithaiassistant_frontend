@@ -38,18 +38,21 @@ function money(n: number): string {
   return `$${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
 }
 
-function formatDelta(n: number | null | undefined, *, moneyValue = false, pct = false): string {
+function formatDelta(
+  n: number | null | undefined,
+  opts?: { moneyValue?: boolean; pct?: boolean },
+): string {
   if (n == null || Number.isNaN(n)) return 'vs prior period'
   if (n === 0) return 'Same as prior period'
   const sign = n > 0 ? '+' : ''
-  if (moneyValue) return `${sign}${money(n)} vs prior`
-  if (pct) return `${sign}${n.toFixed(1)} pts vs prior`
+  if (opts?.moneyValue) return `${sign}${money(n)} vs prior`
+  if (opts?.pct) return `${sign}${n.toFixed(1)} pts vs prior`
   return `${sign}${n.toLocaleString()} vs prior`
 }
 
-function deltaTone(n: number | null | undefined, *, invert = false): string {
+function deltaTone(n: number | null | undefined, opts?: { invert?: boolean }): string {
   if (n == null || n === 0) return 'text-zinc-500 dark:text-zinc-400'
-  const good = invert ? n < 0 : n > 0
+  const good = opts?.invert ? n < 0 : n > 0
   return good
     ? 'text-emerald-600 dark:text-emerald-400'
     : 'text-amber-700 dark:text-amber-400'
