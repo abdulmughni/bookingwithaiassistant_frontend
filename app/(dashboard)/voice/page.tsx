@@ -81,11 +81,14 @@ type FormState = Pick<
   voice_id: string
   end_call_phrases: string
 
-  // Voice tuning (ElevenLabs / 11labs): stability, similarity, style, speed.
+  // ElevenLabs (11labs) only — applied when voice_provider === '11labs'
+  voice_model: string
   voice_stability: string
   voice_similarity_boost: string
   voice_style: string
-  voice_speed: string
+  voice_use_speaker_boost: boolean
+  voice_optimize_streaming_latency: string
+  voice_speed: string // kept for non-11labs / legacy; not shown for 11labs
 
   // Transcriber (Deepgram)
   transcriber_provider: string
@@ -130,9 +133,43 @@ const DEFAULT_FALLBACKS = {
   stop_voice_seconds: '0.2',
   stop_backoff_seconds: '1.0',
   silence_timeout_seconds: '30',
-  max_duration_seconds: '1800',
+  max_duration_seconds: '600',
   background_sound: 'off',
 } as const
+
+/** Defaults applied the moment a user switches provider to 11labs. */
+const ELEVENLABS_DEFAULTS = {
+  voiceId: '21m00Tcm4TlvDq8ikWAM', // Rachel — clear, warm, good for phone
+  model: 'eleven_flash_v2_5',
+  stability: '0.5',
+  similarityBoost: '0.8',
+  style: '0',
+  useSpeakerBoost: true,
+  optimizeStreamingLatency: '3',
+} as const
+
+const ELEVENLABS_VOICES: { id: string; label: string }[] = [
+  { id: '21m00Tcm4TlvDq8ikWAM', label: 'Rachel — calm American female' },
+  { id: 'EXAVITQu4vr4xnSDxMaL', label: 'Bella / Sarah — soft female' },
+  { id: 'MF3mGyEYCl7XYWbV9V6O', label: 'Elli — young bright female' },
+  { id: 'AZnzlk1XvdvUeBnXmlld', label: 'Domi — energetic female' },
+  { id: 'pNInz6obpgDQGcFmaJgB', label: 'Adam — deep American male' },
+  { id: 'ErXwobaYiN019PkySvjV', label: 'Antoni — calm American male' },
+  { id: 'TxGEqnHWrfWFTfGW9XjX', label: 'Josh — deep young male' },
+  { id: 'VR6AewLTigWG4xSOukaG', label: 'Arnold — crisp deep male' },
+  { id: 'ThT5KcBeYPX3keUQqHPh', label: 'Dorothy — pleasant British female' },
+  { id: 'onwK4e9ZLuTAKqWW03F9', label: 'Daniel — deep British male' },
+  { id: 'pFZP5JQG7iQjIQuC4Bku', label: 'Lily — warm British female' },
+]
+
+const ELEVENLABS_MODELS = [
+  { id: 'eleven_flash_v2_5', label: 'eleven_flash_v2_5 (fastest — recommended for calls)' },
+  { id: 'eleven_turbo_v2_5', label: 'eleven_turbo_v2_5' },
+  { id: 'eleven_multilingual_v2', label: 'eleven_multilingual_v2' },
+  { id: 'eleven_monolingual_v1', label: 'eleven_monolingual_v1' },
+] as const
+
+const VAPI_VOICES = ['Elliot', 'Emma', 'Cole', 'Hana', 'Kai', 'Mia', 'Zoe'] as const
 
 function listToLines(value: unknown): string {
   if (!Array.isArray(value)) return ''
@@ -172,9 +209,18 @@ function settingsToForm(s: VoiceSettings, defaults: VoiceConfig['defaults']): Fo
     voice_id: String(voice.voiceId ?? DEFAULT_FALLBACKS.voice_id),
     end_call_phrases: (s.end_call_phrases || []).join(', '),
 
-    voice_stability: stringOrEmpty(voice.stability),
-    voice_similarity_boost: stringOrEmpty(voice.similarityBoost),
-    voice_style: stringOrEmpty(voice.style),
+    voice_model: String(voice.model ?? ELEVENLABS_DEFAULTS.model),
+    voice_stability: stringOrEmpty(voice.stability) || ELEVENLABS_DEFAULTS.stability,
+    voice_similarity_boost:
+      stringOrEmpty(voice.similarityBoost) || ELEVENLABS_DEFAULTS.similarityBoost,
+    voice_style: stringOrEmpty(voice.style) || ELEVENLABS_DEFAULTS.style,
+    voice_use_speaker_boost:
+      typeof voice.useSpeakerBoost === 'boolean'
+        ? (voice.useSpeakerBoost as boolean)
+        : ELEVENLABS_DEFAULTS.useSpeakerBoost,
+    voice_optimize_streaming_latency:
+      stringOrEmpty(voice.optimizeStreamingLatency) ||
+      ELEVENLABS_DEFAULTS.optimizeStreamingLatency,
     voice_speed: stringOrEmpty(voice.speed),
 
     transcriber_provider: String(transcriber.provider ?? DEFAULT_FALLBACKS.transcriber_provider),
@@ -281,19 +327,24 @@ function formToPatch(f: FormState): Partial<VoiceSettings> {
     smartDenoisingPlan: { enabled: f.denoise_smart_enabled },
   }
 
-  // Build voice object (ElevenLabs-style tuning when sliders are set).
+  // Build voice object. For 11labs we always send the phone-tuned defaults
+  // (model / latency / speaker boost) so Sync never drops them.
   const voice: Record<string, unknown> = {
     provider: f.voice_provider,
     voiceId: f.voice_id,
   }
-  const stab = parseNumberOr(f.voice_stability, null)
-  if (stab !== null) voice.stability = stab
-  const sim = parseNumberOr(f.voice_similarity_boost, null)
-  if (sim !== null) voice.similarityBoost = sim
-  const style = parseNumberOr(f.voice_style, null)
-  if (style !== null) voice.style = style
-  const speed = parseNumberOr(f.voice_speed, null)
-  if (speed !== null) voice.speed = speed
+  if (f.voice_provider === '11labs') {
+    voice.model = f.voice_model || ELEVENLABS_DEFAULTS.model
+    voice.stability = parseNumberOr(f.voice_stability, 0.5)
+    voice.similarityBoost = parseNumberOr(f.voice_similarity_boost, 0.8)
+    voice.style = parseNumberOr(f.voice_style, 0) ?? 0
+    voice.useSpeakerBoost = f.voice_use_speaker_boost
+    voice.optimizeStreamingLatency =
+      parseNumberOr(f.voice_optimize_streaming_latency, 3) ?? 3
+  } else {
+    const speed = parseNumberOr(f.voice_speed, null)
+    if (speed !== null) voice.speed = speed
+  }
 
   return {
     system_prompt: f.system_prompt,
@@ -1089,9 +1140,31 @@ export default function VoicePage() {
                         <Label>Voice provider</Label>
                         <Select
                           value={form.voice_provider}
-                          onChange={(e) =>
-                            setForm({ ...form, voice_provider: e.target.value })
-                          }
+                          onChange={(e) => {
+                            const next = e.target.value
+                            if (next === '11labs') {
+                              setForm({
+                                ...form,
+                                voice_provider: next,
+                                voice_id: ELEVENLABS_DEFAULTS.voiceId,
+                                voice_model: ELEVENLABS_DEFAULTS.model,
+                                voice_stability: ELEVENLABS_DEFAULTS.stability,
+                                voice_similarity_boost: ELEVENLABS_DEFAULTS.similarityBoost,
+                                voice_style: ELEVENLABS_DEFAULTS.style,
+                                voice_use_speaker_boost: ELEVENLABS_DEFAULTS.useSpeakerBoost,
+                                voice_optimize_streaming_latency:
+                                  ELEVENLABS_DEFAULTS.optimizeStreamingLatency,
+                              })
+                            } else if (next === 'vapi') {
+                              setForm({
+                                ...form,
+                                voice_provider: next,
+                                voice_id: DEFAULT_FALLBACKS.voice_id,
+                              })
+                            } else {
+                              setForm({ ...form, voice_provider: next })
+                            }
+                          }}
                         >
                           <option value="vapi">vapi (built-in)</option>
                           <option value="11labs">11labs (ElevenLabs)</option>
@@ -1105,87 +1178,182 @@ export default function VoicePage() {
                           The TTS provider that turns the assistant&apos;s text into audio.
                         </Description>
                       </Field>
-                      <Field>
-                        <Label>Voice id</Label>
-                        <Input
-                          value={form.voice_id}
-                          onChange={(e) =>
-                            setForm({ ...form, voice_id: e.target.value })
-                          }
-                        />
-                        <Description>
-                          Vapi voices: Elliot, Emma, Cole, Hana, Kai, Mia, Zoe, …
-                          (case-sensitive). For 11labs use the voice id (e.g.{' '}
-                          <code>rachel</code>) or the public name.
-                        </Description>
-                      </Field>
+
+                      {form.voice_provider === 'vapi' ? (
+                        <Field>
+                          <Label>Voice id</Label>
+                          <Select
+                            value={form.voice_id}
+                            onChange={(e) => setForm({ ...form, voice_id: e.target.value })}
+                          >
+                            {VAPI_VOICES.map((v) => (
+                              <option key={v} value={v}>
+                                {v}
+                              </option>
+                            ))}
+                            {!VAPI_VOICES.includes(
+                              form.voice_id as (typeof VAPI_VOICES)[number],
+                            ) && form.voice_id ? (
+                              <option value={form.voice_id}>{form.voice_id} (custom)</option>
+                            ) : null}
+                          </Select>
+                          <Description>Built-in Vapi voices (case-sensitive).</Description>
+                        </Field>
+                      ) : form.voice_provider !== '11labs' ? (
+                        <Field>
+                          <Label>Voice id</Label>
+                          <Input
+                            value={form.voice_id}
+                            onChange={(e) => setForm({ ...form, voice_id: e.target.value })}
+                          />
+                          <Description>Provider-specific voice identifier.</Description>
+                        </Field>
+                      ) : null}
                     </div>
                   </PanelSection>
 
-                  <PanelSection
-                    icon={<AdjustmentsHorizontalIcon className="size-5" />}
-                    accent="indigo"
-                    title="Voice tuning"
-                    subtitle="ElevenLabs-style sliders for stability, similarity, style and speed."
-                    headerExtra={
-                      <a
-                        href="https://docs.vapi.ai/providers/voice/elevenlabs"
-                        target="_blank"
-                        rel="noopener"
-                        className="text-xs font-medium text-sky-600 underline-offset-2 hover:underline dark:text-sky-400"
-                      >
-                        ElevenLabs docs ↗
-                      </a>
-                    }
-                  >
-                    <Text className="text-xs text-zinc-500">
-                      Leave at default until you hear something you want to change.
-                    </Text>
-                    <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                      <SliderField
-                        label="Stability"
-                        value={form.voice_stability}
-                        onChange={(v) => setForm({ ...form, voice_stability: v })}
-                        min={0}
-                        max={1}
-                        step={0.05}
-                        placeholder="0.5"
-                        hint="Lower = more emotional range. Higher = more consistent."
-                      />
-                      <SliderField
-                        label="Similarity boost"
-                        value={form.voice_similarity_boost}
-                        onChange={(v) =>
-                          setForm({ ...form, voice_similarity_boost: v })
-                        }
-                        min={0}
-                        max={1}
-                        step={0.05}
-                        placeholder="0.75"
-                        hint="How closely to match the original speaker."
-                      />
-                      <SliderField
-                        label="Style"
-                        value={form.voice_style}
-                        onChange={(v) => setForm({ ...form, voice_style: v })}
-                        min={0}
-                        max={1}
-                        step={0.05}
-                        placeholder="0.0"
-                        hint="Amplify the speaker's stylistic traits."
-                      />
-                      <SliderField
-                        label="Speed"
-                        value={form.voice_speed}
-                        onChange={(v) => setForm({ ...form, voice_speed: v })}
-                        min={0.7}
-                        max={1.2}
-                        step={0.05}
-                        placeholder="1.0"
-                        hint="0.7–1.2 multiplier (1.0 = natural)."
-                      />
-                    </div>
-                  </PanelSection>
+                  {form.voice_provider === '11labs' && (
+                    <PanelSection
+                      icon={<AdjustmentsHorizontalIcon className="size-5" />}
+                      accent="indigo"
+                      title="ElevenLabs settings"
+                      subtitle="Phone-tuned defaults for low latency. Change only if you need a different voice or feel."
+                      headerExtra={
+                        <a
+                          href="https://docs.vapi.ai/providers/voice/elevenlabs"
+                          target="_blank"
+                          rel="noopener"
+                          className="text-xs font-medium text-sky-600 underline-offset-2 hover:underline dark:text-sky-400"
+                        >
+                          ElevenLabs docs ↗
+                        </a>
+                      }
+                    >
+                      <FieldGroup>
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <Field>
+                            <Label>Voice</Label>
+                            <Select
+                              value={
+                                ELEVENLABS_VOICES.some((v) => v.id === form.voice_id)
+                                  ? form.voice_id
+                                  : '__custom__'
+                              }
+                              onChange={(e) => {
+                                const v = e.target.value
+                                if (v === '__custom__') return
+                                setForm({ ...form, voice_id: v })
+                              }}
+                            >
+                              {ELEVENLABS_VOICES.map((v) => (
+                                <option key={v.id} value={v.id}>
+                                  {v.label}
+                                </option>
+                              ))}
+                              <option value="__custom__">Custom voice ID…</option>
+                            </Select>
+                            <Description>
+                              Premade ElevenLabs voices. Default: Rachel (best for phone).
+                            </Description>
+                          </Field>
+                          <Field>
+                            <Label>Custom voice ID</Label>
+                            <Input
+                              value={form.voice_id}
+                              onChange={(e) => setForm({ ...form, voice_id: e.target.value })}
+                              placeholder="Paste your ElevenLabs voiceId"
+                            />
+                            <Description>
+                              From your ElevenLabs library if you use a cloned / custom voice.
+                            </Description>
+                          </Field>
+                        </div>
+
+                        <Field>
+                          <Label>Model</Label>
+                          <Select
+                            value={form.voice_model}
+                            onChange={(e) => setForm({ ...form, voice_model: e.target.value })}
+                          >
+                            {ELEVENLABS_MODELS.map((m) => (
+                              <option key={m.id} value={m.id}>
+                                {m.label}
+                              </option>
+                            ))}
+                          </Select>
+                          <Description>
+                            <code>eleven_flash_v2_5</code> is fastest — recommended for live phone
+                            calls.
+                          </Description>
+                        </Field>
+
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <SliderField
+                            label="Stability"
+                            value={form.voice_stability}
+                            onChange={(v) => setForm({ ...form, voice_stability: v })}
+                            min={0}
+                            max={1}
+                            step={0.05}
+                            placeholder="0.5"
+                            hint="Default 0.5. Lower = more expressive; higher = more consistent."
+                          />
+                          <SliderField
+                            label="Similarity boost"
+                            value={form.voice_similarity_boost}
+                            onChange={(v) =>
+                              setForm({ ...form, voice_similarity_boost: v })
+                            }
+                            min={0}
+                            max={1}
+                            step={0.05}
+                            placeholder="0.8"
+                            hint="Default 0.8. How closely to match the original speaker."
+                          />
+                          <SliderField
+                            label="Style"
+                            value={form.voice_style}
+                            onChange={(v) => setForm({ ...form, voice_style: v })}
+                            min={0}
+                            max={1}
+                            step={0.05}
+                            placeholder="0"
+                            hint="Default 0. Amplifies stylistic traits (can add latency)."
+                          />
+                          <Field>
+                            <Label>Streaming latency (0–4)</Label>
+                            <Select
+                              value={form.voice_optimize_streaming_latency}
+                              onChange={(e) =>
+                                setForm({
+                                  ...form,
+                                  voice_optimize_streaming_latency: e.target.value,
+                                })
+                              }
+                            >
+                              <option value="0">0 — highest quality</option>
+                              <option value="1">1</option>
+                              <option value="2">2</option>
+                              <option value="3">3 — recommended for calls</option>
+                              <option value="4">4 — lowest latency</option>
+                            </Select>
+                            <Description>
+                              Higher = snappier replies on phone (default 3).
+                            </Description>
+                          </Field>
+                        </div>
+
+                        <SwitchTile
+                          label="Speaker boost"
+                          description="Post-process clarity for phone speakers. Default on."
+                          checked={form.voice_use_speaker_boost}
+                          onChange={(v) =>
+                            setForm({ ...form, voice_use_speaker_boost: v })
+                          }
+                        />
+                      </FieldGroup>
+                    </PanelSection>
+                  )}
 
                   <PanelSection
                     icon={<MusicalNoteIcon className="size-5" />}
@@ -1595,7 +1763,7 @@ export default function VoicePage() {
                           }
                         />
                         <Description>
-                          Hard call ceiling. Vapi default 600 (10 min); we default 1800.
+                          Hard call ceiling. Vapi default 600 (10 min); we default 600.
                         </Description>
                       </Field>
                     </div>
