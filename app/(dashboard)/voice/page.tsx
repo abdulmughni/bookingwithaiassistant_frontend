@@ -154,6 +154,7 @@ const ELEVENLABS_VOICES: { id: string; label: string }[] = [
   { id: 'MF3mGyEYCl7XYWbV9V6O', label: 'Elli — young bright female' },
   { id: 'AZnzlk1XvdvUeBnXmlld', label: 'Domi — energetic female' },
   { id: 'pNInz6obpgDQGcFmaJgB', label: 'Adam — deep American male' },
+  { id: 'cjVigY5qzO86Huf0OWal', label: 'Eric — smooth, trustworthy male' },
   { id: 'ErXwobaYiN019PkySvjV', label: 'Antoni — calm American male' },
   { id: 'TxGEqnHWrfWFTfGW9XjX', label: 'Josh — deep young male' },
   { id: 'VR6AewLTigWG4xSOukaG', label: 'Arnold — crisp deep male' },
@@ -1264,7 +1265,7 @@ export default function VoicePage() {
                               placeholder="Paste your ElevenLabs voiceId"
                             />
                             <Description>
-                              From your ElevenLabs library if you use a cloned / custom voice.
+                              From Vapi Voice Library (copy ID) or your own ElevenLabs voice.
                             </Description>
                           </Field>
                         </div>
