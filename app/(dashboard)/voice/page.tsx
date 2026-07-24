@@ -466,6 +466,11 @@ export default function VoicePage() {
   const [freeAreaCode, setFreeAreaCode] = useState('')
   const [creatingFree, setCreatingFree] = useState(false)
   const [selectedFreeId, setSelectedFreeId] = useState('')
+  const [twilioNumber, setTwilioNumber] = useState('')
+  const [twilioAccountSid, setTwilioAccountSid] = useState('')
+  const [twilioAuthToken, setTwilioAuthToken] = useState('')
+  const [twilioName, setTwilioName] = useState('')
+  const [importingTwilio, setImportingTwilio] = useState(false)
 
   // Tools panel — populated once the API key is configured. Refetched after
   // every successful Save & sync so newly-bound tool ids are reflected
@@ -668,6 +673,41 @@ export default function VoicePage() {
       notifyError(e instanceof ApiError ? e.message : 'Could not create a free number')
     } finally {
       setCreatingFree(false)
+    }
+  }
+
+  const importTwilioNumber = async () => {
+    if (readOnly) {
+      notifyError('Settings are locked until your account is activated.')
+      return
+    }
+    const number = twilioNumber.trim()
+    const accountSid = twilioAccountSid.trim()
+    const authToken = twilioAuthToken.trim()
+    if (!number || !accountSid || !authToken) {
+      notifyError('Phone number, Twilio Account SID, and Auth Token are required.')
+      return
+    }
+    setImportingTwilio(true)
+    try {
+      const token = await getToken()
+      await api.voice.importTwilioNumber(token, {
+        number,
+        twilio_account_sid: accountSid,
+        twilio_auth_token: authToken,
+        name: twilioName.trim() || undefined,
+      })
+      notifySuccess('Twilio number imported and connected.')
+      setTwilioNumber('')
+      setTwilioAccountSid('')
+      setTwilioAuthToken('')
+      setTwilioName('')
+      refetch()
+      loadPhones()
+    } catch (e) {
+      notifyError(e instanceof ApiError ? e.message : 'Could not import Twilio number')
+    } finally {
+      setImportingTwilio(false)
     }
   }
 
@@ -1942,6 +1982,65 @@ export default function VoicePage() {
                   </div>
                 </div>
               )}
+            </div>
+
+            {/* Import a customer-owned Twilio number. Creds go to Vapi only;
+                we bind Server URL (no static assistant) so calls hit our gate. */}
+            <div className="mt-5 rounded-xl border border-violet-200 bg-violet-50/50 p-4 dark:border-violet-900/50 dark:bg-violet-950/20">
+              <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                Import Twilio number
+              </p>
+              <Text className="mt-0.5 text-xs">
+                Ask the customer to buy a number in Twilio, then paste their Account SID, Auth
+                Token, and number here. We import it into Vapi and route inbound calls through
+                your server (no static assistant bind). Credentials are not stored in our
+                database.
+              </Text>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <Field>
+                  <Label>Phone number</Label>
+                  <Input
+                    value={twilioNumber}
+                    onChange={(e) => setTwilioNumber(e.target.value)}
+                    placeholder="+14155551234"
+                    autoComplete="off"
+                  />
+                </Field>
+                <Field>
+                  <Label>Label (optional)</Label>
+                  <Input
+                    value={twilioName}
+                    onChange={(e) => setTwilioName(e.target.value)}
+                    placeholder="Main line"
+                    autoComplete="off"
+                  />
+                </Field>
+                <Field>
+                  <Label>Twilio Account SID</Label>
+                  <Input
+                    value={twilioAccountSid}
+                    onChange={(e) => setTwilioAccountSid(e.target.value)}
+                    placeholder="ACxxxxxxxx…"
+                    autoComplete="off"
+                  />
+                </Field>
+                <Field>
+                  <Label>Twilio Auth Token</Label>
+                  <Input
+                    type="password"
+                    value={twilioAuthToken}
+                    onChange={(e) => setTwilioAuthToken(e.target.value)}
+                    placeholder="••••••••"
+                    autoComplete="new-password"
+                  />
+                </Field>
+              </div>
+              <div className="mt-4">
+                <Button onClick={importTwilioNumber} disabled={importingTwilio || readOnly}>
+                  <PhoneIcon data-slot="icon" className={importingTwilio ? 'animate-pulse' : ''} />
+                  {importingTwilio ? 'Importing…' : 'Import Twilio number'}
+                </Button>
+              </div>
             </div>
 
             {phones === null ? (

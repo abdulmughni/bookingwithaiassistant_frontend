@@ -414,6 +414,25 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ area_code: areaCode, name: name ?? '' }),
       }),
+    importTwilioNumber: (
+      token: string,
+      data: {
+        number: string
+        twilio_account_sid: string
+        twilio_auth_token: string
+        name?: string
+      },
+    ) =>
+      request<import('./types').VoiceConfig>('/api/voice/phone-numbers/twilio', {
+        token,
+        method: 'POST',
+        body: JSON.stringify({
+          number: data.number,
+          twilio_account_sid: data.twilio_account_sid,
+          twilio_auth_token: data.twilio_auth_token,
+          name: data.name ?? '',
+        }),
+      }),
     attachPhoneNumber: (token: string, phoneId: string) =>
       request<import('./types').VoiceConfig>(
         `/api/voice/phone-numbers/${encodeURIComponent(phoneId)}/attach`,
