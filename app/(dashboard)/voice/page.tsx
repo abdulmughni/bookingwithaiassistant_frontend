@@ -132,9 +132,11 @@ const DEFAULT_FALLBACKS = {
   stop_num_words: '0',
   stop_voice_seconds: '0.2',
   stop_backoff_seconds: '1.0',
-  silence_timeout_seconds: '30',
+  silence_timeout_seconds: '20',
   max_duration_seconds: '600',
   background_sound: 'off',
+  end_call_phrases: 'goodbye, bye, take care, have a great day, have a good day',
+  end_call_message: "You're all set — we'll see you then. Take care!",
 } as const
 
 /** Defaults applied the moment a user switches provider to 11labs. */
@@ -208,7 +210,8 @@ function settingsToForm(s: VoiceSettings, defaults: VoiceConfig['defaults']): Fo
     model_name: s.model_name || 'gpt-4o-mini',
     voice_provider: String(voice.provider ?? DEFAULT_FALLBACKS.voice_provider),
     voice_id: String(voice.voiceId ?? DEFAULT_FALLBACKS.voice_id),
-    end_call_phrases: (s.end_call_phrases || []).join(', '),
+    end_call_phrases:
+      (s.end_call_phrases || []).join(', ') || DEFAULT_FALLBACKS.end_call_phrases,
 
     voice_model: String(voice.model ?? ELEVENLABS_DEFAULTS.model),
     voice_stability: stringOrEmpty(voice.stability) || ELEVENLABS_DEFAULTS.stability,
@@ -267,7 +270,7 @@ function settingsToForm(s: VoiceSettings, defaults: VoiceConfig['defaults']): Fo
     background_sound: s.background_sound || DEFAULT_FALLBACKS.background_sound,
     recording_enabled: s.recording_enabled !== false,
     voicemail_message: s.voicemail_message || '',
-    end_call_message: s.end_call_message || '',
+    end_call_message: s.end_call_message || DEFAULT_FALLBACKS.end_call_message,
 
     denoise_smart_enabled:
       typeof smartDenoise.enabled === 'boolean'
@@ -1160,8 +1163,9 @@ export default function VoicePage() {
                           }
                         />
                         <Description>
-                          Comma-separated. Vapi will hang up when the assistant says any of
-                          these.
+                          Comma-separated ending-only phrases. Avoid common conversational words
+                          such as &quot;okay&quot; or &quot;great&quot; to prevent accidental
+                          hangups.
                         </Description>
                       </Field>
                     </FieldGroup>
@@ -1789,7 +1793,7 @@ export default function VoicePage() {
                           }
                         />
                         <Description>
-                          Hang up after this many seconds of total silence.
+                          Hang up after this many seconds of total silence. Recommended: 20.
                         </Description>
                       </Field>
                       <Field>
@@ -1846,7 +1850,7 @@ export default function VoicePage() {
                         onChange={(e) =>
                           setForm({ ...form, end_call_message: e.target.value })
                         }
-                        placeholder="Thanks for calling — have a great day!"
+                        placeholder={DEFAULT_FALLBACKS.end_call_message}
                       />
                       <Description>
                         Spoken right before the assistant hangs up.
