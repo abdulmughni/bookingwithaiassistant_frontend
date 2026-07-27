@@ -53,10 +53,8 @@ type TenantFormSnapshot = {
   service_types: string[]
   required_fields: string[]
   optional_fields: string[]
-  emergency_keywords: string[]
   service_areas: string[]
   service_area_zips: string[]
-  supported_regions: string[]
   payment_methods: string[]
   timezone: string
   working_hours: Record<string, unknown>
@@ -122,10 +120,8 @@ function snapshotFromTenant(
     service_types: [...(tenant.service_types || [])],
     required_fields: [...(tenant.required_fields || [])],
     optional_fields: [...(tenant.optional_fields || [])],
-    emergency_keywords: [...(tenant.emergency_keywords || [])],
     service_areas: [...(tenant.service_areas || [])],
     service_area_zips: [...(tenant.service_area_zips || [])],
-    supported_regions: [...(tenant.supported_regions || [])],
     payment_methods: [...(tenant.payment_methods || [])],
     timezone: tenant.timezone || 'UTC',
     working_hours: { ...(tenant.working_hours || {}) },
@@ -171,10 +167,8 @@ function TenantConfigTab({
   const [serviceTypes, setServiceTypes] = useState<string[]>([])
   const [requiredFields, setRequiredFields] = useState<string[]>([])
   const [optionalFields, setOptionalFields] = useState<string[]>([])
-  const [emergencyKeywords, setEmergencyKeywords] = useState<string[]>([])
   const [serviceAreas, setServiceAreas] = useState<string[]>([])
   const [serviceAreaZips, setServiceAreaZips] = useState<string[]>([])
-  const [supportedRegions, setSupportedRegions] = useState<string[]>([])
   const [paymentMethods, setPaymentMethods] = useState<string[]>([])
 
   const [timezone, setTimezone] = useState<string>('UTC')
@@ -246,10 +240,8 @@ function TenantConfigTab({
       service_types: serviceTypes,
       required_fields: requiredFields,
       optional_fields: optionalFields,
-      emergency_keywords: emergencyKeywords,
       service_areas: serviceAreas,
       service_area_zips: serviceAreaZips,
-      supported_regions: supportedRegions,
       payment_methods: paymentMethods,
       timezone: timezone.trim() || 'UTC',
       working_hours: workingHours,
@@ -285,10 +277,8 @@ function TenantConfigTab({
     serviceTypes,
     requiredFields,
     optionalFields,
-    emergencyKeywords,
     serviceAreas,
     serviceAreaZips,
-    supportedRegions,
     paymentMethods,
     timezone,
     workingHours,
@@ -323,10 +313,8 @@ function TenantConfigTab({
     setServiceTypes([...snap.service_types])
     setRequiredFields([...snap.required_fields])
     setOptionalFields([...snap.optional_fields])
-    setEmergencyKeywords([...snap.emergency_keywords])
     setServiceAreas([...snap.service_areas])
     setServiceAreaZips([...snap.service_area_zips])
-    setSupportedRegions([...snap.supported_regions])
     setPaymentMethods([...snap.payment_methods])
     setTimezone(snap.timezone)
     setWorkingHours({ ...snap.working_hours })
@@ -443,10 +431,8 @@ function TenantConfigTab({
         service_types: serviceTypes,
         required_fields: requiredFields,
         optional_fields: optionalFields,
-        emergency_keywords: emergencyKeywords,
         service_areas: serviceAreas,
         service_area_zips: serviceAreaZips,
-        supported_regions: supportedRegions,
         payment_methods: paymentMethods,
         timezone: timezone.trim() || 'UTC',
         working_hours: workingHours as Record<string, unknown>,
@@ -565,10 +551,8 @@ function TenantConfigTab({
           <Field><TagInput label="Service types" description="Type and press comma or Enter to add each service." value={serviceTypes} onChange={setServiceTypes} placeholder="e.g. AC repair" /></Field>
           <Field><TagInput label="Required booking fields" description="Keys required at booking (e.g. customer_name, phone_number)." value={requiredFields} onChange={setRequiredFields} placeholder="customer_name" /></Field>
           <Field><TagInput label="Optional booking fields" value={optionalFields} onChange={setOptionalFields} placeholder="notes" /></Field>
-          <Field><TagInput label="Emergency keywords" value={emergencyKeywords} onChange={setEmergencyKeywords} placeholder="emergency, urgent" /></Field>
-          <Field><TagInput label="Service areas (cities/regions)" value={serviceAreas} onChange={setServiceAreas} placeholder="Austin" /></Field>
+          <Field><TagInput label="Service areas (cities/regions)" description="Towns and neighborhoods you cover. Also add common short forms as separate entries (e.g. BK, NYC)." value={serviceAreas} onChange={setServiceAreas} placeholder="Austin" /></Field>
           <Field><TagInput label="Service area ZIP codes" value={serviceAreaZips} onChange={setServiceAreaZips} placeholder="78701" /></Field>
-          <Field><TagInput label="Supported regions" description="e.g. country or region codes." value={supportedRegions} onChange={setSupportedRegions} placeholder="usa" /></Field>
           <Field><TagInput label="Accepted payment methods" description="Shown to customers when they ask 'how can I pay?'. Press comma or Enter to add each method." value={paymentMethods} onChange={setPaymentMethods} placeholder="Cash, Bank transfer, Zelle" /></Field>
         </FieldGroup>
       </section>

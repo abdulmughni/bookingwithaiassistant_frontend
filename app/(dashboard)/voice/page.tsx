@@ -77,6 +77,8 @@ type FormState = Pick<
 > & {
   // Channel basics
   first_message_mode: string
+  model_temperature: string
+  voicemail_detection_enabled: boolean
   voice_provider: string
   voice_id: string
   end_call_phrases: string
@@ -121,30 +123,38 @@ type FormState = Pick<
   end_call_message: string
 }
 
+/** Platform default for Vapi ``startSpeakingPlan.transcriptionEndpointingPlan``. */
+const DEFAULT_TRANSCRIPTION_ENDPOINTING = {
+  onPunctuationSeconds: 0.3,
+  onNoPunctuationSeconds: 1.2,
+  onNumberSeconds: 0.5,
+} as const
+
 const DEFAULT_FALLBACKS = {
   transcriber_provider: 'deepgram',
   transcriber_model: 'nova-3',
   transcriber_language: 'en',
-  voice_provider: 'vapi',
-  voice_id: 'Elliot',
+  voice_provider: '11labs',
+  voice_id: 'cjVigY5qzO86Huf0OWal',
+  model_temperature: '0.3',
   start_smart_provider: 'livekit',
-  start_wait_seconds: '0.4',
-  stop_num_words: '0',
+  start_wait_seconds: '0.6',
+  stop_num_words: '2',
   stop_voice_seconds: '0.2',
   stop_backoff_seconds: '1.0',
   silence_timeout_seconds: '20',
   max_duration_seconds: '600',
   background_sound: 'off',
-  end_call_phrases: 'goodbye, bye, take care, have a great day, have a good day',
-  end_call_message: "You're all set — we'll see you then. Take care!",
+  end_call_phrases: 'take care, goodbye, bye',
+  end_call_message: "You're all set — take care!",
 } as const
 
 /** Defaults applied the moment a user switches provider to 11labs. */
 const ELEVENLABS_DEFAULTS = {
-  voiceId: '21m00Tcm4TlvDq8ikWAM', // Rachel — clear, warm, good for phone
+  voiceId: 'cjVigY5qzO86Huf0OWal', // Eric — smooth, trustworthy male
   model: 'eleven_flash_v2_5',
   stability: '0.5',
-  similarityBoost: '0.8',
+  similarityBoost: '0.75',
   style: '0',
   useSpeakerBoost: true,
   optimizeStreamingLatency: '3',
@@ -208,6 +218,14 @@ function settingsToForm(s: VoiceSettings, defaults: VoiceConfig['defaults']): Fo
     first_message_mode: s.first_message_mode || 'assistant-speaks-first',
     model_provider: s.model_provider || 'openai',
     model_name: s.model_name || 'gpt-4o-mini',
+    model_temperature:
+      s.model_temperature !== undefined && s.model_temperature !== null
+        ? String(s.model_temperature)
+        : DEFAULT_FALLBACKS.model_temperature,
+    voicemail_detection_enabled:
+      s.voicemail_detection && Object.keys(s.voicemail_detection).length > 0
+        ? String(s.voicemail_detection.provider || '').trim() === 'vapi'
+        : true,
     voice_provider: String(voice.provider ?? DEFAULT_FALLBACKS.voice_provider),
     voice_id: String(voice.voiceId ?? DEFAULT_FALLBACKS.voice_id),
     end_call_phrases:
@@ -309,12 +327,13 @@ function formToPatch(f: FormState): Partial<VoiceSettings> {
   if (f.start_smart_provider) {
     const smart: Record<string, unknown> = { provider: f.start_smart_provider }
     if (f.start_smart_provider === 'livekit') {
-      smart.waitFunction = '2000 / (1 + exp(-10 * (x - 0.5)))'
+      smart.waitFunction = '700 + 4000 * x'
     }
     startPlan.smartEndpointingPlan = smart
   }
   const wait = parseNumberOr(f.start_wait_seconds, null)
   if (wait !== null) startPlan.waitSeconds = wait
+  startPlan.transcriptionEndpointingPlan = { ...DEFAULT_TRANSCRIPTION_ENDPOINTING }
 
   const stopPlan: Record<string, unknown> = {}
   const numWords = parseNumberOr(f.stop_num_words, null)
@@ -340,7 +359,7 @@ function formToPatch(f: FormState): Partial<VoiceSettings> {
   if (f.voice_provider === '11labs') {
     voice.model = f.voice_model || ELEVENLABS_DEFAULTS.model
     voice.stability = parseNumberOr(f.voice_stability, 0.5)
-    voice.similarityBoost = parseNumberOr(f.voice_similarity_boost, 0.8)
+    voice.similarityBoost = parseNumberOr(f.voice_similarity_boost, 0.75)
     voice.style = parseNumberOr(f.voice_style, 0) ?? 0
     voice.useSpeakerBoost = f.voice_use_speaker_boost
     voice.optimizeStreamingLatency =
@@ -356,6 +375,7 @@ function formToPatch(f: FormState): Partial<VoiceSettings> {
     first_message_mode: f.first_message_mode,
     model_provider: f.model_provider,
     model_name: f.model_name,
+    model_temperature: parseNumberOr(f.model_temperature, null) ?? undefined,
     voice,
     transcriber,
     end_call_phrases: f.end_call_phrases
@@ -368,6 +388,7 @@ function formToPatch(f: FormState): Partial<VoiceSettings> {
     max_duration_seconds: parseNumberOr(f.max_duration_seconds, null) ?? undefined,
     background_sound: f.background_sound,
     recording_enabled: f.recording_enabled,
+    voicemail_detection: f.voicemail_detection_enabled ? { provider: 'vapi' } : {},
     voicemail_message: f.voicemail_message,
     end_call_message: f.end_call_message,
     background_speech_denoising_plan,
@@ -1155,6 +1176,23 @@ export default function VoicePage() {
                       </div>
 
                       <Field>
+                        <Label>Model temperature</Label>
+                        <Input
+                          type="number"
+                          step="0.1"
+                          min="0"
+                          max="2"
+                          value={form.model_temperature}
+                          onChange={(e) =>
+                            setForm({ ...form, model_temperature: e.target.value })
+                          }
+                        />
+                        <Description>
+                          Lower = more consistent (0.3 recommended for booking flows).
+                        </Description>
+                      </Field>
+
+                      <Field>
                         <Label>End-call phrases</Label>
                         <Input
                           value={form.end_call_phrases}
@@ -1829,7 +1867,18 @@ export default function VoicePage() {
                     title="Messaging"
                     subtitle="What the assistant says when ending the call or hitting voicemail."
                   >
-                    <Field>
+                    <div className="mt-4">
+                      <SwitchTile
+                        label="Voicemail detection"
+                        description="Uses Vapi to detect voicemail and hang up (or play your voicemail message)."
+                        checked={form.voicemail_detection_enabled}
+                        onChange={(v) =>
+                          setForm({ ...form, voicemail_detection_enabled: v })
+                        }
+                      />
+                    </div>
+
+                    <Field className="mt-4">
                       <Label>Voicemail message</Label>
                       <Input
                         value={form.voicemail_message}

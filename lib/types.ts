@@ -408,6 +408,9 @@ export interface CallStatsPeriodBlock {
   unbooked_calls: number
   booked_calls: number
   conversion_pct: number | null
+  avg_call_duration_seconds?: number | null
+  total_talk_minutes?: number
+  total_call_cost?: number
 }
 
 /** One-screen call value report from GET /api/calls/stats. */
@@ -419,6 +422,7 @@ export interface CallStats {
   previous_start: string
   previous_end: string
   avg_job_value_fallback: number
+  has_activity: boolean
   current: CallStatsPeriodBlock
   previous: CallStatsPeriodBlock
   deltas: {
@@ -428,8 +432,31 @@ export interface CallStats {
     after_hours_calls: number | null
     unbooked_calls: number | null
     conversion_pct: number | null
+    booked_calls: number | null
+    total_talk_minutes: number | null
+    total_call_cost: number | null
+    calls_filtered: number | null
+    minutes_saved: number | null
   }
   peak_hours: { hour: number; count: number }[]
+  daily_volume: { date: string; label: string; count: number }[]
+  call_categories: {
+    real_customer: number
+    spam: number
+    wrong_number: number
+    sales_call: number
+    uncategorized: number
+  }
+  /** Spam / wrong-number / sales calls excluded from billed minutes. */
+  quota_protection: {
+    calls_filtered: number
+    minutes_saved: number
+    by_category: {
+      spam: number
+      wrong_number: number
+      sales_call: number
+    }
+  }
   bookings_by_status: {
     upcoming: number
     completed: number
@@ -445,6 +472,8 @@ export interface VoiceSettings {
   first_message_mode?: string
   model_provider: string
   model_name: string
+  /** LLM sampling temperature (0–2). Platform default 0.3. */
+  model_temperature?: number | null
   voice: Record<string, unknown>
   /** Deepgram config: { provider, model, language, smartFormat, keyterm[], keywords[], endpointing? } */
   transcriber: Record<string, unknown>
@@ -457,6 +486,8 @@ export interface VoiceSettings {
   /** "off" | "office" | URL to a custom mp3/wav. */
   background_sound?: string
   recording_enabled?: boolean | null
+  /** Vapi voicemail detection, e.g. ``{ provider: "vapi" }``. */
+  voicemail_detection?: Record<string, unknown>
   voicemail_message?: string
   end_call_message?: string
   /**
