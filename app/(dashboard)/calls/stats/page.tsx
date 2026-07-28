@@ -39,22 +39,8 @@ const STATUS_COLORS = {
   no_show: '#f59e0b',
 } as const
 
-const CATEGORY_COLORS = {
-  real_customer: '#0d9488',
-  uncategorized: '#64748b',
-  spam: '#ef4444',
-  wrong_number: '#f59e0b',
-  sales_call: '#8b5cf6',
-} as const
-
 function money(n: number): string {
   return `$${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
-}
-
-function formatCost(n: number): string {
-  if (n === 0) return '$0'
-  if (n < 0.01) return `$${n.toFixed(4)}`
-  return `$${n.toFixed(2)}`
 }
 
 function formatDuration(seconds: number | null | undefined): string {
@@ -67,14 +53,13 @@ function formatDuration(seconds: number | null | undefined): string {
 
 function formatDelta(
   n: number | null | undefined,
-  opts?: { moneyValue?: boolean; pct?: boolean; minutes?: boolean },
+  opts?: { moneyValue?: boolean; pct?: boolean },
 ): string {
   if (n == null || Number.isNaN(n)) return 'vs prior period'
   if (n === 0) return 'Same as prior period'
   const sign = n > 0 ? '+' : ''
   if (opts?.moneyValue) return `${sign}${money(n)} vs prior`
   if (opts?.pct) return `${sign}${n.toFixed(1)} pts vs prior`
-  if (opts?.minutes) return `${sign}${n.toFixed(1)} min vs prior`
   return `${sign}${n.toLocaleString()} vs prior`
 }
 
@@ -97,21 +82,6 @@ export default function CallStatsPage() {
     [period],
   )
 
-  const peakData = useMemo(() => {
-    return (data?.peak_hours ?? []).map((b) => ({
-      hour: b.hour,
-      label:
-        b.hour === 0
-          ? '12a'
-          : b.hour < 12
-            ? `${b.hour}a`
-            : b.hour === 12
-              ? '12p'
-              : `${b.hour - 12}p`,
-      count: b.count,
-    }))
-  }, [data?.peak_hours])
-
   const dailyData = useMemo(() => data?.daily_volume ?? [], [data?.daily_volume])
 
   const statusData = useMemo(() => {
@@ -123,18 +93,6 @@ export default function CallStatsPage() {
       { key: 'no_show', name: 'No-show', value: s.no_show, fill: STATUS_COLORS.no_show },
     ].filter((row) => row.value > 0)
   }, [data?.bookings_by_status])
-
-  const categoryData = useMemo(() => {
-    const c = data?.call_categories
-    if (!c) return []
-    return [
-      { key: 'real_customer', name: 'Customers', value: c.real_customer, fill: CATEGORY_COLORS.real_customer },
-      { key: 'uncategorized', name: 'Uncategorized', value: c.uncategorized, fill: CATEGORY_COLORS.uncategorized },
-      { key: 'spam', name: 'Spam', value: c.spam, fill: CATEGORY_COLORS.spam },
-      { key: 'wrong_number', name: 'Wrong number', value: c.wrong_number, fill: CATEGORY_COLORS.wrong_number },
-      { key: 'sales_call', name: 'Sales / solicitations', value: c.sales_call, fill: CATEGORY_COLORS.sales_call },
-    ].filter((row) => row.value > 0)
-  }, [data?.call_categories])
 
   const cur = data?.current
   const deltas = data?.deltas
@@ -203,14 +161,6 @@ export default function CallStatsPage() {
             />
           </div>
 
-          <SpamProtectionBanner
-            callsFiltered={protection?.calls_filtered ?? 0}
-            minutesSaved={protection?.minutes_saved ?? 0}
-            byCategory={protection?.by_category}
-            deltaCalls={deltas?.calls_filtered}
-            deltaMinutes={deltas?.minutes_saved}
-          />
-
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <KpiCard
               label="Calls answered"
@@ -242,7 +192,7 @@ export default function CallStatsPage() {
             />
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2">
             <KpiCard
               label="Avg call length"
               value={formatDuration(cur.avg_call_duration_seconds)}
@@ -250,18 +200,14 @@ export default function CallStatsPage() {
               icon={<ClockIcon className="size-5" />}
             />
             <KpiCard
-              label="Total talk time"
-              value={`${(cur.total_talk_minutes ?? 0).toLocaleString()} min`}
-              hint={formatDelta(deltas?.total_talk_minutes, { minutes: true })}
-              hintClass={deltaTone(deltas?.total_talk_minutes)}
-              icon={<ClockIcon className="size-5" />}
-            />
-            <KpiCard
-              label="Vapi call cost"
-              value={formatCost(cur.total_call_cost ?? 0)}
-              hint={formatDelta(deltas?.total_call_cost, { moneyValue: true })}
-              hintClass={deltaTone(deltas?.total_call_cost, { invert: true })}
-              icon={<BanknotesIcon className="size-5" />}
+              label="Spam filtered"
+              value={(protection?.calls_filtered ?? 0).toLocaleString()}
+              hint={
+                (protection?.minutes_saved ?? 0) > 0
+                  ? `${protection?.minutes_saved} min not billed`
+                  : 'Not counted in your minutes'
+              }
+              icon={<ShieldCheckIcon className="size-5" />}
             />
           </div>
 
@@ -295,36 +241,6 @@ export default function CallStatsPage() {
             </ChartCard>
 
             <ChartCard
-              title="Peak call hours"
-              subtitle={`When callers ring · ${data.timezone}`}
-              empty={peakData.every((d) => d.count === 0)}
-              emptyMessage="No inbound calls yet."
-            >
-              <BarChart data={peakData} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-zinc-200 dark:stroke-zinc-800" />
-                <XAxis
-                  dataKey="label"
-                  tick={{ fontSize: 11 }}
-                  interval={2}
-                  className="fill-zinc-500"
-                />
-                <YAxis allowDecimals={false} tick={{ fontSize: 11 }} className="fill-zinc-500" />
-                <Tooltip
-                  cursor={{ fill: 'rgba(148,163,184,0.15)' }}
-                  contentStyle={{
-                    borderRadius: 12,
-                    border: '1px solid rgb(228 228 231)',
-                    fontSize: 12,
-                  }}
-                  formatter={(value) => [String(value ?? 0), 'Calls']}
-                />
-                <Bar dataKey="count" radius={[4, 4, 0, 0]} fill="#0d9488" />
-              </BarChart>
-            </ChartCard>
-          </div>
-
-          <div className="grid gap-4 lg:grid-cols-2">
-            <ChartCard
               title="Bookings by status"
               subtitle="Voice bookings created this period"
               empty={statusData.length === 0}
@@ -353,116 +269,10 @@ export default function CallStatsPage() {
                 </Bar>
               </BarChart>
             </ChartCard>
-
-            <ChartCard
-              title="Call types"
-              subtitle="Classification · spam / sales / wrong numbers can be excluded from your minutes"
-              empty={categoryData.length === 0}
-              emptyMessage="No classified calls yet."
-            >
-              <BarChart
-                data={categoryData}
-                layout="vertical"
-                margin={{ top: 8, right: 16, left: 8, bottom: 0 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" className="stroke-zinc-200 dark:stroke-zinc-800" />
-                <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
-                <YAxis type="category" dataKey="name" width={120} tick={{ fontSize: 12 }} />
-                <Tooltip
-                  cursor={{ fill: 'rgba(148,163,184,0.15)' }}
-                  contentStyle={{
-                    borderRadius: 12,
-                    border: '1px solid rgb(228 228 231)',
-                    fontSize: 12,
-                  }}
-                />
-                <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                  {categoryData.map((entry) => (
-                    <Cell key={entry.key} fill={entry.fill} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ChartCard>
           </div>
         </>
       )}
     </PageShell>
-  )
-}
-
-function SpamProtectionBanner({
-  callsFiltered,
-  minutesSaved,
-  byCategory,
-  deltaCalls,
-  deltaMinutes,
-}: {
-  callsFiltered: number
-  minutesSaved: number
-  byCategory?: { spam: number; wrong_number: number; sales_call: number }
-  deltaCalls?: number | null
-  deltaMinutes?: number | null
-}) {
-  const parts: string[] = []
-  if (byCategory) {
-    if (byCategory.spam) parts.push(`${byCategory.spam} spam`)
-    if (byCategory.wrong_number) parts.push(`${byCategory.wrong_number} wrong number`)
-    if (byCategory.sales_call) parts.push(`${byCategory.sales_call} sales`)
-  }
-  const breakdown = parts.length > 0 ? parts.join(' · ') : null
-
-  return (
-    <div className="rounded-2xl border border-emerald-200/80 bg-emerald-50/80 p-5 shadow-sm dark:border-emerald-800/50 dark:bg-emerald-950/30">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex gap-3">
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-300">
-            <ShieldCheckIcon className="size-5" />
-          </span>
-          <div>
-            <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">
-              Spam filter protects your call minutes
-            </p>
-            <p className="mt-1 text-sm text-emerald-800/90 dark:text-emerald-200/80">
-              Short spam, wrong-number, and sales calls are detected automatically and{' '}
-              <span className="font-medium">not counted against your plan minutes</span>.
-            </p>
-            {breakdown ? (
-              <p className="mt-2 text-xs font-medium text-emerald-700 dark:text-emerald-300">
-                This period: {breakdown}
-              </p>
-            ) : (
-              <p className="mt-2 text-xs text-emerald-700/80 dark:text-emerald-400/80">
-                No filtered calls this period — we&apos;ll show them here when they appear.
-              </p>
-            )}
-          </div>
-        </div>
-        <div className="grid shrink-0 grid-cols-2 gap-3 sm:min-w-56">
-          <div className="rounded-xl bg-white/70 px-3 py-2 dark:bg-emerald-950/40">
-            <p className="text-xs font-medium text-emerald-700 dark:text-emerald-300">
-              Calls filtered
-            </p>
-            <p className="mt-0.5 text-2xl font-semibold tabular-nums text-emerald-950 dark:text-white">
-              {callsFiltered.toLocaleString()}
-            </p>
-            <p className={clsx('text-xs font-medium', deltaTone(deltaCalls))}>
-              {formatDelta(deltaCalls)}
-            </p>
-          </div>
-          <div className="rounded-xl bg-white/70 px-3 py-2 dark:bg-emerald-950/40">
-            <p className="text-xs font-medium text-emerald-700 dark:text-emerald-300">
-              Minutes saved
-            </p>
-            <p className="mt-0.5 text-2xl font-semibold tabular-nums text-emerald-950 dark:text-white">
-              {minutesSaved.toLocaleString()}
-            </p>
-            <p className={clsx('text-xs font-medium', deltaTone(deltaMinutes))}>
-              {formatDelta(deltaMinutes, { minutes: true })}
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
   )
 }
 
@@ -476,8 +286,8 @@ function EmptyStats({ period }: { period: Period }) {
         </h3>
         <p className="mx-auto mt-2 max-w-md text-sm text-zinc-500 dark:text-zinc-400">
           {period === 'week'
-            ? 'When your AI line answers calls this week, jobs booked, estimated value, peak hours, and conversion will show up here automatically.'
-            : 'When your AI line answers calls this month, jobs booked, estimated value, peak hours, and conversion will show up here automatically.'}
+            ? 'When your AI line answers calls this week, jobs booked and conversion will show up here automatically.'
+            : 'When your AI line answers calls this month, jobs booked and conversion will show up here automatically.'}
         </p>
         <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
           <Button href="/voice" color="brand">

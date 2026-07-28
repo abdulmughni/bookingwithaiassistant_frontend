@@ -77,6 +77,22 @@ function statusColor(status: string): 'lime' | 'amber' | 'zinc' | 'red' | 'sky' 
   }
 }
 
+/** Non-customer labels only — real-customer stays unlabeled. */
+function callCategoryBadge(
+  category: string | null | undefined,
+): { label: string; color: 'red' | 'amber' | 'violet' } | null {
+  switch ((category || '').trim().toLowerCase()) {
+    case 'spam':
+      return { label: 'Spam', color: 'red' }
+    case 'wrong-number':
+      return { label: 'Wrong number', color: 'amber' }
+    case 'sales-call':
+      return { label: 'Sales call', color: 'violet' }
+    default:
+      return null
+  }
+}
+
 function DirectionIcon({ direction, className }: { direction: string; className?: string }) {
   const cls = clsx('size-5', className)
   if (direction === 'outbound') return <PhoneArrowUpRightIcon className={cls} />
@@ -527,6 +543,10 @@ export default function CallsPage() {
                   </DialogTitle>
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     <Badge color={statusColor(detail.status)}>{detail.status}</Badge>
+                    {(() => {
+                      const cat = callCategoryBadge(detail.call_category)
+                      return cat ? <Badge color={cat.color}>{cat.label}</Badge> : null
+                    })()}
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-white/90 px-3 py-1 text-xs font-medium text-zinc-700 shadow-sm ring-1 ring-zinc-950/5 backdrop-blur-sm dark:bg-zinc-800/90 dark:text-zinc-200 dark:ring-white/10">
                       <DirectionIcon direction={detail.direction} className="size-3.5 text-zinc-500 dark:text-zinc-400" />
                       {directionDisplayLabel(detail.direction)}
@@ -574,6 +594,10 @@ export default function CallsPage() {
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     <DetailStat label="Direction" value={directionDisplayLabel(detail.direction)} />
                     <DetailStat label="Status" value={detail.status} />
+                    <DetailStat
+                      label="Call type"
+                      value={callCategoryBadge(detail.call_category)?.label || 'Customer'}
+                    />
                     <DetailStat label="Duration" value={formatDuration(detail.duration_seconds)} />
                     <DetailStat label="Cost" value={formatCost(detail.cost)} />
                     <DetailStat label="Ended reason" value={detail.ended_reason || '—'} capitalize={false} />
@@ -933,6 +957,10 @@ function CallGridCard({
                 {directionLabel}
               </span>
               <Badge color={statusColor(call.status)}>{call.status}</Badge>
+              {(() => {
+                const cat = callCategoryBadge(call.call_category)
+                return cat ? <Badge color={cat.color}>{cat.label}</Badge> : null
+              })()}
               {call.ended_reason && (
                 <span className="text-[11px] text-zinc-400">
                   · {call.ended_reason}
@@ -1086,6 +1114,10 @@ function CallListRow({
             </p>
             <div className="flex flex-col items-start gap-1">
               <Badge color={statusColor(call.status)}>{call.status}</Badge>
+              {(() => {
+                const cat = callCategoryBadge(call.call_category)
+                return cat ? <Badge color={cat.color}>{cat.label}</Badge> : null
+              })()}
               <span className="max-w-56 text-[11px] leading-snug text-zinc-500 dark:text-zinc-400">
                 Created {formatDateTime(call.created_at, timeZone)}
                 <br />

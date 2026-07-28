@@ -378,6 +378,8 @@ export interface CallLogSummary {
   updated_at: string
   /** Bookings created during this Vapi session (requires backend linkage). */
   bookings_count: number
+  /** End-of-call classification: real-customer | spam | wrong-number | sales-call */
+  call_category?: string | null
 }
 
 /** Full call record (GET /api/calls/{id}). */
