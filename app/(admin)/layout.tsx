@@ -80,7 +80,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <SidebarHeader>
             <div className="flex flex-col gap-0 px-2 py-0.5">
               <BrandLogo height={31} priority className="max-w-44.5" />
-              <p className="truncate pl-0.5 text-[11px] font-medium leading-tight text-zinc-500 dark:text-zinc-400">
+              <p className="truncate pl-[25px] text-[10px] font-medium leading-tight text-zinc-500 dark:text-zinc-400">
                 Admin Console
               </p>
             </div>
