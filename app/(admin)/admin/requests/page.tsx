@@ -49,7 +49,11 @@ export default function AdminRequestsPage() {
       try {
         const token = await getToken()
         await api.admin.resolveRequest(token, id, status)
-        toast.success(status === 'resolved' ? 'Request resolved.' : 'Request dismissed.')
+        toast.success(
+          status === 'resolved'
+            ? 'Request resolved — plan applied.'
+            : 'Request dismissed.',
+        )
         await load()
       } catch (err) {
         toast.error(err instanceof ApiError ? err.message : 'Action failed.')
@@ -62,7 +66,7 @@ export default function AdminRequestsPage() {
     <PageShell>
       <PageHeader
         title="Plan change requests"
-        description="Clients can't switch plans themselves — they submit a request. Apply the plan from the client's detail page, then resolve the request here."
+        description="Clients can't switch plans themselves — they submit a request. Resolve applies their requested plan automatically; dismiss closes without changing the plan."
       >
         <Button outline onClick={() => setShowResolved((v) => !v)}>
           {showResolved ? 'Show open only' : 'Show all'}
@@ -163,19 +167,21 @@ export default function AdminRequestsPage() {
         onClose={() => setConfirmAction(null)}
         title={
           confirmAction?.status === 'resolved'
-            ? 'Mark this request as resolved?'
+            ? 'Resolve and apply this plan?'
             : 'Dismiss this request?'
         }
         description={
           confirmAction?.status === 'resolved'
-            ? `Confirm you've already applied the plan change for ${
-                confirmAction?.request.tenant_name ?? 'this client'
-              } from their detail page. The request will be closed.`
+            ? confirmAction?.request.requested_plan_id
+              ? `This will assign ${confirmAction.request.requested_plan_id} to ${
+                  confirmAction.request.tenant_name ?? 'this client'
+                } and close the request.`
+              : `This request has no preferred plan. Resolving will only close it — assign a plan from the client detail page if needed.`
             : `The request from ${
                 confirmAction?.request.tenant_name ?? 'this client'
               } will be closed without any plan change.`
         }
-        confirmLabel={confirmAction?.status === 'resolved' ? 'Yes, resolve' : 'Yes, dismiss'}
+        confirmLabel={confirmAction?.status === 'resolved' ? 'Yes, apply & resolve' : 'Yes, dismiss'}
         busyLabel="Working…"
         color={confirmAction?.status === 'resolved' ? 'green' : 'dark/zinc'}
         onConfirm={async () => {

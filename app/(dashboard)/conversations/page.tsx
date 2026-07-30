@@ -673,13 +673,14 @@ export default function ConversationsPage() {
   }, [messages, messagesLoading])
 
   const fetchConversations = useCallback(
-    async (opts?: { reset?: boolean }) => {
+    async (opts?: { reset?: boolean; background?: boolean }) => {
       const reset = Boolean(opts?.reset)
-      if (reset) {
+      const background = Boolean(opts?.background)
+      if (reset && !background) {
         setConversationsLoading(true)
         setConversationsLoadingMore(false)
         conversationsOffsetRef.current = 0
-      } else {
+      } else if (!reset) {
         setConversationsLoadingMore(true)
       }
       try {
@@ -704,7 +705,7 @@ export default function ConversationsPage() {
         const nextOffset = page.next_offset ?? offset + page.items.length
         conversationsOffsetRef.current = nextOffset
       } finally {
-        setConversationsLoading(false)
+        if (!background) setConversationsLoading(false)
         setConversationsLoadingMore(false)
       }
     },
@@ -989,10 +990,9 @@ export default function ConversationsPage() {
       if (convId === selectedId && event.id) {
         setMessages((prev) => prev.filter((m) => m.id !== event.id))
       }
-
-      const eventChannel = convId.split('|')[1] || ''
-      if (channelTab !== 'all' && eventChannel && eventChannel !== channelTab) return
-      void fetchConversations({ reset: true })
+      // Do not refetch the whole inbox on every cascade delete — that races with
+      // local delete and causes loading flashes. Deleted conversations are already
+      // removed from state; missing ids are ignored.
       return
     }
 
@@ -1001,7 +1001,10 @@ export default function ConversationsPage() {
     if (!convId) return
 
     // conversation_id = "<tenant>|<channel>|<account>|<customer>"
-    const eventChannel = convId.split('|')[1] || ''
+    const parts = convId.split('|')
+    const eventChannel = parts[1] || ''
+    const accountId = parts[2] || ''
+    const customerId = parts[3] || ''
 
     // Live thread updates: inbound customer messages (webhook) and AI replies.
     // Dashboard sends are appended locally — ignore their WS echo.
@@ -1033,12 +1036,34 @@ export default function ConversationsPage() {
         ? `${event.content.slice(0, 199)}…`
         : event.content ?? ''
 
+    let reappeared = false
     setConversations((prev) => {
       const idx = prev.findIndex((c) => c.id === convId)
       if (idx === -1) {
-        // Not loaded yet: only pull it in when no search filter is narrowing the list.
-        if (!debouncedQuery) void fetchConversations({ reset: true })
-        return prev
+        // Conversation was deleted (or never loaded). Same contact reuses the
+        // deterministic id — upsert a row so live WS updates work without refresh.
+        if (debouncedQuery) return prev
+        reappeared = true
+        const stub: Conversation = {
+          id: convId,
+          tenant_id: parts[0] || '',
+          channel: eventChannel || 'web',
+          account_id: accountId,
+          channel_account_id: accountId,
+          customer_id: customerId,
+          customer_name: customerId || 'Customer',
+          customer_phone: null,
+          intent: null,
+          status: 'active',
+          current_node: null,
+          booking_id: null,
+          created_at: event.created_at,
+          updated_at: event.created_at,
+          last_message_preview: preview,
+          last_message_role: event.role ?? null,
+          last_message_at: event.created_at,
+        }
+        return [stub, ...prev]
       }
       const updated: Conversation = {
         ...prev[idx],
@@ -1051,6 +1076,11 @@ export default function ConversationsPage() {
       next.splice(idx, 1)
       return [updated, ...next]
     })
+
+    // Background refresh fills in display names / avatars for reappeared chats.
+    if (reappeared) {
+      void fetchConversations({ reset: true, background: true })
+    }
   })
 
   return (
