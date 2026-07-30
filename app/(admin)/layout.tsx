@@ -24,7 +24,8 @@ import {
 } from '@/components/sidebar'
 import { SidebarLayout } from '@/components/sidebar-layout'
 import { useIsAdmin } from '@/lib/hooks'
-import { APP_BRAND_NAME, brandGradientClass } from '@/lib/brand'
+import { BrandLogo } from '@/components/brand-logo'
+import { brandGradientClass } from '@/lib/brand'
 
 const adminNav = [
   { label: 'Overview', href: '/admin', icon: ChartBarSquareIcon, exact: true },
@@ -77,20 +78,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       sidebar={
         <Sidebar>
           <SidebarHeader>
-            <div className="flex items-center gap-3 px-2 py-1.5">
-              <span
-                className={`flex size-9 shrink-0 items-center justify-center rounded-xl text-white shadow-sm shadow-brand-500/30 ${brandGradientClass}`}
-              >
-                <ShieldCheckIcon className="size-5" />
-              </span>
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-zinc-950 dark:text-white">
-                  Admin Console
-                </p>
-                <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">
-                  {APP_BRAND_NAME}
-                </p>
-              </div>
+            <div className="flex flex-col gap-1 px-2 py-1.5">
+              <BrandLogo height={26} priority className="max-w-[148px]" />
+              <p className="truncate pl-0.5 text-xs font-medium text-zinc-500 dark:text-zinc-400">
+                Admin Console
+              </p>
             </div>
           </SidebarHeader>
 

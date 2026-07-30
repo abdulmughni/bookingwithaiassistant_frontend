@@ -1,6 +1,5 @@
 'use client'
 
-import clsx from 'clsx'
 import { useEffect } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { useAuth, useUser, useClerk, UserButton } from '@clerk/nextjs'
@@ -35,7 +34,7 @@ import { JobberReconnectBanner } from '@/components/jobber-reconnect-banner'
 import { ClientOpsBanners } from '@/components/client-ops-banners'
 import { NotificationBell } from '@/components/notification-bell'
 import { RealtimeProvider } from '@/lib/realtime'
-import { APP_BRAND_NAME, brandLogoClass } from '@/lib/brand'
+import { BrandLogo } from '@/components/brand-logo'
 
 export default function DashboardLayout({
   children,
@@ -89,18 +88,8 @@ export default function DashboardLayout({
           <SidebarHeader>
             <SidebarSection>
               <SidebarItem href="/">
-                <span className="flex items-center gap-2">
-                  <span
-                    className={clsx(
-                      'flex size-7 items-center justify-center rounded-lg text-xs font-bold',
-                      brandLogoClass,
-                    )}
-                  >
-                    B
-                  </span>
-                  <SidebarLabel className="text-sm font-semibold">
-                    {APP_BRAND_NAME}
-                  </SidebarLabel>
+                <span className="flex min-w-0 items-center py-0.5">
+                  <BrandLogo height={26} priority className="max-w-[148px]" />
                 </span>
               </SidebarItem>
             </SidebarSection>
