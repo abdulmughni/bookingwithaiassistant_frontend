@@ -88,8 +88,8 @@ export default function DashboardLayout({
           <SidebarHeader>
             <SidebarSection>
               <SidebarItem href="/">
-                <span className="flex min-w-0 items-center py-0.5">
-                  <BrandLogo height={31} priority className="max-w-[178px]" />
+                <span className="flex min-w-0 items-center">
+                  <BrandLogo height={31} priority className="max-w-44.5" />
                 </span>
               </SidebarItem>
             </SidebarSection>
