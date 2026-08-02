@@ -77,20 +77,35 @@ function statusColor(status: string): 'lime' | 'amber' | 'zinc' | 'red' | 'sky' 
   }
 }
 
-/** Non-customer labels only — real-customer stays unlabeled. */
+/** Non-customer labels only — real-customer stays unlabeled. All spam types → Spam. */
 function callCategoryBadge(
   category: string | null | undefined,
-): { label: string; color: 'red' | 'amber' | 'violet' } | null {
+): { label: string; color: 'red' } | null {
   switch ((category || '').trim().toLowerCase()) {
     case 'spam':
-      return { label: 'Spam', color: 'red' }
     case 'wrong-number':
-      return { label: 'Wrong number', color: 'amber' }
     case 'sales-call':
-      return { label: 'Sales call', color: 'violet' }
+      return { label: 'Spam', color: 'red' }
     default:
       return null
   }
+}
+
+function CallSpamBadges({
+  category,
+  quotaExcluded,
+}: {
+  category: string | null | undefined
+  quotaExcluded?: boolean | null
+}) {
+  const cat = callCategoryBadge(category)
+  if (!cat) return null
+  return (
+    <>
+      <Badge color={cat.color}>{cat.label}</Badge>
+      {quotaExcluded ? <Badge color="zinc">Not billed</Badge> : null}
+    </>
+  )
 }
 
 function DirectionIcon({ direction, className }: { direction: string; className?: string }) {
@@ -543,10 +558,10 @@ export default function CallsPage() {
                   </DialogTitle>
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     <Badge color={statusColor(detail.status)}>{detail.status}</Badge>
-                    {(() => {
-                      const cat = callCategoryBadge(detail.call_category)
-                      return cat ? <Badge color={cat.color}>{cat.label}</Badge> : null
-                    })()}
+                    <CallSpamBadges
+                      category={detail.call_category}
+                      quotaExcluded={detail.quota_excluded}
+                    />
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-white/90 px-3 py-1 text-xs font-medium text-zinc-700 shadow-sm ring-1 ring-zinc-950/5 backdrop-blur-sm dark:bg-zinc-800/90 dark:text-zinc-200 dark:ring-white/10">
                       <DirectionIcon direction={detail.direction} className="size-3.5 text-zinc-500 dark:text-zinc-400" />
                       {directionDisplayLabel(detail.direction)}
@@ -596,7 +611,13 @@ export default function CallsPage() {
                     <DetailStat label="Status" value={detail.status} />
                     <DetailStat
                       label="Call type"
-                      value={callCategoryBadge(detail.call_category)?.label || 'Customer'}
+                      value={
+                        callCategoryBadge(detail.call_category)?.label
+                          ? detail.quota_excluded
+                            ? 'Spam · not billed'
+                            : 'Spam'
+                          : 'Customer'
+                      }
                     />
                     <DetailStat label="Duration" value={formatDuration(detail.duration_seconds)} />
                     <DetailStat label="Cost" value={formatCost(detail.cost)} />
@@ -957,10 +978,10 @@ function CallGridCard({
                 {directionLabel}
               </span>
               <Badge color={statusColor(call.status)}>{call.status}</Badge>
-              {(() => {
-                const cat = callCategoryBadge(call.call_category)
-                return cat ? <Badge color={cat.color}>{cat.label}</Badge> : null
-              })()}
+              <CallSpamBadges
+                category={call.call_category}
+                quotaExcluded={call.quota_excluded}
+              />
               {call.ended_reason && (
                 <span className="text-[11px] text-zinc-400">
                   · {call.ended_reason}
@@ -1114,10 +1135,10 @@ function CallListRow({
             </p>
             <div className="flex flex-col items-start gap-1">
               <Badge color={statusColor(call.status)}>{call.status}</Badge>
-              {(() => {
-                const cat = callCategoryBadge(call.call_category)
-                return cat ? <Badge color={cat.color}>{cat.label}</Badge> : null
-              })()}
+              <CallSpamBadges
+                category={call.call_category}
+                quotaExcluded={call.quota_excluded}
+              />
               <span className="max-w-56 text-[11px] leading-snug text-zinc-500 dark:text-zinc-400">
                 Created {formatDateTime(call.created_at, timeZone)}
                 <br />

@@ -378,8 +378,10 @@ export interface CallLogSummary {
   updated_at: string
   /** Bookings created during this Vapi session (requires backend linkage). */
   bookings_count: number
-  /** End-of-call classification: real-customer | spam | wrong-number | sales-call */
+  /** End-of-call classification (client-facing): real-customer | spam */
   call_category?: string | null
+  /** True when spam/wrong-number/sales and under 20s — minutes not billed. */
+  quota_excluded?: boolean
 }
 
 /** Full call record (GET /api/calls/{id}). */
@@ -449,7 +451,7 @@ export interface CallStats {
     sales_call: number
     uncategorized: number
   }
-  /** Spam / wrong-number / sales calls excluded from billed minutes. */
+  /** Spam calls excluded from billed minutes (wrong-number / sales included). */
   quota_protection: {
     calls_filtered: number
     minutes_saved: number

@@ -204,8 +204,8 @@ export default function CallStatsPage() {
               value={(protection?.calls_filtered ?? 0).toLocaleString()}
               hint={
                 (protection?.minutes_saved ?? 0) > 0
-                  ? `${protection?.minutes_saved} min not billed`
-                  : 'Not counted in your minutes'
+                  ? `${protection?.minutes_saved} min not billed · spam under 20s`
+                  : 'Spam under 20s is not billed'
               }
               icon={<ShieldCheckIcon className="size-5" />}
             />

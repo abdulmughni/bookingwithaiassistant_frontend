@@ -11,16 +11,14 @@ import {
   SidebarHeader,
   SidebarItem,
   SidebarLabel,
+  SidebarNavGroup,
   SidebarSection,
   SidebarSpacer,
 } from '@/components/sidebar'
 import { Navbar, NavbarSpacer } from '@/components/navbar'
-import { mainNavItems } from '@/lib/navigation'
+import { isNavGroupCurrent, isNavHrefCurrent, mainNavItems } from '@/lib/navigation'
 import { useIsAdmin } from '@/lib/hooks'
-import {
-  ArrowRightStartOnRectangleIcon,
-  QuestionMarkCircleIcon,
-} from '@heroicons/react/20/solid'
+import { ArrowRightStartOnRectangleIcon } from '@heroicons/react/20/solid'
 import {
   NavbarOrganizationSwitcher,
   OrganizationGate,
@@ -97,30 +95,46 @@ export default function DashboardLayout({
 
           <SidebarBody>
             <SidebarSection>
-              {mainNavItems.map((item) => (
-                <SidebarItem
-                  key={item.href}
-                  href={item.href}
-                  current={
-                    item.href === '/'
-                      ? pathname === '/'
-                      : pathname.startsWith(item.href)
-                  }
-                >
-                  <item.icon data-slot="icon" />
-                  <SidebarLabel>{item.label}</SidebarLabel>
-                </SidebarItem>
-              ))}
+              {mainNavItems.map((item) => {
+                if (item.type === 'group') {
+                  const groupActive = isNavGroupCurrent(item, pathname)
+                  return (
+                    <SidebarNavGroup
+                      key={item.label}
+                      label={item.label}
+                      icon={item.icon}
+                      active={groupActive}
+                    >
+                      {item.children.map((child) => (
+                        <SidebarItem
+                          key={child.href}
+                          href={child.href}
+                          current={isNavHrefCurrent(child.href, pathname)}
+                        >
+                          {child.icon ? <child.icon data-slot="icon" /> : null}
+                          <SidebarLabel>{child.label}</SidebarLabel>
+                        </SidebarItem>
+                      ))}
+                    </SidebarNavGroup>
+                  )
+                }
+
+                return (
+                  <SidebarItem
+                    key={item.href}
+                    href={item.href}
+                    current={isNavHrefCurrent(item.href, pathname)}
+                  >
+                    <item.icon data-slot="icon" />
+                    <SidebarLabel>{item.label}</SidebarLabel>
+                  </SidebarItem>
+                )
+              })}
             </SidebarSection>
 
             <SidebarSpacer />
 
-            {/* <SidebarSection>
-              <SidebarItem href="#">
-                <QuestionMarkCircleIcon data-slot="icon" />
-                <SidebarLabel>Support</SidebarLabel>
-              </SidebarItem>
-            </SidebarSection> */}
+            {/* Support menu item intentionally hidden for now */}
           </SidebarBody>
 
           <SidebarFooter>
