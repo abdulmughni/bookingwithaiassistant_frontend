@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useCallback, useEffect, useState } from 'react'
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import clsx from 'clsx'
 import { ChevronRightIcon } from '@heroicons/react/20/solid'
@@ -296,7 +296,7 @@ function IntegrationsPageInner() {
   const searchParams = useSearchParams()
   const [showConnect, setShowConnect] = useState(false)
   const [jobberOauthLoading, setJobberOauthLoading] = useState(false)
-  const [marketplaceKickstartDone, setMarketplaceKickstartDone] = useState(false)
+  const marketplaceKickstartDoneRef = useRef(false)
   const getToken = useApiToken()
   const getFreshToken = useFreshOrgToken()
 
@@ -347,20 +347,20 @@ function IntegrationsPageInner() {
   }, [searchParams, router, refetchTenant, refetch])
 
   useEffect(() => {
-    if (loading || tenantLoading || marketplaceKickstartDone) return
+    if (loading || tenantLoading || marketplaceKickstartDoneRef.current) return
     if (!isJobberMarketplaceLaunch(searchParams)) return
     if (jobberMarketplaceOAuthAlreadyStarted()) {
-      setMarketplaceKickstartDone(true)
+      marketplaceKickstartDoneRef.current = true
       router.replace('/integrations')
       return
     }
     if (!shouldKickstartJobberOAuth(tenant ?? null, credentials)) {
-      setMarketplaceKickstartDone(true)
+      marketplaceKickstartDoneRef.current = true
       router.replace('/integrations')
       return
     }
 
-    setMarketplaceKickstartDone(true)
+    marketplaceKickstartDoneRef.current = true
     void (async () => {
       const started = await startJobberOAuth()
       if (!started) {
@@ -370,7 +370,6 @@ function IntegrationsPageInner() {
   }, [
     loading,
     tenantLoading,
-    marketplaceKickstartDone,
     searchParams,
     tenant,
     credentials,
@@ -381,10 +380,11 @@ function IntegrationsPageInner() {
   const handleJobberOAuth = () => void startJobberOAuth()
 
   const fromJobberMarketplace = isJobberMarketplaceLaunch(searchParams)
+  // Overlay while tenant/credentials load for a marketplace launch, or while OAuth redirect runs.
+  // Kickstart "already ran" is tracked with a ref in the effect (not render state).
   const showJobberConnecting =
     jobberOauthLoading ||
     (fromJobberMarketplace &&
-      !marketplaceKickstartDone &&
       !jobberMarketplaceOAuthAlreadyStarted() &&
       (loading ||
         tenantLoading ||

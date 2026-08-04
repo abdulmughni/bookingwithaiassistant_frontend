@@ -167,10 +167,18 @@ export function BookingDetailsDialog({
   open,
   booking,
   onClose,
+  onEdit,
+  onComplete,
+  onNoShow,
+  onCancel,
 }: {
   open: boolean
   booking: Booking | null
   onClose: () => void
+  onEdit?: (booking: Booking) => void
+  onComplete?: (booking: Booking) => void
+  onNoShow?: (booking: Booking) => void
+  onCancel?: (booking: Booking) => void
 }) {
   const getToken = useApiToken()
   const tenantTz = useTenantTimezone()
@@ -210,6 +218,7 @@ export function BookingDetailsDialog({
   const data: Booking & Partial<BookingDetails> = details ?? booking
   const hasCall = Boolean(details?.call)
   const messages = details?.messages ?? []
+  const isActive = data.status === 'confirmed' || data.status === 'rescheduled'
 
   return (
     <Dialog open={open} onClose={onClose} size="3xl">
@@ -391,7 +400,48 @@ export function BookingDetailsDialog({
         )}
       </div>
 
-      <div className="mt-8 flex justify-end gap-2">
+      <div className="mt-8 flex flex-wrap justify-end gap-2">
+        {onEdit && (
+          <Button
+            outline
+            onClick={() => {
+              onEdit(booking)
+            }}
+          >
+            Edit
+          </Button>
+        )}
+        {isActive && onComplete && (
+          <Button
+            plain
+            onClick={() => {
+              onComplete(booking)
+            }}
+          >
+            Complete
+          </Button>
+        )}
+        {isActive && onNoShow && (
+          <Button
+            plain
+            onClick={() => {
+              onNoShow(booking)
+            }}
+          >
+            No-show
+          </Button>
+        )}
+        {isActive && onCancel && (
+          <Button
+            plain
+            className="text-red-600 dark:text-red-400"
+            onClick={() => {
+              onCancel(booking)
+            }}
+          >
+            Cancel booking
+          </Button>
+        )}
         <Button onClick={onClose}>Close</Button>
       </div>
     </Dialog>

@@ -33,7 +33,7 @@ function emptyDay(): DayState {
   return { open: false, start: '09:00', end: '17:00', callsActive: true }
 }
 
-function parseWorkingHours(raw: Record<string, unknown> | null | undefined): WorkingHoursState {
+export function parseWorkingHours(raw: Record<string, unknown> | null | undefined): WorkingHoursState {
   const base = Object.fromEntries(DAYS.map((d) => [d.key, emptyDay()])) as WorkingHoursState
   if (!raw || typeof raw !== 'object') return base
 
