@@ -637,6 +637,108 @@ export const api = {
         `/api/admin/plan-change-requests/${encodeURIComponent(requestId)}/resolve`,
         { token, method: 'POST', body: JSON.stringify({ status }) },
       ),
+
+    prompts: {
+      list: (token: string, tenantId: string) =>
+        request<import('./types').PromptConfig[]>(
+          `/api/admin/tenants/${encodeURIComponent(tenantId)}/prompts`,
+          { token },
+        ),
+      update: (token: string, tenantId: string, nodeKey: string, promptText: string) =>
+        request<import('./types').PromptConfig>(
+          `/api/admin/tenants/${encodeURIComponent(tenantId)}/prompts/${encodeURIComponent(nodeKey)}`,
+          {
+            token,
+            method: 'PUT',
+            body: JSON.stringify({ prompt_text: promptText }),
+          },
+        ),
+      reset: (token: string, tenantId: string, nodeKey: string) =>
+        request<import('./types').PromptConfig>(
+          `/api/admin/tenants/${encodeURIComponent(tenantId)}/prompts/${encodeURIComponent(nodeKey)}/reset`,
+          { token, method: 'POST' },
+        ),
+      resetAll: (token: string, tenantId: string) =>
+        request<{ reset_count: number; status: string }>(
+          `/api/admin/tenants/${encodeURIComponent(tenantId)}/prompts/reset-all`,
+          { token, method: 'POST' },
+        ),
+    },
+
+    voice: {
+      get: (token: string, tenantId: string) =>
+        request<import('./types').VoiceConfig>(
+          `/api/admin/tenants/${encodeURIComponent(tenantId)}/voice`,
+          { token },
+        ),
+      update: (token: string, tenantId: string, data: Partial<import('./types').VoiceSettings>) =>
+        request<import('./types').VoiceConfig>(
+          `/api/admin/tenants/${encodeURIComponent(tenantId)}/voice`,
+          { token, method: 'PATCH', body: JSON.stringify(data) },
+        ),
+      sync: (token: string, tenantId: string) =>
+        request<import('./types').VoiceSyncResponse>(
+          `/api/admin/tenants/${encodeURIComponent(tenantId)}/voice/sync`,
+          { token, method: 'POST' },
+        ),
+      deleteAssistant: (token: string, tenantId: string) =>
+        request<import('./types').VoiceConfig>(
+          `/api/admin/tenants/${encodeURIComponent(tenantId)}/voice/assistant`,
+          { token, method: 'DELETE' },
+        ),
+      listPhoneNumbers: (token: string, tenantId: string) =>
+        request<import('./types').VoicePhoneNumber[]>(
+          `/api/admin/tenants/${encodeURIComponent(tenantId)}/voice/phone-numbers`,
+          { token },
+        ),
+      createFreeNumber: (token: string, tenantId: string, areaCode: string, name?: string) =>
+        request<import('./types').VoiceConfig>(
+          `/api/admin/tenants/${encodeURIComponent(tenantId)}/voice/phone-numbers/free`,
+          {
+            token,
+            method: 'POST',
+            body: JSON.stringify({ area_code: areaCode, name: name ?? '' }),
+          },
+        ),
+      importTwilioNumber: (
+        token: string,
+        tenantId: string,
+        data: {
+          number: string
+          twilio_account_sid: string
+          twilio_auth_token: string
+          name?: string
+        },
+      ) =>
+        request<import('./types').VoiceConfig>(
+          `/api/admin/tenants/${encodeURIComponent(tenantId)}/voice/phone-numbers/twilio`,
+          {
+            token,
+            method: 'POST',
+            body: JSON.stringify({
+              number: data.number,
+              twilio_account_sid: data.twilio_account_sid,
+              twilio_auth_token: data.twilio_auth_token,
+              name: data.name ?? '',
+            }),
+          },
+        ),
+      attachPhoneNumber: (token: string, tenantId: string, phoneId: string) =>
+        request<import('./types').VoiceConfig>(
+          `/api/admin/tenants/${encodeURIComponent(tenantId)}/voice/phone-numbers/${encodeURIComponent(phoneId)}/attach`,
+          { token, method: 'POST' },
+        ),
+      detachPhoneNumber: (token: string, tenantId: string, phoneId: string) =>
+        request<import('./types').VoiceConfig>(
+          `/api/admin/tenants/${encodeURIComponent(tenantId)}/voice/phone-numbers/${encodeURIComponent(phoneId)}/detach`,
+          { token, method: 'POST' },
+        ),
+      listTools: (token: string, tenantId: string) =>
+        request<import('./types').VoiceToolsResponse>(
+          `/api/admin/tenants/${encodeURIComponent(tenantId)}/voice/tools`,
+          { token },
+        ),
+    },
   },
 
   credentials: {

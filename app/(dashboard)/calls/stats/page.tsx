@@ -290,10 +290,7 @@ function EmptyStats({ period }: { period: Period }) {
             : 'When your AI line answers calls this month, jobs booked and conversion will show up here automatically.'}
         </p>
         <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-          <Button href="/voice" color="brand">
-            Set up voice
-          </Button>
-          <Button href="/calls" outline>
+          <Button href="/calls" color="brand">
             View call log
           </Button>
         </div>

@@ -1,8 +1,8 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import clsx from 'clsx'
 import { toast } from 'sonner'
 import {
@@ -46,7 +46,9 @@ import {
   priceLabel,
   validityLabel,
 } from '@/components/admin/shared'
-import { PageShell, SkeletonBlock, dashCardClass } from '@/components/dashboard-ui'
+import { PageShell, SkeletonBlock, dashCardClass, settingsTabClass } from '@/components/dashboard-ui'
+import { PromptConfigPanel, type PromptApiAdapter } from '@/components/prompt-config-panel'
+import { VoiceSetupPanel, type VoiceApiAdapter } from '@/components/voice-setup-panel'
 import { api, ApiError } from '@/lib/api'
 import { clearVerificationToken, getVerificationToken } from '@/lib/admin-verification'
 import { useApiData, useApiToken, usePlans } from '@/lib/hooks'
@@ -70,12 +72,66 @@ const QUOTA_BADGE: Record<QuotaState, { label: string; color: 'green' | 'amber' 
   no_plan: { label: 'No plan', color: 'zinc' },
 }
 
+type ClientDetailTab = 'details' | 'prompts' | 'voice'
+
+function parseClientTab(value: string | null): ClientDetailTab {
+  if (value === 'prompts' || value === 'voice') return value
+  return 'details'
+}
+
 export default function AdminClientDetailPage() {
   const params = useParams<{ id: string }>()
   const tenantId = decodeURIComponent(params.id)
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const activeTab = parseClientTab(searchParams.get('tab'))
   const getToken = useApiToken()
   const { data: plans } = usePlans()
+
+  const setActiveTab = useCallback(
+    (tab: ClientDetailTab) => {
+      const next = new URLSearchParams(searchParams.toString())
+      if (tab === 'details') next.delete('tab')
+      else next.set('tab', tab)
+      const qs = next.toString()
+      router.replace(
+        `/admin/clients/${encodeURIComponent(tenantId)}${qs ? `?${qs}` : ''}`,
+        { scroll: false },
+      )
+    },
+    [router, searchParams, tenantId],
+  )
+
+  const promptsApi = useMemo<PromptApiAdapter>(
+    () => ({
+      list: (token) => api.admin.prompts.list(token, tenantId),
+      update: (token, nodeKey, promptText) =>
+        api.admin.prompts.update(token, tenantId, nodeKey, promptText),
+      reset: (token, nodeKey) => api.admin.prompts.reset(token, tenantId, nodeKey),
+      resetAll: (token) => api.admin.prompts.resetAll(token, tenantId),
+    }),
+    [tenantId],
+  )
+
+  const voiceApi = useMemo<VoiceApiAdapter>(
+    () => ({
+      get: (token) => api.admin.voice.get(token, tenantId),
+      update: (token, data) => api.admin.voice.update(token, tenantId, data),
+      sync: (token) => api.admin.voice.sync(token, tenantId),
+      deleteAssistant: (token) => api.admin.voice.deleteAssistant(token, tenantId),
+      listPhoneNumbers: (token) => api.admin.voice.listPhoneNumbers(token, tenantId),
+      createFreeNumber: (token, areaCode, name) =>
+        api.admin.voice.createFreeNumber(token, tenantId, areaCode, name),
+      importTwilioNumber: (token, data) =>
+        api.admin.voice.importTwilioNumber(token, tenantId, data),
+      attachPhoneNumber: (token, phoneId) =>
+        api.admin.voice.attachPhoneNumber(token, tenantId, phoneId),
+      detachPhoneNumber: (token, phoneId) =>
+        api.admin.voice.detachPhoneNumber(token, tenantId, phoneId),
+      listTools: (token) => api.admin.voice.listTools(token, tenantId),
+    }),
+    [tenantId],
+  )
 
   const {
     data: tenant,
@@ -83,6 +139,7 @@ export default function AdminClientDetailPage() {
     error,
     refetch,
   } = useApiData((token) => api.admin.getTenant(token, tenantId), [tenantId])
+
 
   const [confirmStatus, setConfirmStatus] = useState<'activate' | 'suspend' | null>(null)
   const [pendingPlanId, setPendingPlanId] = useState<string | null>(null)
@@ -304,6 +361,45 @@ export default function AdminClientDetailPage() {
         </div>
       </header>
 
+      <div className="rounded-2xl border border-zinc-200/80 bg-white px-4 shadow-sm dark:border-zinc-700/80 dark:bg-zinc-900/80 sm:px-6">
+        <nav
+          className="-mb-px flex gap-6 overflow-x-auto border-b border-zinc-200/80 pt-2 dark:border-zinc-700/80"
+          aria-label="Client detail tabs"
+        >
+          <button
+            type="button"
+            onClick={() => setActiveTab('details')}
+            className={settingsTabClass(activeTab === 'details')}
+          >
+            Details
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('prompts')}
+            className={settingsTabClass(activeTab === 'prompts')}
+          >
+            Message Prompts
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('voice')}
+            className={settingsTabClass(activeTab === 'voice')}
+          >
+            Voice Setting
+          </button>
+        </nav>
+      </div>
+
+      {activeTab === 'prompts' && (
+        <PromptConfigPanel key={`prompts-${tenantId}`} api={promptsApi} />
+      )}
+
+      {activeTab === 'voice' && (
+        <VoiceSetupPanel key={`voice-${tenantId}`} api={voiceApi} />
+      )}
+
+      {activeTab === 'details' && (
+        <>
       <FunnelBlock
         funnel={funnel ?? tenant.funnel}
         period={funnelPeriod}
@@ -644,6 +740,8 @@ export default function AdminClientDetailPage() {
           </Button>
         </div>
       </section>
+        </>
+      )}
 
       {/* Dialogs */}
       <ConfirmActionDialog

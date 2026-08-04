@@ -7,7 +7,6 @@ import {
   Cog6ToothIcon,
   ChartBarSquareIcon,
   PhoneIcon,
-  MicrophoneIcon,
   UsersIcon,
 } from '@heroicons/react/20/solid'
 
@@ -52,7 +51,6 @@ export const mainNavItems: NavItem[] = [
     children: [
       { label: 'Call stats', href: '/calls/stats', icon: ChartBarSquareIcon },
       { label: 'Calls', href: '/calls', icon: PhoneIcon },
-      { label: 'Voice setup', href: '/voice', icon: MicrophoneIcon },
     ],
   },
   { type: 'link', label: 'Accounts', href: '/accounts', icon: LinkIcon },
