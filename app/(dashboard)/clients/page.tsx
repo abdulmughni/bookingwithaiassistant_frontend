@@ -2,13 +2,16 @@
 
 import { Suspense, useCallback, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { MagnifyingGlassIcon } from '@heroicons/react/20/solid'
+import { MagnifyingGlassIcon, PlusIcon } from '@heroicons/react/20/solid'
 import { Button } from '@/components/button'
 import { Card, CardBody } from '@/components/card'
 import { Input, InputGroup } from '@/components/input'
 import { FilterPanel, PageHeader, PageShell } from '@/components/dashboard-ui'
 import { Badge } from '@/components/badge'
 import { ClientDetailsDialog } from '@/components/client-details-dialog'
+import { ClientFormDialog } from '@/components/client-form-dialog'
+import { ClientDeleteDialog } from '@/components/client-delete-dialog'
+import { HoverIconActions } from '@/components/hover-icon-actions'
 import { useApiToken } from '@/lib/hooks'
 import { api } from '@/lib/api'
 import { formatDate } from '@/lib/utils'
@@ -24,6 +27,11 @@ function ClientsPageInner() {
   const [loading, setLoading] = useState(true)
   const [viewMode, setViewMode] = useState<'box' | 'list'>('box')
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null)
+  const [formState, setFormState] = useState<{
+    mode: 'create' | 'edit'
+    client?: Customer | null
+  } | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Customer | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -59,6 +67,11 @@ function ClientsPageInner() {
     router.replace('/clients', { scroll: false })
   }
 
+  const openEdit = (client: Customer) => {
+    setSelectedClientId(null)
+    setFormState({ mode: 'edit', client })
+  }
+
   const runSearch = () => setSearch(q.trim())
 
   return (
@@ -66,7 +79,12 @@ function ClientsPageInner() {
       <PageHeader
         title="Clients"
         description="Your end customers — deduplicated across chat, voice, and Jobber."
-      />
+      >
+        <Button color="brand" onClick={() => setFormState({ mode: 'create' })}>
+          <PlusIcon data-slot="icon" />
+          New client
+        </Button>
+      </PageHeader>
 
       <FilterPanel>
         <div className="min-w-56 flex-1">
@@ -114,9 +132,24 @@ function ClientsPageInner() {
             ))}
           </div>
         ) : customers.length === 0 ? (
-          <Card className="border-dashed">
-            <CardBody className="py-14 text-center text-sm text-zinc-500">
-              No clients yet. They appear here when someone books an appointment.
+          <Card className="border-dashed border-zinc-300 dark:border-zinc-700">
+            <CardBody className="flex flex-col items-center gap-4 py-14 text-center">
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
+                  {search ? 'No clients match your search' : 'No clients yet'}
+                </p>
+                <p className="text-sm text-zinc-500">
+                  {search
+                    ? 'Try a different name, phone, or email.'
+                    : 'Add one manually, or they’ll appear here when someone books.'}
+                </p>
+              </div>
+              {!search ? (
+                <Button color="brand" onClick={() => setFormState({ mode: 'create' })}>
+                  <PlusIcon data-slot="icon" />
+                  New client
+                </Button>
+              ) : null}
             </CardBody>
           </Card>
         ) : (
@@ -135,10 +168,14 @@ function ClientsPageInner() {
                         openClient(c.id)
                       }
                     }}
-                    className="cursor-pointer border border-zinc-200 shadow-sm transition hover:border-brand-300 hover:shadow-md focus-visible:outline-2 focus-visible:outline-blue-500 dark:border-zinc-700 dark:hover:border-brand-600/50"
+                    className="group relative cursor-pointer border border-zinc-200 shadow-sm transition hover:border-brand-300 hover:shadow-md focus-visible:outline-2 focus-visible:outline-blue-500 dark:border-zinc-700 dark:hover:border-brand-600/50"
                   >
+                    <HoverIconActions
+                      onEdit={() => openEdit(c)}
+                      onDelete={() => setDeleteTarget(c)}
+                    />
                     <CardBody className="space-y-3">
-                      <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start justify-between gap-3 pr-10">
                         <div className="min-w-0">
                           <p className="truncate font-semibold text-zinc-950 dark:text-white">
                             {c.display_name}
@@ -182,10 +219,14 @@ function ClientsPageInner() {
                         openClient(c.id)
                       }
                     }}
-                    className="cursor-pointer border border-zinc-200 shadow-sm transition hover:border-brand-300 hover:shadow-md focus-visible:outline-2 focus-visible:outline-blue-500 dark:border-zinc-700 dark:hover:border-brand-600/50"
+                    className="group relative cursor-pointer border border-zinc-200 shadow-sm transition hover:border-brand-300 hover:shadow-md focus-visible:outline-2 focus-visible:outline-blue-500 dark:border-zinc-700 dark:hover:border-brand-600/50"
                   >
+                    <HoverIconActions
+                      onEdit={() => openEdit(c)}
+                      onDelete={() => setDeleteTarget(c)}
+                    />
                     <CardBody className="xl:grid xl:grid-cols-[1.4fr_1.2fr_0.7fr_0.8fr_0.5fr] xl:items-center xl:gap-4">
-                      <div>
+                      <div className="min-w-0 pr-10 xl:pr-0">
                         <p className="font-semibold text-zinc-950 dark:text-white">{c.display_name}</p>
                         <p className="mt-0.5 text-xs text-zinc-500 xl:hidden">
                           {[c.phone, c.email].filter(Boolean).join(' · ') || 'No contact'}
@@ -223,6 +264,26 @@ function ClientsPageInner() {
         clientId={selectedClientId}
         onClose={closeClient}
         onUpdated={() => void load()}
+      />
+
+      <ClientFormDialog
+        open={formState !== null}
+        mode={formState?.mode ?? 'create'}
+        client={formState?.client}
+        onClose={() => setFormState(null)}
+        onSaved={() => void load()}
+      />
+
+      <ClientDeleteDialog
+        open={deleteTarget !== null}
+        client={deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onDeleted={() => {
+          if (deleteTarget && selectedClientId === deleteTarget.id) {
+            closeClient()
+          }
+          void load()
+        }}
       />
     </PageShell>
   )

@@ -9,8 +9,10 @@ import type {
   DateSelectArg,
   DayHeaderContentArg,
   EventClickArg,
+  EventContentArg,
   EventInput,
 } from '@fullcalendar/core'
+import { PencilSquareIcon } from '@heroicons/react/24/outline'
 import clsx from 'clsx'
 import {
   bookingsToEvents,
@@ -41,12 +43,45 @@ function TimeGridDayHeader({ arg }: { arg: DayHeaderContentArg }) {
   )
 }
 
+function BookingEventContent({
+  arg,
+  onEdit,
+}: {
+  arg: EventContentArg
+  onEdit?: (booking: Booking) => void
+}) {
+  const booking = arg.event.extendedProps.booking as Booking | undefined
+
+  return (
+    <div className="bc-event">
+      {arg.timeText ? <div className="bc-event__time">{arg.timeText}</div> : null}
+      <div className="bc-event__title">{arg.event.title}</div>
+      {booking && onEdit ? (
+        <button
+          type="button"
+          className="bc-event__edit"
+          title="Edit booking"
+          aria-label="Edit booking"
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            onEdit(booking)
+          }}
+        >
+          <PencilSquareIcon className="size-3.5" aria-hidden />
+        </button>
+      ) : null}
+    </div>
+  )
+}
+
 export function BookingsCalendar({
   bookings,
   timeZone,
   workingHours,
   durationMinutes,
   onEventClick,
+  onEventEdit,
   onSlotSelect,
   className,
 }: {
@@ -55,6 +90,7 @@ export function BookingsCalendar({
   workingHours: Record<string, unknown> | null | undefined
   durationMinutes: number
   onEventClick: (booking: Booking) => void
+  onEventEdit?: (booking: Booking) => void
   onSlotSelect: (startIsoLocal: string) => void
   className?: string
 }) {
@@ -85,7 +121,7 @@ export function BookingsCalendar({
   return (
     <div
       className={clsx(
-        'bookings-calendar overflow-hidden rounded-2xl border border-zinc-200/80 bg-white shadow-sm ring-1 ring-zinc-950/[0.03] dark:border-zinc-800 dark:bg-zinc-900 dark:ring-white/[0.04]',
+        'bookings-calendar overflow-hidden rounded-2xl border border-zinc-200/80 bg-white shadow-sm ring-1 ring-zinc-950/3 dark:border-zinc-800 dark:bg-zinc-900 dark:ring-white/4',
         className,
       )}
     >
@@ -132,6 +168,7 @@ export function BookingsCalendar({
           minute: '2-digit',
           meridiem: 'short',
         }}
+        eventContent={(arg) => <BookingEventContent arg={arg} onEdit={onEventEdit} />}
         dayHeaderContent={(arg) => {
           if (arg.view.type === 'dayGridMonth') {
             return arg.text

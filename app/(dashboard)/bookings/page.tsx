@@ -20,6 +20,7 @@ import {
 import { BookingDetailsDialog } from '@/components/booking-details-dialog'
 import { BookingFormDialog } from '@/components/booking-form-dialog'
 import { BookingsCalendar } from '@/components/bookings-calendar'
+import { HoverIconActions } from '@/components/hover-icon-actions'
 import { SourceBadge } from '@/components/channel-icon'
 import { useApiData, useApiToken, useTenantTimezone } from '@/lib/hooks'
 import { api } from '@/lib/api'
@@ -295,16 +296,6 @@ function BookingsPageInner() {
         className="text-xs"
         onClick={(e) => {
           stopBubble(e)
-          openEdit(booking)
-        }}
-      >
-        Edit
-      </Button>
-      <Button
-        plain
-        className="text-xs"
-        onClick={(e) => {
-          stopBubble(e)
           openAction(booking, 'complete')
         }}
       >
@@ -497,6 +488,7 @@ function BookingsPageInner() {
             workingHours={tenant?.working_hours}
             durationMinutes={durationMinutes}
             onEventClick={openDetails}
+            onEventEdit={openEdit}
             onSlotSelect={(slot) => openCreate(slot)}
           />
         )
@@ -535,8 +527,9 @@ function BookingsPageInner() {
                             openDetails(booking)
                           }
                         }}
-                        className={`cursor-pointer border shadow-sm transition hover:shadow-md focus-visible:outline-2 focus-visible:outline-blue-500 dark:hover:border-zinc-600 ${cardTone}`}
+                        className={`group relative cursor-pointer border shadow-sm transition hover:shadow-md focus-visible:outline-2 focus-visible:outline-blue-500 dark:hover:border-zinc-600 ${cardTone}`}
                       >
+                        <HoverIconActions onEdit={() => openEdit(booking)} />
                         <CardBody className="space-y-4">
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
@@ -597,20 +590,6 @@ function BookingsPageInner() {
                           {ACTIVE_STATUSES.has(booking.status) && (
                             <div className="flex flex-wrap gap-2">{renderActionButtons(booking)}</div>
                           )}
-                          {!ACTIVE_STATUSES.has(booking.status) && (
-                            <div className="flex flex-wrap gap-2">
-                              <Button
-                                plain
-                                className="text-xs"
-                                onClick={(e) => {
-                                  stopBubble(e)
-                                  openEdit(booking)
-                                }}
-                              >
-                                Edit
-                              </Button>
-                            </div>
-                          )}
 
                           {booking.status_note && (
                             <p className="rounded-md bg-zinc-50 px-3 py-2 text-xs text-zinc-600 italic dark:bg-zinc-800/60 dark:text-zinc-300">
@@ -656,8 +635,9 @@ function BookingsPageInner() {
                             openDetails(booking)
                           }
                         }}
-                        className={`cursor-pointer border shadow-sm transition hover:shadow-md focus-visible:outline-2 focus-visible:outline-blue-500 dark:hover:border-zinc-600 ${rowTone}`}
+                        className={`group relative cursor-pointer border shadow-sm transition hover:shadow-md focus-visible:outline-2 focus-visible:outline-blue-500 dark:hover:border-zinc-600 ${rowTone}`}
                       >
+                        <HoverIconActions onEdit={() => openEdit(booking)} />
                         <CardBody className="p-0">
                           <div className="flex flex-col gap-3 p-4 xl:grid xl:grid-cols-[minmax(8rem,1.35fr)_minmax(7rem,1fr)_minmax(6rem,1fr)_auto_auto_minmax(8rem,1.15fr)_minmax(7rem,auto)] xl:items-center xl:gap-4 xl:p-3">
                             <div className="min-w-0 xl:border-0">
@@ -722,20 +702,7 @@ function BookingsPageInner() {
                               </div>
                             </div>
                             <div className="flex flex-wrap gap-1 border-t border-zinc-100 pt-3 xl:justify-end xl:border-t-0 xl:pt-0 dark:border-zinc-800">
-                              {ACTIVE_STATUSES.has(booking.status) ? (
-                                renderActionButtons(booking)
-                              ) : (
-                                <Button
-                                  plain
-                                  className="text-xs"
-                                  onClick={(e) => {
-                                    stopBubble(e)
-                                    openEdit(booking)
-                                  }}
-                                >
-                                  Edit
-                                </Button>
-                              )}
+                              {ACTIVE_STATUSES.has(booking.status) && renderActionButtons(booking)}
                             </div>
                           </div>
                         </CardBody>

@@ -259,6 +259,21 @@ export const api = {
       request<import('./types').CustomerDetail>(`/api/customers/${encodeURIComponent(id)}`, {
         token,
       }),
+    create: (
+      token: string,
+      body: {
+        display_name: string
+        phone?: string | null
+        email?: string | null
+        primary_address?: string | null
+        notes?: string | null
+      },
+    ) =>
+      request<import('./types').Customer>('/api/customers', {
+        token,
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
     update: (
       token: string,
       id: string,
@@ -273,6 +288,11 @@ export const api = {
         token,
         method: 'PATCH',
         body: JSON.stringify(body),
+      }),
+    delete: (token: string, id: string) =>
+      request<null>(`/api/customers/${encodeURIComponent(id)}`, {
+        token,
+        method: 'DELETE',
       }),
   },
 
