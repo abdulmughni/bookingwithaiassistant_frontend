@@ -263,7 +263,10 @@ function ClientsPageInner() {
         open={Boolean(selectedClientId)}
         clientId={selectedClientId}
         onClose={closeClient}
-        onUpdated={() => void load()}
+        onEdit={(client) => {
+          setSelectedClientId(null)
+          setFormState({ mode: 'edit', client })
+        }}
       />
 
       <ClientFormDialog

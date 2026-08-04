@@ -1,39 +1,62 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import {
+  EnvelopeIcon,
+  MapPinIcon,
+  PencilSquareIcon,
+  PhoneIcon,
+  UserCircleIcon,
+} from '@heroicons/react/24/outline'
 import { Dialog, DialogTitle } from '@/components/dialog'
 import { Button } from '@/components/button'
-import { Input } from '@/components/input'
 import { Badge } from '@/components/badge'
 import { SourceBadge } from '@/components/channel-icon'
 import { useApiToken } from '@/lib/hooks'
-import { api, ApiError } from '@/lib/api'
-import { notifyError, notifySuccess } from '@/lib/notify'
+import { api } from '@/lib/api'
 import { formatDate, formatDateTime } from '@/lib/utils'
-import type { CustomerDetail } from '@/lib/types'
+import type { Customer, CustomerDetail } from '@/lib/types'
+
+function DetailRow({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: typeof PhoneIcon
+  label: string
+  value: string
+}) {
+  return (
+    <div className="flex gap-3 rounded-xl border border-zinc-200/80 bg-white px-3.5 py-3 dark:border-zinc-800 dark:bg-zinc-950/40">
+      <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-zinc-50 text-zinc-500 ring-1 ring-zinc-950/5 dark:bg-zinc-800/80 dark:text-zinc-400 dark:ring-white/5">
+        <Icon className="size-4" aria-hidden />
+      </div>
+      <div className="min-w-0">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+          {label}
+        </p>
+        <p className="mt-0.5 wrap-break-word text-sm font-medium text-zinc-900 dark:text-zinc-100">
+          {value}
+        </p>
+      </div>
+    </div>
+  )
+}
 
 export function ClientDetailsDialog({
   open,
   clientId,
   onClose,
-  onUpdated,
+  onEdit,
 }: {
   open: boolean
   clientId: string | null
   onClose: () => void
-  onUpdated?: () => void
+  onEdit?: (client: Customer) => void
 }) {
   const getToken = useApiToken()
   const [data, setData] = useState<CustomerDetail | null>(null)
   const [loading, setLoading] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState({
-    display_name: '',
-    phone: '',
-    email: '',
-    primary_address: '',
-    notes: '',
-  })
 
   const load = useCallback(async () => {
     const id = (clientId || '').trim()
@@ -46,13 +69,6 @@ export function ClientDetailsDialog({
       const token = await getToken()
       const row = await api.customers.get(token, id)
       setData(row)
-      setForm({
-        display_name: row.display_name,
-        phone: row.phone ?? '',
-        email: row.email ?? '',
-        primary_address: row.primary_address ?? '',
-        notes: row.notes ?? '',
-      })
     } catch {
       setData(null)
     } finally {
@@ -68,36 +84,22 @@ export function ClientDetailsDialog({
     void load()
   }, [open, clientId, load])
 
-  const handleSave = async () => {
-    const id = (clientId || '').trim()
-    if (!id) return
-    setSaving(true)
-    try {
-      const token = await getToken()
-      await api.customers.update(token, id, {
-        display_name: form.display_name,
-        phone: form.phone || null,
-        email: form.email || null,
-        primary_address: form.primary_address || null,
-        notes: form.notes || null,
-      })
-      notifySuccess('Client updated.')
-      await load()
-      onUpdated?.()
-    } catch (e) {
-      notifyError(e instanceof ApiError ? e.message : 'Could not save client')
-    } finally {
-      setSaving(false)
-    }
-  }
-
   return (
     <Dialog open={open} onClose={onClose} size="3xl">
       <div className="flex items-start justify-between gap-4">
-        <DialogTitle className="text-lg font-semibold text-zinc-950 dark:text-white">
-          {loading && !data ? 'Loading client…' : data?.display_name || 'Client'}
-        </DialogTitle>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="min-w-0">
+          <DialogTitle className="text-lg font-semibold text-zinc-950 dark:text-white">
+            {loading && !data ? 'Loading client…' : data?.display_name || 'Client'}
+          </DialogTitle>
+          {data ? (
+            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+              Last seen {data.last_seen_at ? formatDate(data.last_seen_at) : '—'}
+              {' · '}
+              Updated {formatDate(data.updated_at)}
+            </p>
+          ) : null}
+        </div>
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
           {data?.jobber_client_id ? <Badge color="lime">Jobber</Badge> : null}
           {data ? (
             <Badge color="zinc">
@@ -116,51 +118,44 @@ export function ClientDetailsDialog({
         <p className="mt-6 text-sm text-zinc-500">Client not found.</p>
       ) : (
         <div className="mt-6 grid gap-6 lg:grid-cols-2">
-          <section className="space-y-4 rounded-xl border border-zinc-200 bg-zinc-50/60 p-4 dark:border-white/10 dark:bg-zinc-900/40">
-            <h2 className="text-sm font-semibold text-zinc-900 dark:text-white">Contact</h2>
-            <label className="block text-xs text-zinc-500">
-              Name
-              <Input
-                className="mt-1"
-                value={form.display_name}
-                onChange={(e) => setForm((f) => ({ ...f, display_name: e.target.value }))}
-              />
-            </label>
-            <label className="block text-xs text-zinc-500">
-              Phone
-              <Input
-                className="mt-1"
-                value={form.phone}
-                onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-              />
-            </label>
-            <label className="block text-xs text-zinc-500">
-              Email
-              <Input
-                className="mt-1"
-                value={form.email}
-                onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-              />
-            </label>
-            <label className="block text-xs text-zinc-500">
-              Address
-              <Input
-                className="mt-1"
-                value={form.primary_address}
-                onChange={(e) => setForm((f) => ({ ...f, primary_address: e.target.value }))}
-              />
-            </label>
-            <label className="block text-xs text-zinc-500">
-              Notes
-              <Input
-                className="mt-1"
-                value={form.notes}
-                onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-              />
-            </label>
-            <Button color="brand" disabled={saving} onClick={() => void handleSave()}>
-              {saving ? 'Saving…' : 'Save changes'}
-            </Button>
+          <section className="space-y-3 rounded-xl border border-zinc-200 bg-zinc-50/60 p-4 dark:border-white/10 dark:bg-zinc-900/40">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-sm font-semibold text-zinc-900 dark:text-white">Contact</h2>
+              {onEdit ? (
+                <Button
+                  plain
+                  className="text-xs"
+                  onClick={() => {
+                    onEdit(data)
+                  }}
+                >
+                  <PencilSquareIcon data-slot="icon" className="size-4" />
+                  Edit
+                </Button>
+              ) : null}
+            </div>
+            <DetailRow
+              icon={UserCircleIcon}
+              label="Name"
+              value={data.display_name || '—'}
+            />
+            <DetailRow icon={PhoneIcon} label="Phone" value={data.phone || '—'} />
+            <DetailRow icon={EnvelopeIcon} label="Email" value={data.email || '—'} />
+            <DetailRow
+              icon={MapPinIcon}
+              label="Address"
+              value={data.primary_address || '—'}
+            />
+            {data.notes ? (
+              <div className="rounded-xl border border-zinc-200/80 bg-white px-3.5 py-3 dark:border-zinc-800 dark:bg-zinc-950/40">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                  Notes
+                </p>
+                <p className="mt-1 whitespace-pre-wrap text-sm text-zinc-800 dark:text-zinc-200">
+                  {data.notes}
+                </p>
+              </div>
+            ) : null}
           </section>
 
           <div className="space-y-6">
@@ -215,7 +210,18 @@ export function ClientDetailsDialog({
         </div>
       )}
 
-      <div className="mt-6 flex justify-end">
+      <div className="mt-6 flex flex-wrap justify-end gap-2">
+        {data && onEdit ? (
+          <Button
+            outline
+            onClick={() => {
+              onEdit(data)
+            }}
+          >
+            <PencilSquareIcon data-slot="icon" className="size-4" />
+            Edit client
+          </Button>
+        ) : null}
         <Button plain onClick={onClose}>
           Close
         </Button>
