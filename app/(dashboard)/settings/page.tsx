@@ -8,7 +8,6 @@ import { Divider } from '@/components/divider'
 import { Text } from '@/components/text'
 import { Input } from '@/components/input'
 import { Select } from '@/components/select'
-import { Textarea } from '@/components/textarea'
 import { Field, FieldGroup, Label, Description } from '@/components/fieldset'
 import { TagInput } from '@/components/tag-input'
 import { WorkingHoursEditor } from '@/components/working-hours-editor'
@@ -16,7 +15,6 @@ import { useApiData, useApiToken } from '@/lib/hooks'
 import { ApiError, api } from '@/lib/api'
 import { notifyError, notifySuccess } from '@/lib/notify'
 import type { Credential, Tenant, TimezoneChoice } from '@/lib/types'
-import { buildTenantPricesPayload, normalizeTenantPrices } from '@/lib/pricing'
 import { DocumentsTab } from './documents-tab'
 import { ReadOnlyBanner, useReadOnlyAccount } from '@/components/account-status-gate'
 
@@ -66,7 +64,6 @@ type TenantFormSnapshot = {
   crm_type: string
   confidence_threshold: number
   max_turns: number
-  prices: ReturnType<typeof normalizeTenantPrices>
 }
 
 function resolveIndustryType(raw: string): string {
@@ -138,7 +135,6 @@ function snapshotFromTenant(
     crm_type: allowedCrmValues.has(wantCrm) ? wantCrm : 'none',
     confidence_threshold: Number(tenant.confidence_threshold ?? 0.75),
     max_turns: Number(tenant.max_turns ?? 12),
-    prices: normalizeTenantPrices(tenant.prices),
   }
 }
 
@@ -184,11 +180,6 @@ function TenantConfigTab({
 
   const [confidenceThreshold, setConfidenceThreshold] = useState('0.75')
   const [maxTurns, setMaxTurns] = useState('12')
-
-  const [diagnosticVisitPrice, setDiagnosticVisitPrice] = useState('89')
-  const [standardHourlyRate, setStandardHourlyRate] = useState('120')
-  const [defaultVisitPrice, setDefaultVisitPrice] = useState('89')
-  const [servicePrices, setServicePrices] = useState<Record<string, string>>({})
 
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -258,14 +249,6 @@ function TenantConfigTab({
       crm_type: crmType || 'none',
       confidence_threshold: Number.isNaN(ct) ? baseline.confidence_threshold : ct,
       max_turns: Number.isNaN(mt) ? baseline.max_turns : mt,
-      prices: buildTenantPricesPayload(
-        {
-          diagnostic_visit: Number.parseFloat(diagnosticVisitPrice),
-          standard_hourly_rate: Number.parseFloat(standardHourlyRate),
-          default_visit: Number.parseFloat(defaultVisitPrice),
-        },
-        servicePrices,
-      ),
     }
   }, [
     name,
@@ -289,10 +272,6 @@ function TenantConfigTab({
     crmType,
     confidenceThreshold,
     maxTurns,
-    diagnosticVisitPrice,
-    standardHourlyRate,
-    defaultVisitPrice,
-    servicePrices,
     baseline,
   ])
 
@@ -325,26 +304,7 @@ function TenantConfigTab({
     setCrmType(snap.crm_type)
     setConfidenceThreshold(String(snap.confidence_threshold))
     setMaxTurns(String(snap.max_turns))
-    setDiagnosticVisitPrice(String(snap.prices.defaults.diagnostic_visit))
-    setStandardHourlyRate(String(snap.prices.defaults.standard_hourly_rate))
-    setDefaultVisitPrice(String(snap.prices.defaults.default_visit))
-    const nextServicePrices: Record<string, string> = {}
-    for (const svc of snap.service_types) {
-      const amount = snap.prices.services[svc]
-      nextServicePrices[svc] = amount !== undefined ? String(amount) : ''
-    }
-    setServicePrices(nextServicePrices)
   }, [tenant, allowedCrmValues])
-
-  useEffect(() => {
-    setServicePrices((prev) => {
-      const next: Record<string, string> = {}
-      for (const svc of serviceTypes) {
-        next[svc] = prev[svc] ?? ''
-      }
-      return next
-    })
-  }, [serviceTypes])
 
   // Load the curated IANA list once. The dropdown is the only way to set the
   // tenant timezone — values saved on the tenant are pure IANA strings.
@@ -390,22 +350,6 @@ function TenantConfigTab({
     const mt = parseInt(maxTurns, 10)
     if (Number.isNaN(ct) || ct < 0 || ct > 1) { notifyError('Confidence threshold must be between 0 and 1'); return }
     if (Number.isNaN(mt) || mt < 1) { notifyError('Max turns must be at least 1'); return }
-    const pricesPayload = buildTenantPricesPayload(
-      {
-        diagnostic_visit: Number.parseFloat(diagnosticVisitPrice),
-        standard_hourly_rate: Number.parseFloat(standardHourlyRate),
-        default_visit: Number.parseFloat(defaultVisitPrice),
-      },
-      servicePrices,
-    )
-    if (
-      pricesPayload.defaults.diagnostic_visit <= 0 ||
-      pricesPayload.defaults.standard_hourly_rate <= 0 ||
-      pricesPayload.defaults.default_visit <= 0
-    ) {
-      notifyError('Default pricing amounts must be greater than zero')
-      return
-    }
 
     setSaving(true)
     setSaved(false)
@@ -444,7 +388,6 @@ function TenantConfigTab({
         crm_type: crmType || 'none',
         confidence_threshold: ct,
         max_turns: mt,
-        prices: pricesPayload,
       })
       notifySuccess('Settings saved')
       setSaved(true)
@@ -553,60 +496,6 @@ function TenantConfigTab({
           <Field><TagInput label="Service areas (cities/regions)" description="Towns and neighborhoods you cover. Also add common short forms as separate entries (e.g. BK, NYC)." value={serviceAreas} onChange={setServiceAreas} placeholder="Austin" /></Field>
           <Field><TagInput label="Service area ZIP codes" value={serviceAreaZips} onChange={setServiceAreaZips} placeholder="78701" /></Field>
           <Field><TagInput label="Accepted payment methods" description="Shown to customers when they ask 'how can I pay?'. Press comma or Enter to add each method." value={paymentMethods} onChange={setPaymentMethods} placeholder="Cash, Bank transfer, Zelle" /></Field>
-        </FieldGroup>
-      </section>
-
-      <Divider />
-
-      <section>
-        <Subheading>Service pricing</Subheading>
-        <Text className="mt-2 text-sm text-zinc-500">
-          Used by the AI when customers ask about cost, and sent to Jobber as a line item when a booking is created.
-          RAG pricing documents can still add more detail in chat.
-        </Text>
-        <FieldGroup className="mt-4">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <Field>
-              <Label>Diagnostic visit ($)</Label>
-              <Description>Flat fee for diagnostic / inspection visits.</Description>
-              <Input type="number" min={1} step="0.01" value={diagnosticVisitPrice} onChange={(e) => setDiagnosticVisitPrice(e.target.value)} />
-            </Field>
-            <Field>
-              <Label>Standard hourly rate ($)</Label>
-              <Description>Quoted repair rate per hour in conversations.</Description>
-              <Input type="number" min={1} step="0.01" value={standardHourlyRate} onChange={(e) => setStandardHourlyRate(e.target.value)} />
-            </Field>
-            <Field>
-              <Label>Default visit price ($)</Label>
-              <Description>Fallback Jobber line-item price when a service has no specific price.</Description>
-              <Input type="number" min={1} step="0.01" value={defaultVisitPrice} onChange={(e) => setDefaultVisitPrice(e.target.value)} />
-            </Field>
-          </div>
-          {serviceTypes.length > 0 ? (
-            <Field>
-              <Label>Price per service type ($)</Label>
-              <Description>Optional — overrides the default visit price for Jobber line items.</Description>
-              <div className="mt-2 space-y-2">
-                {serviceTypes.map((svc) => (
-                  <div key={svc} className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_8rem] sm:items-center">
-                    <Text className="text-sm text-zinc-700 dark:text-zinc-300">{svc}</Text>
-                    <Input
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      placeholder="Optional"
-                      value={servicePrices[svc] ?? ''}
-                      onChange={(e) =>
-                        setServicePrices((prev) => ({ ...prev, [svc]: e.target.value }))
-                      }
-                    />
-                  </div>
-                ))}
-              </div>
-            </Field>
-          ) : (
-            <Text className="text-sm text-zinc-500">Add service types above to set per-service prices.</Text>
-          )}
         </FieldGroup>
       </section>
 
