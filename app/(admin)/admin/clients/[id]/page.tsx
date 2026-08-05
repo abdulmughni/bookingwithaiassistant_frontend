@@ -48,6 +48,7 @@ import {
 } from '@/components/admin/shared'
 import { PageShell, SkeletonBlock, dashCardClass, settingsTabClass } from '@/components/dashboard-ui'
 import { PromptConfigPanel, type PromptApiAdapter } from '@/components/prompt-config-panel'
+import { CostPolicyPicker } from '@/components/cost-policy-picker'
 import { VoiceSetupPanel, type VoiceApiAdapter } from '@/components/voice-setup-panel'
 import { api, ApiError } from '@/lib/api'
 import { clearVerificationToken, getVerificationToken } from '@/lib/admin-verification'
@@ -157,6 +158,41 @@ export default function AdminClientDetailPage() {
   const [deleting, setDeleting] = useState(false)
   const [funnelPeriod, setFunnelPeriod] = useState<'week' | 'month' | 'all'>('month')
   const [funnel, setFunnel] = useState<AdminFunnel | null>(null)
+  const [waiveDiagnosticFee, setWaiveDiagnosticFee] = useState(true)
+  const [servesCommercial, setServesCommercial] = useState(false)
+  const [savingCostPolicy, setSavingCostPolicy] = useState(false)
+
+  useEffect(() => {
+    if (!tenant) return
+    setWaiveDiagnosticFee(tenant.waive_diagnostic_fee !== false)
+    setServesCommercial(Boolean(tenant.serves_commercial))
+  }, [tenant])
+
+  const costPolicyDirty = useMemo(() => {
+    if (!tenant) return false
+    const baselineWaive = tenant.waive_diagnostic_fee !== false
+    const baselineCommercial = Boolean(tenant.serves_commercial)
+    return (
+      waiveDiagnosticFee !== baselineWaive || servesCommercial !== baselineCommercial
+    )
+  }, [tenant, waiveDiagnosticFee, servesCommercial])
+
+  const saveCostPolicy = useCallback(async () => {
+    setSavingCostPolicy(true)
+    try {
+      const token = await getToken()
+      await api.admin.updateTenantCostPolicy(token, tenantId, {
+        waive_diagnostic_fee: waiveDiagnosticFee,
+        serves_commercial: servesCommercial,
+      })
+      toast.success('Cost policy saved')
+      await refetch()
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Failed to save cost policy')
+    } finally {
+      setSavingCostPolicy(false)
+    }
+  }, [getToken, tenantId, waiveDiagnosticFee, servesCommercial, refetch])
 
   const loadFunnel = useCallback(async () => {
     try {
@@ -449,6 +485,39 @@ export default function AdminClientDetailPage() {
           </ul>
         </section>
       )}
+
+      <section className={`${dashCardClass} p-5`}>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold text-zinc-950 dark:text-white">Cost policy</h2>
+            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+              What the booking assistant injects as fee guidance. Full policy text is shown under
+              each option so you can see exact AI behavior.
+            </p>
+          </div>
+          <Button
+            type="button"
+            color="dark"
+            disabled={!costPolicyDirty || savingCostPolicy}
+            onClick={() => void saveCostPolicy()}
+          >
+            {savingCostPolicy ? 'Saving…' : 'Save'}
+          </Button>
+        </div>
+        <div className="mt-4">
+          <CostPolicyPicker
+            showPolicyText
+            value={{
+              waive_diagnostic_fee: waiveDiagnosticFee,
+              serves_commercial: servesCommercial,
+            }}
+            onChange={(next) => {
+              setWaiveDiagnosticFee(next.waive_diagnostic_fee)
+              setServesCommercial(next.serves_commercial)
+            }}
+          />
+        </div>
+      </section>
 
       <div className="grid items-start gap-6 lg:grid-cols-3">
         {/* Plan + credits — primary column */}

@@ -27,6 +27,10 @@ export interface Tenant {
   overtime_surcharge: string
   /** Accepted payment methods (e.g. "Cash", "Bank transfer"). */
   payment_methods: string[]
+  /** Cost policy: waive diagnostic fee when repair approved (default true). */
+  waive_diagnostic_fee: boolean
+  /** Cost policy: also serve commercial / multi-unit (appends estimate line). */
+  serves_commercial: boolean
   technical_playbooks: unknown[]
   intent_keywords: Record<string, unknown>
   tone_keywords: Record<string, unknown>
@@ -787,6 +791,8 @@ export interface AdminTenantDetail extends AdminTenant {
   } | null
   open_alerts?: AdminAlert[]
   channel_accounts?: AdminChannelAccountRow[]
+  waive_diagnostic_fee?: boolean
+  serves_commercial?: boolean
 }
 
 /** Result of POST /api/admin/tenants/{id}/client-login (one-time credentials). */

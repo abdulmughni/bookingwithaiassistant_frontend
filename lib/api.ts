@@ -553,6 +553,15 @@ export const api = {
         `/api/admin/tenants/${encodeURIComponent(tenantId)}/channels/ai`,
         { token, method: 'PATCH', body: JSON.stringify(data) },
       ),
+    updateTenantCostPolicy: (
+      token: string,
+      tenantId: string,
+      data: { waive_diagnostic_fee?: boolean; serves_commercial?: boolean },
+    ) =>
+      request<{ waive_diagnostic_fee: boolean; serves_commercial: boolean }>(
+        `/api/admin/tenants/${encodeURIComponent(tenantId)}/cost-policy`,
+        { token, method: 'PATCH', body: JSON.stringify(data) },
+      ),
     verifyIdentity: (token: string, password: string) =>
       request<import('./types').VerifyIdentityResult>('/api/admin/verify-identity', {
         token,

@@ -17,6 +17,7 @@ import { notifyError, notifySuccess } from '@/lib/notify'
 import type { Credential, Tenant, TimezoneChoice } from '@/lib/types'
 import { DocumentsTab } from './documents-tab'
 import { ReadOnlyBanner, useReadOnlyAccount } from '@/components/account-status-gate'
+import { CostPolicyPicker } from '@/components/cost-policy-picker'
 
 /**
  * Disables every form control inside (native fieldset semantics) and blocks
@@ -53,6 +54,8 @@ type TenantFormSnapshot = {
   service_areas: string[]
   service_area_zips: string[]
   payment_methods: string[]
+  waive_diagnostic_fee: boolean
+  serves_commercial: boolean
   timezone: string
   working_hours: Record<string, unknown>
   booking_buffers: {
@@ -119,6 +122,8 @@ function snapshotFromTenant(
     service_areas: [...(tenant.service_areas || [])],
     service_area_zips: [...(tenant.service_area_zips || [])],
     payment_methods: [...(tenant.payment_methods || [])],
+    waive_diagnostic_fee: tenant.waive_diagnostic_fee !== false,
+    serves_commercial: Boolean(tenant.serves_commercial),
     timezone: tenant.timezone || 'UTC',
     working_hours: { ...(tenant.working_hours || {}) },
     booking_buffers: {
@@ -165,6 +170,8 @@ function TenantConfigTab({
   const [serviceAreas, setServiceAreas] = useState<string[]>([])
   const [serviceAreaZips, setServiceAreaZips] = useState<string[]>([])
   const [paymentMethods, setPaymentMethods] = useState<string[]>([])
+  const [waiveDiagnosticFee, setWaiveDiagnosticFee] = useState(true)
+  const [servesCommercial, setServesCommercial] = useState(false)
 
   const [timezone, setTimezone] = useState<string>('UTC')
   const [timezoneChoices, setTimezoneChoices] = useState<TimezoneChoice[]>([])
@@ -233,6 +240,8 @@ function TenantConfigTab({
       service_areas: serviceAreas,
       service_area_zips: serviceAreaZips,
       payment_methods: paymentMethods,
+      waive_diagnostic_fee: waiveDiagnosticFee,
+      serves_commercial: servesCommercial,
       timezone: timezone.trim() || 'UTC',
       working_hours: workingHours,
       booking_buffers: {
@@ -262,6 +271,8 @@ function TenantConfigTab({
     serviceAreas,
     serviceAreaZips,
     paymentMethods,
+    waiveDiagnosticFee,
+    servesCommercial,
     timezone,
     workingHours,
     minBookingMinutes,
@@ -294,6 +305,8 @@ function TenantConfigTab({
     setServiceAreas([...snap.service_areas])
     setServiceAreaZips([...snap.service_area_zips])
     setPaymentMethods([...snap.payment_methods])
+    setWaiveDiagnosticFee(snap.waive_diagnostic_fee)
+    setServesCommercial(snap.serves_commercial)
     setTimezone(snap.timezone)
     setWorkingHours({ ...snap.working_hours })
     setMinBookingMinutes(String(snap.booking_buffers.minimum_minutes))
@@ -377,6 +390,8 @@ function TenantConfigTab({
         service_areas: serviceAreas,
         service_area_zips: serviceAreaZips,
         payment_methods: paymentMethods,
+        waive_diagnostic_fee: waiveDiagnosticFee,
+        serves_commercial: servesCommercial,
         timezone: timezone.trim() || 'UTC',
         working_hours: workingHours as Record<string, unknown>,
         booking_buffers: {
@@ -483,6 +498,28 @@ function TenantConfigTab({
             </Field>
           ) : null}
         </FieldGroup>
+      </section>
+
+      <Divider />
+
+      <section>
+        <Subheading>Cost policy</Subheading>
+        <Text className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+          Controls how the booking assistant explains fees before confirmation. Pick one fee rule;
+          optionally add commercial work.
+        </Text>
+        <div className="mt-4">
+          <CostPolicyPicker
+            value={{
+              waive_diagnostic_fee: waiveDiagnosticFee,
+              serves_commercial: servesCommercial,
+            }}
+            onChange={(next) => {
+              setWaiveDiagnosticFee(next.waive_diagnostic_fee)
+              setServesCommercial(next.serves_commercial)
+            }}
+          />
+        </div>
       </section>
 
       <Divider />
