@@ -259,6 +259,7 @@ export interface Notification {
   id: string
   type: string
   booking_id: string | null
+  conversation_id?: string | null
   title: string
   body: string
   is_read: boolean
@@ -303,6 +304,14 @@ export interface BookingCreatedEvent {
   notification?: Notification
 }
 
+export interface EmergencyReportedEvent {
+  type: 'emergency.reported'
+  conversation_id: string
+  reason?: string
+  hazard?: string | null
+  notification?: Notification
+}
+
 /** Control frames the socket also emits (ignored by feature code). */
 export interface RealtimeControlEvent {
   type: 'connected' | 'ping'
@@ -313,6 +322,7 @@ export type RealtimeEvent =
   | MessageCreatedEvent
   | MessageDeletedEvent
   | BookingCreatedEvent
+  | EmergencyReportedEvent
   | RealtimeControlEvent
 
 export interface Credential {

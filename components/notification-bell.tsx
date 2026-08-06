@@ -27,8 +27,12 @@ export function NotificationBell({ className }: { className?: string }) {
   const handleOpen = (notif: Notification, close: () => void) => {
     void markRead(notif.id)
     close()
-    if (notif.booking_id) {
+    if (notif.type === 'emergency.reported' && notif.conversation_id) {
+      router.push(`/conversations?id=${encodeURIComponent(notif.conversation_id)}`)
+    } else if (notif.booking_id) {
       router.push(`/bookings?booking=${encodeURIComponent(notif.booking_id)}`)
+    } else if (notif.conversation_id) {
+      router.push(`/conversations?id=${encodeURIComponent(notif.conversation_id)}`)
     } else {
       router.push('/bookings')
     }
