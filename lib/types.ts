@@ -340,6 +340,8 @@ export interface PromptConfig {
   label: string
   description: string
   prompt_text: string
+  /** Code default from PROMPT_DEFAULTS — used by Reset even when viewing a custom override. */
+  default_prompt_text: string
   is_custom: boolean
   updated_at: string | null
 }

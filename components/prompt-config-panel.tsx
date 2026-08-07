@@ -52,14 +52,24 @@ export function PromptConfigPanel({ api: promptsApi }: { api: PromptApiAdapter }
     }
   }
 
-  const handleReset = async (nodeKey: string) => {
+  const handleReset = async (prompt: PromptConfig) => {
+    const nodeKey = prompt.node_key
+    const defaultText = prompt.default_prompt_text ?? prompt.prompt_text
     setResettingKey(nodeKey)
     try {
-      const token = await getToken()
-      const result = await promptsApi.reset(token, nodeKey)
-      setDrafts((prev) => ({ ...prev, [nodeKey]: result.prompt_text }))
-      notifySuccess(`Prompt "${nodeKey}" reset to default`)
-      refetch()
+      if (prompt.is_custom) {
+        const token = await getToken()
+        const result = await promptsApi.reset(token, nodeKey)
+        setDrafts((prev) => ({
+          ...prev,
+          [nodeKey]: result.default_prompt_text ?? result.prompt_text,
+        }))
+        notifySuccess(`Prompt "${nodeKey}" reset to default`)
+        refetch()
+      } else {
+        setDrafts((prev) => ({ ...prev, [nodeKey]: defaultText }))
+        notifySuccess(`Prompt "${nodeKey}" restored to default`)
+      }
     } catch (e) {
       notifyError(e instanceof ApiError ? e.message : 'Could not reset prompt')
     } finally {
@@ -119,10 +129,13 @@ export function PromptConfigPanel({ api: promptsApi }: { api: PromptApiAdapter }
       </div>
 
       {prompts.map((prompt) => {
+        const defaultText = prompt.default_prompt_text ?? prompt.prompt_text
         const draft = drafts[prompt.node_key] ?? prompt.prompt_text
         const isModified = draft !== prompt.prompt_text
+        const isAtDefault = draft === defaultText && !prompt.is_custom
         const isSaving = savingKey === prompt.node_key
         const isResetting = resettingKey === prompt.node_key
+        const canReset = prompt.is_custom || draft !== defaultText
 
         return (
           <div
@@ -151,6 +164,15 @@ export function PromptConfigPanel({ api: promptsApi }: { api: PromptApiAdapter }
                   </code>
                 </p>
               </div>
+              <Button
+                type="button"
+                color="zinc"
+                onClick={() => handleReset(prompt)}
+                disabled={isResetting || !canReset}
+                className="shrink-0"
+              >
+                {isResetting ? 'Resetting...' : 'Reset'}
+              </Button>
             </div>
 
             <Textarea
@@ -167,20 +189,10 @@ export function PromptConfigPanel({ api: promptsApi }: { api: PromptApiAdapter }
               <Button
                 type="button"
                 onClick={() => handleSave(prompt.node_key)}
-                disabled={isSaving || (!isModified && !prompt.is_custom && draft === prompt.prompt_text)}
+                disabled={isSaving || (!isModified && !prompt.is_custom && isAtDefault)}
               >
                 {isSaving ? 'Saving...' : 'Save prompt'}
               </Button>
-              {prompt.is_custom && (
-                <Button
-                  type="button"
-                  color="zinc"
-                  onClick={() => handleReset(prompt.node_key)}
-                  disabled={isResetting}
-                >
-                  {isResetting ? 'Resetting...' : 'Revert to default'}
-                </Button>
-              )}
               {isModified && (
                 <span className="text-xs text-amber-600 dark:text-amber-400">Unsaved changes</span>
               )}
