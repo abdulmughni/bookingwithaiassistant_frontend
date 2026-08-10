@@ -32,10 +32,9 @@ const channelAccent: Record<string, string> = {
   web: 'border-l-zinc-400',
 }
 
-const destinationIconFrame: Record<'facebook' | 'instagram' | 'whatsapp', string> = {
+const destinationIconFrame: Record<'facebook' | 'instagram', string> = {
   facebook: 'border-sky-200 bg-sky-50 dark:border-sky-700/80 dark:bg-sky-950/50',
   instagram: 'border-fuchsia-200 bg-fuchsia-50 dark:border-fuchsia-700/80 dark:bg-fuchsia-950/50',
-  whatsapp: 'border-emerald-200 bg-emerald-50 dark:border-emerald-700/80 dark:bg-emerald-950/50',
 }
 
 function DestinationConnectCard({
@@ -47,7 +46,7 @@ function DestinationConnectCard({
   onClick,
   disabled,
 }: {
-  channel: 'facebook' | 'instagram' | 'whatsapp'
+  channel: 'facebook' | 'instagram'
   title: string
   description: string
   actionLabel: string
@@ -207,7 +206,7 @@ function AccountsPageInner() {
   const searchParams = useSearchParams()
   const [showConnect, setShowConnect] = useState(false)
   const [connectMode, setConnectMode] = useState<'destination' | 'manual'>('destination')
-  const [newChannel, setNewChannel] = useState('whatsapp')
+  const [newChannel, setNewChannel] = useState('facebook')
   const [newAccountId, setNewAccountId] = useState('')
   const [newLabel, setNewLabel] = useState('')
   const [newVerifyToken, setNewVerifyToken] = useState('')
@@ -224,9 +223,8 @@ function AccountsPageInner() {
 
   useEffect(() => {
     const fb = searchParams.get('fb_oauth')
-    const wa = searchParams.get('wa_oauth')
     const ig = searchParams.get('ig_oauth')
-    if (!fb && !wa && !ig) return
+    if (!fb && !ig) return
     const msg = searchParams.get('message')
     const formatMetaSuccess = () => {
       const pages = Number(searchParams.get('pages') || '0')
@@ -245,15 +243,6 @@ function AccountsPageInner() {
       notifyError(msg || 'Facebook connection failed.')
     } else if (ig === 'error') {
       notifyError(msg || 'Instagram connection failed.')
-    }
-    if (wa === 'success') {
-      const n = searchParams.get('numbers')
-      notifySuccess(
-        n ? `WhatsApp connected — ${n} number(s) added.` : 'WhatsApp connected successfully.',
-      )
-      refetch()
-    } else if (wa === 'error') {
-      notifyError(msg || 'WhatsApp connection failed.')
     }
     router.replace('/accounts')
   }, [searchParams, router, refetch])
@@ -277,32 +266,12 @@ function AccountsPageInner() {
     }
   }
 
-  const handleWhatsAppOAuth = async () => {
-    setOauthLoading(true)
-    try {
-      const token = await getFreshToken()
-      if (!token) {
-        notifyError('Select a workspace (organization) before connecting WhatsApp.')
-        setOauthLoading(false)
-        return
-      }
-      const { authorization_url } = await api.oauth.whatsappStart(token)
-      window.location.assign(authorization_url)
-    } catch (e) {
-      notifyError(e instanceof ApiError ? e.message : 'Could not start WhatsApp connection')
-      setOauthLoading(false)
-    }
-  }
-
   const handleCreate = async () => {
     setSaving(true)
     try {
       const token = await getToken()
       const meta: Record<string, unknown> = {}
-      if (newChannel === 'whatsapp') {
-        meta.phone_number_id = newAccountId
-        if (newAccessToken.trim()) meta.access_token = newAccessToken.trim()
-      } else if (newChannel === 'facebook' || newChannel === 'instagram') {
+      if (newChannel === 'facebook' || newChannel === 'instagram') {
         const raw = newAccountId.replace(/^page_/i, '').replace(/^ig_/i, '')
         if (newChannel === 'facebook') meta.page_id = raw
         if (newAccessToken.trim()) meta.access_token = newAccessToken.trim()
@@ -382,7 +351,7 @@ function AccountsPageInner() {
     <PageShell>
       <PageHeader
         title="Channel accounts"
-        description="Connect WhatsApp, Facebook Messenger, and Instagram so customer messages reach your dashboard."
+        description="Connect Facebook Messenger and Instagram so customer messages reach your dashboard."
       >
         <Button color="brand" onClick={() => {
             setConnectMode('destination')
@@ -420,7 +389,7 @@ function AccountsPageInner() {
             <CardBody className="py-12 text-center">
               <Text>No channel accounts connected yet</Text>
               <p className="mx-auto mt-2 max-w-sm text-sm text-zinc-500 dark:text-zinc-400">
-                Add an account to connect WhatsApp, Facebook, Instagram, or web chat.
+                Add an account to connect Facebook, Instagram, or web chat.
               </p>
             </CardBody>
           </Card>
@@ -471,7 +440,6 @@ function AccountsPageInner() {
               <Field>
                 <Label>Channel</Label>
                 <Select value={newChannel} onChange={(e) => setNewChannel(e.target.value)}>
-                  <option value="whatsapp">WhatsApp</option>
                   <option value="facebook">Facebook</option>
                   <option value="instagram">Instagram</option>
                   <option value="web">Web</option>
@@ -480,7 +448,7 @@ function AccountsPageInner() {
               <Field>
                 <Label>Account ID</Label>
                 <Input
-                  placeholder="Phone number ID, page ID, or widget ID"
+                  placeholder="Page ID, Instagram ID, or widget ID"
                   value={newAccountId}
                   onChange={(e) => setNewAccountId(e.target.value)}
                 />
@@ -501,11 +469,9 @@ function AccountsPageInner() {
                 <Label>Access Token (optional but recommended)</Label>
                 <Input
                   placeholder={
-                    newChannel === 'whatsapp'
-                      ? 'WhatsApp access token'
-                      : newChannel === 'web'
-                        ? 'Not needed for web channel'
-                        : 'Facebook / Instagram access token'
+                    newChannel === 'web'
+                      ? 'Not needed for web channel'
+                      : 'Facebook / Instagram access token'
                   }
                   value={newAccessToken}
                   onChange={(e) => setNewAccessToken(e.target.value)}
