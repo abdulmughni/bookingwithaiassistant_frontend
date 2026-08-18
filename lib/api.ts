@@ -240,6 +240,9 @@ export const api = {
       request<null>(`/api/notifications/${id}/read`, { method: 'POST', token }),
     markAllRead: (token: string) =>
       request<null>('/api/notifications/read-all', { method: 'POST', token }),
+    remove: (token: string, id: string) =>
+      requestDelete(token, `/api/notifications/${encodeURIComponent(id)}`),
+    clearAll: (token: string) => requestDelete(token, '/api/notifications'),
   },
 
   customers: {

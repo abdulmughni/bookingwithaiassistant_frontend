@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
+  ArrowPathIcon,
   ExclamationTriangleIcon,
   PlusIcon,
   SparklesIcon,
@@ -342,6 +343,13 @@ function BookingsPageInner() {
             {todayCount} today
           </span>
         )}
+        <Button outline onClick={() => refetch()} disabled={loading}>
+          <ArrowPathIcon
+            data-slot="icon"
+            className={loading ? 'animate-spin' : undefined}
+          />
+          Refresh
+        </Button>
         <Button color="brand" onClick={() => openCreate()}>
           <PlusIcon data-slot="icon" />
           New booking

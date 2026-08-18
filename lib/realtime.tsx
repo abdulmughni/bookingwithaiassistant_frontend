@@ -33,6 +33,8 @@ interface RealtimeContextValue {
   subscribe: (handler: EventHandler) => () => void
   markRead: (id: string) => Promise<void>
   markAllRead: () => Promise<void>
+  removeNotification: (id: string) => Promise<void>
+  clearAllNotifications: () => Promise<void>
   refreshNotifications: () => Promise<void>
 }
 
@@ -101,12 +103,44 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     }
   }, [getToken, refreshNotifications])
 
+  const removeNotification = useCallback(
+    async (id: string) => {
+      setNotifications((prev) => {
+        const next = prev.filter((n) => n.id !== id)
+        const unread = next.filter((n) => !n.is_read).length
+        setUnreadCount(unread)
+        return next
+      })
+      try {
+        const token = await getToken()
+        if (token) await api.notifications.remove(token, id)
+      } catch {
+        void refreshNotifications()
+      }
+    },
+    [getToken, refreshNotifications],
+  )
+
+  const clearAllNotifications = useCallback(async () => {
+    setNotifications([])
+    setUnreadCount(0)
+    try {
+      const token = await getToken()
+      if (token) await api.notifications.clearAll(token)
+    } catch {
+      void refreshNotifications()
+    }
+  }, [getToken, refreshNotifications])
+
   // Handle events the provider owns (bell). Others are fanned out to subscribers.
   const handleEvent = useCallback((event: RealtimeEvent) => {
     if (event.type === 'connected' || event.type === 'ping') return
 
     if (
-      (event.type === 'booking.created' || event.type === 'emergency.reported') &&
+      (event.type === 'booking.created' ||
+        event.type === 'booking.rescheduled' ||
+        event.type === 'booking.cancelled' ||
+        event.type === 'emergency.reported') &&
       event.notification
     ) {
       const notif = event.notification
@@ -241,9 +275,21 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       subscribe,
       markRead,
       markAllRead,
+      removeNotification,
+      clearAllNotifications,
       refreshNotifications,
     }),
-    [connected, notifications, unreadCount, subscribe, markRead, markAllRead, refreshNotifications],
+    [
+      connected,
+      notifications,
+      unreadCount,
+      subscribe,
+      markRead,
+      markAllRead,
+      removeNotification,
+      clearAllNotifications,
+      refreshNotifications,
+    ],
   )
 
   return <RealtimeContext.Provider value={value}>{children}</RealtimeContext.Provider>

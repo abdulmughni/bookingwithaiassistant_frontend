@@ -293,13 +293,14 @@ export interface MessageDeletedEvent {
 }
 
 export interface BookingCreatedEvent {
-  type: 'booking.created'
+  type: 'booking.created' | 'booking.rescheduled' | 'booking.cancelled'
   id: string
   customer_name: string
   service_type: string
   selected_slot: string | null
   source_channel: string | null
   created_at: string
+  status?: string
   /** Persisted notification row, attached so the bell updates without a refetch. */
   notification?: Notification
 }
