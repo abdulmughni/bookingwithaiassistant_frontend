@@ -5,9 +5,11 @@ import clsx from 'clsx'
 import { useRouter } from 'next/navigation'
 import { BellIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import { useRealtime } from '@/lib/realtime'
+import { useTenantTimezone } from '@/lib/hooks'
+import { formatDateTime } from '@/lib/utils'
 import type { Notification } from '@/lib/types'
 
-function timeAgo(iso: string): string {
+function timeAgo(iso: string, timeZone: string): string {
   const d = new Date(iso)
   const diff = Date.now() - d.getTime()
   const mins = Math.floor(diff / 60000)
@@ -20,7 +22,18 @@ function timeAgo(iso: string): string {
   const days = Math.floor(hrs / 24)
   if (days === 1) return '1 day ago'
   if (days < 7) return `${days} days ago`
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  return d.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    timeZone: timeZone || undefined,
+  })
+}
+
+function displayBody(body: string, timeZone: string): string {
+  if (!body) return ''
+  return body.replace(/\d{4}-\d{2}-\d{2}T[^\s·]+/g, (iso) =>
+    formatDateTime(iso, timeZone),
+  )
 }
 
 function typeMeta(type: string): { label: string; className: string } {
@@ -60,6 +73,7 @@ function typeMeta(type: string): { label: string; className: string } {
 
 export function NotificationBell({ className }: { className?: string }) {
   const router = useRouter()
+  const tenantTz = useTenantTimezone()
   const {
     notifications,
     unreadCount,
@@ -160,7 +174,7 @@ export function NotificationBell({ className }: { className?: string }) {
                                 {meta.label}
                               </span>
                               <span className="ml-auto shrink-0 text-xs text-zinc-400 dark:text-zinc-500">
-                                {timeAgo(notif.created_at)}
+                                {timeAgo(notif.created_at, tenantTz)}
                               </span>
                             </span>
                             <span className="block truncate text-sm font-medium text-zinc-900 dark:text-white">
@@ -168,7 +182,7 @@ export function NotificationBell({ className }: { className?: string }) {
                             </span>
                             {notif.body ? (
                               <span className="mt-0.5 block truncate text-xs text-zinc-500 dark:text-zinc-400">
-                                {notif.body}
+                                {displayBody(notif.body, tenantTz)}
                               </span>
                             ) : null}
                           </span>
