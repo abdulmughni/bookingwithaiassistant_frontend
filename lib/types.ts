@@ -891,5 +891,6 @@ export interface AdminTenantProfile {
 export interface DeleteTenantResult {
   deleted: boolean
   clerk_org_deleted: boolean
+  clerk_users_deleted?: number
   detail: string
 }
