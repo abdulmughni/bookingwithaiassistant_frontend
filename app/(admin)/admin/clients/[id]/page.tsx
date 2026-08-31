@@ -125,6 +125,8 @@ export default function AdminClientDetailPage() {
         api.admin.voice.createFreeNumber(token, tenantId, areaCode, name),
       importTwilioNumber: (token, data) =>
         api.admin.voice.importTwilioNumber(token, tenantId, data),
+      importTelnyxNumber: (token, data) =>
+        api.admin.voice.importTelnyxNumber(token, tenantId, data),
       attachPhoneNumber: (token, phoneId) =>
         api.admin.voice.attachPhoneNumber(token, tenantId, phoneId),
       detachPhoneNumber: (token, phoneId) =>
