@@ -26,6 +26,17 @@ function resolveWsBase(): string {
 
 type EventHandler = (event: RealtimeEvent) => void
 
+function isDashboardNotification(value: unknown): value is Notification {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'id' in value &&
+    'type' in value &&
+    typeof (value as Notification).id === 'string' &&
+    typeof (value as Notification).type === 'string'
+  )
+}
+
 interface RealtimeContextValue {
   connected: boolean
   notifications: Notification[]
@@ -136,7 +147,10 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   const handleEvent = useCallback((event: RealtimeEvent) => {
     if (event.type === 'connected' || event.type === 'ping') return
 
-    const notif = 'notification' in event ? event.notification : undefined
+    const notif =
+      'notification' in event && isDashboardNotification(event.notification)
+        ? event.notification
+        : undefined
     if (notif) {
       setNotifications((prev) => {
         if (prev.some((n) => n.id === notif.id)) return prev

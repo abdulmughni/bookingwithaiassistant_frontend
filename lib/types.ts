@@ -319,7 +319,6 @@ export interface ConnectionAlertEvent {
     | 'integration.reconnect_required'
     | 'integration.disconnected'
   notification?: Notification
-  [key: string]: unknown
 }
 
 /** Control frames the socket also emits (ignored by feature code). */
