@@ -136,14 +136,8 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   const handleEvent = useCallback((event: RealtimeEvent) => {
     if (event.type === 'connected' || event.type === 'ping') return
 
-    if (
-      (event.type === 'booking.created' ||
-        event.type === 'booking.rescheduled' ||
-        event.type === 'booking.cancelled' ||
-        event.type === 'emergency.reported') &&
-      event.notification
-    ) {
-      const notif = event.notification
+    const notif = 'notification' in event ? event.notification : undefined
+    if (notif) {
       setNotifications((prev) => {
         if (prev.some((n) => n.id === notif.id)) return prev
         return [notif, ...prev].slice(0, 100)

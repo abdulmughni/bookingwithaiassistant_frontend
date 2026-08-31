@@ -313,6 +313,15 @@ export interface EmergencyReportedEvent {
   notification?: Notification
 }
 
+export interface ConnectionAlertEvent {
+  type:
+    | 'channel.reconnect_required'
+    | 'integration.reconnect_required'
+    | 'integration.disconnected'
+  notification?: Notification
+  [key: string]: unknown
+}
+
 /** Control frames the socket also emits (ignored by feature code). */
 export interface RealtimeControlEvent {
   type: 'connected' | 'ping'
@@ -324,6 +333,7 @@ export type RealtimeEvent =
   | MessageDeletedEvent
   | BookingCreatedEvent
   | EmergencyReportedEvent
+  | ConnectionAlertEvent
   | RealtimeControlEvent
 
 export interface Credential {
