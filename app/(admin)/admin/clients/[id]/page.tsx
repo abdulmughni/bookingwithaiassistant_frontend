@@ -7,6 +7,7 @@ import clsx from 'clsx'
 import { toast } from 'sonner'
 import {
   ArrowLeftIcon,
+  ArrowPathIcon,
   ArrowTopRightOnSquareIcon,
   CalendarDaysIcon,
   ChatBubbleLeftRightIcon,
@@ -146,6 +147,7 @@ export default function AdminClientDetailPage() {
 
   const [confirmStatus, setConfirmStatus] = useState<'activate' | 'suspend' | null>(null)
   const [pendingPlanId, setPendingPlanId] = useState<string | null>(null)
+  const [confirmRenew, setConfirmRenew] = useState(false)
   const [showAddCredits, setShowAddCredits] = useState(false)
   const [creditMessages, setCreditMessages] = useState('')
   const [creditMinutes, setCreditMinutes] = useState('')
@@ -230,11 +232,11 @@ export default function AdminClientDetailPage() {
   )
 
   const runAssignPlan = useCallback(
-    async (planId: string) => {
+    async (planId: string, successMessage = 'Plan updated.') => {
       const token = await getToken()
       try {
         await api.admin.assignPlan(token, tenantId, planId)
-        toast.success('Plan updated.')
+        toast.success(successMessage)
         await refetch()
       } catch (err) {
         toast.error(err instanceof ApiError ? err.message : 'Plan change failed.')
@@ -590,7 +592,7 @@ export default function AdminClientDetailPage() {
                     </p>
                     {tenant.is_expired && (
                       <p className="mt-2 text-xs text-red-600/90 dark:text-red-300/90">
-                        Inbound traffic is blocked until you assign or renew a plan.
+                        Inbound traffic is blocked until you restart this pack or assign a plan.
                       </p>
                     )}
                   </div>
@@ -634,6 +636,21 @@ export default function AdminClientDetailPage() {
                     ))}
                   </Select>
                 </div>
+                {tenant.plan ? (
+                  <Button
+                    color="brand"
+                    disabled={!tenant.is_expired}
+                    title={
+                      tenant.is_expired
+                        ? 'Restart this pack from today'
+                        : 'Enabled only after the current pack expires'
+                    }
+                    onClick={() => setConfirmRenew(true)}
+                  >
+                    <ArrowPathIcon data-slot="icon" />
+                    Restart pack
+                  </Button>
+                ) : null}
               </div>
             </div>
           </section>
@@ -835,6 +852,21 @@ export default function AdminClientDetailPage() {
         busyLabel="Suspending…"
         color="red"
         onConfirm={() => runStatusChange('suspend')}
+      />
+
+      <ConfirmActionDialog
+        open={confirmRenew}
+        onClose={() => setConfirmRenew(false)}
+        title="Restart this pack?"
+        description={`Starts ${currentPlanName} again from today. Credits reset to the plan quota, and validity runs from now for ${tenant.plan ? validityLabel(tenant.plan.validity_days) : 'the pack window'}.`}
+        confirmLabel="Restart from today"
+        busyLabel="Restarting…"
+        color="brand"
+        onConfirm={async () => {
+          if (tenant.plan?.id) {
+            await runAssignPlan(tenant.plan.id, 'Pack restarted from today.')
+          }
+        }}
       />
 
       <ConfirmActionDialog
