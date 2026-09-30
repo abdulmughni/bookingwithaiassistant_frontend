@@ -313,6 +313,14 @@ export interface EmergencyReportedEvent {
   notification?: Notification
 }
 
+export interface ConnectionAlertEvent {
+  type:
+    | 'channel.reconnect_required'
+    | 'integration.reconnect_required'
+    | 'integration.disconnected'
+  notification?: Notification
+}
+
 /** Control frames the socket also emits (ignored by feature code). */
 export interface RealtimeControlEvent {
   type: 'connected' | 'ping'
@@ -324,6 +332,7 @@ export type RealtimeEvent =
   | MessageDeletedEvent
   | BookingCreatedEvent
   | EmergencyReportedEvent
+  | ConnectionAlertEvent
   | RealtimeControlEvent
 
 export interface Credential {
@@ -891,5 +900,6 @@ export interface AdminTenantProfile {
 export interface DeleteTenantResult {
   deleted: boolean
   clerk_org_deleted: boolean
+  clerk_users_deleted?: number
   detail: string
 }

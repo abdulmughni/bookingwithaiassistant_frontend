@@ -80,6 +80,14 @@ export type VoiceApiAdapter = {
       name?: string
     },
   ) => Promise<VoiceConfig>
+  importTelnyxNumber: (
+    token: string,
+    data: {
+      number: string
+      telnyx_api_key: string
+      name?: string
+    },
+  ) => Promise<VoiceConfig>
   attachPhoneNumber: (token: string, phoneId: string) => Promise<VoiceConfig>
   detachPhoneNumber: (token: string, phoneId: string) => Promise<VoiceConfig>
   listTools: (token: string) => Promise<VoiceToolsResponse>
@@ -524,6 +532,11 @@ export function VoiceSetupPanel({
   const [twilioAuthToken, setTwilioAuthToken] = useState('')
   const [twilioName, setTwilioName] = useState('')
   const [importingTwilio, setImportingTwilio] = useState(false)
+  const [paidProvider, setPaidProvider] = useState<'twilio' | 'telnyx'>('twilio')
+  const [telnyxNumber, setTelnyxNumber] = useState('')
+  const [telnyxApiKey, setTelnyxApiKey] = useState('')
+  const [telnyxName, setTelnyxName] = useState('')
+  const [importingTelnyx, setImportingTelnyx] = useState(false)
 
   // Tools panel — populated once the API key is configured. Refetched after
   // every successful Save & sync so newly-bound tool ids are reflected
@@ -761,6 +774,38 @@ export function VoiceSetupPanel({
       notifyError(e instanceof ApiError ? e.message : 'Could not import Twilio number')
     } finally {
       setImportingTwilio(false)
+    }
+  }
+
+  const importTelnyxNumber = async () => {
+    if (readOnly) {
+      notifyError('Settings are locked until your account is activated.')
+      return
+    }
+    const number = telnyxNumber.trim()
+    const apiKey = telnyxApiKey.trim()
+    if (!number || !apiKey) {
+      notifyError('Phone number and Telnyx API key are required.')
+      return
+    }
+    setImportingTelnyx(true)
+    try {
+      const token = await getToken()
+      await voiceApi.importTelnyxNumber(token, {
+        number,
+        telnyx_api_key: apiKey,
+        name: telnyxName.trim() || undefined,
+      })
+      notifySuccess('Telnyx number imported and connected.')
+      setTelnyxNumber('')
+      setTelnyxApiKey('')
+      setTelnyxName('')
+      refetch()
+      loadPhones()
+    } catch (e) {
+      notifyError(e instanceof ApiError ? e.message : 'Could not import Telnyx number')
+    } finally {
+      setImportingTelnyx(false)
     }
   }
 
@@ -2066,63 +2111,127 @@ export function VoiceSetupPanel({
               )}
             </div>
 
-            {/* Import a customer-owned Twilio number. Creds go to Vapi only;
-                we bind Server URL (no static assistant) so calls hit our gate. */}
+            {/* Import a customer-owned Twilio or Telnyx number. Creds go to Vapi
+                only; we bind Server URL (no static assistant) so calls hit our gate. */}
             <div className="mt-5 rounded-xl border border-violet-200 bg-violet-50/50 p-4 dark:border-violet-900/50 dark:bg-violet-950/20">
               <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                Import Twilio number
+                Import paid number
               </p>
               <Text className="mt-0.5 text-xs">
-                Ask the customer to buy a number in Twilio, then paste their Account SID, Auth
-                Token, and number here. We import it into Vapi and route inbound calls through
-                your server (no static assistant bind). Credentials are not stored in our
-                database.
+                Ask the customer to buy a number in Twilio or Telnyx, then paste the number and
+                credentials here. We import it into Vapi and route inbound calls through your
+                server (no static assistant bind). Credentials are not stored in our database.
               </Text>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <Field>
-                  <Label>Phone number</Label>
-                  <Input
-                    value={twilioNumber}
-                    onChange={(e) => setTwilioNumber(e.target.value)}
-                    placeholder="+14155551234"
-                    autoComplete="off"
-                  />
-                </Field>
-                <Field>
-                  <Label>Label (optional)</Label>
-                  <Input
-                    value={twilioName}
-                    onChange={(e) => setTwilioName(e.target.value)}
-                    placeholder="Main line"
-                    autoComplete="off"
-                  />
-                </Field>
-                <Field>
-                  <Label>Twilio Account SID</Label>
-                  <Input
-                    value={twilioAccountSid}
-                    onChange={(e) => setTwilioAccountSid(e.target.value)}
-                    placeholder="ACxxxxxxxx…"
-                    autoComplete="off"
-                  />
-                </Field>
-                <Field>
-                  <Label>Twilio Auth Token</Label>
-                  <Input
-                    type="password"
-                    value={twilioAuthToken}
-                    onChange={(e) => setTwilioAuthToken(e.target.value)}
-                    placeholder="••••••••"
-                    autoComplete="new-password"
-                  />
-                </Field>
+              <div className="mt-3 inline-flex rounded-lg border border-zinc-200 p-0.5 dark:border-zinc-700">
+                {(['twilio', 'telnyx'] as const).map((provider) => (
+                  <button
+                    key={provider}
+                    type="button"
+                    onClick={() => setPaidProvider(provider)}
+                    disabled={readOnly || importingTwilio || importingTelnyx}
+                    className={clsx(
+                      'rounded-md px-3 py-1.5 text-sm font-semibold capitalize disabled:opacity-50',
+                      paidProvider === provider
+                        ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-950'
+                        : 'text-zinc-600 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white',
+                    )}
+                  >
+                    {provider === 'twilio' ? 'Twilio' : 'Telnyx'}
+                  </button>
+                ))}
               </div>
-              <div className="mt-4">
-                <Button onClick={importTwilioNumber} disabled={importingTwilio || readOnly}>
-                  <PhoneIcon data-slot="icon" className={importingTwilio ? 'animate-pulse' : ''} />
-                  {importingTwilio ? 'Importing…' : 'Import Twilio number'}
-                </Button>
-              </div>
+              {paidProvider === 'twilio' ? (
+                <>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <Field>
+                      <Label>Phone number</Label>
+                      <Input
+                        value={twilioNumber}
+                        onChange={(e) => setTwilioNumber(e.target.value)}
+                        placeholder="+14155551234"
+                        autoComplete="off"
+                      />
+                    </Field>
+                    <Field>
+                      <Label>Label (optional)</Label>
+                      <Input
+                        value={twilioName}
+                        onChange={(e) => setTwilioName(e.target.value)}
+                        placeholder="Main line"
+                        autoComplete="off"
+                      />
+                    </Field>
+                    <Field>
+                      <Label>Twilio Account SID</Label>
+                      <Input
+                        value={twilioAccountSid}
+                        onChange={(e) => setTwilioAccountSid(e.target.value)}
+                        placeholder="ACxxxxxxxx…"
+                        autoComplete="off"
+                      />
+                    </Field>
+                    <Field>
+                      <Label>Twilio Auth Token</Label>
+                      <Input
+                        type="password"
+                        value={twilioAuthToken}
+                        onChange={(e) => setTwilioAuthToken(e.target.value)}
+                        placeholder="••••••••"
+                        autoComplete="new-password"
+                      />
+                    </Field>
+                  </div>
+                  <div className="mt-4">
+                    <Button onClick={importTwilioNumber} disabled={importingTwilio || readOnly}>
+                      <PhoneIcon data-slot="icon" className={importingTwilio ? 'animate-pulse' : ''} />
+                      {importingTwilio ? 'Importing…' : 'Import Twilio number'}
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <Text className="mt-3 text-xs">
+                    The number must already exist in the Telnyx account. Outbound calling also
+                    needs an Outbound Voice Profile in the Telnyx portal (not configured here).
+                  </Text>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <Field>
+                      <Label>Phone number</Label>
+                      <Input
+                        value={telnyxNumber}
+                        onChange={(e) => setTelnyxNumber(e.target.value)}
+                        placeholder="+14155551234"
+                        autoComplete="off"
+                      />
+                    </Field>
+                    <Field>
+                      <Label>Label (optional)</Label>
+                      <Input
+                        value={telnyxName}
+                        onChange={(e) => setTelnyxName(e.target.value)}
+                        placeholder="Main line"
+                        autoComplete="off"
+                      />
+                    </Field>
+                    <Field className="sm:col-span-2">
+                      <Label>Telnyx API key</Label>
+                      <Input
+                        type="password"
+                        value={telnyxApiKey}
+                        onChange={(e) => setTelnyxApiKey(e.target.value)}
+                        placeholder="KEY••••••••"
+                        autoComplete="new-password"
+                      />
+                    </Field>
+                  </div>
+                  <div className="mt-4">
+                    <Button onClick={importTelnyxNumber} disabled={importingTelnyx || readOnly}>
+                      <PhoneIcon data-slot="icon" className={importingTelnyx ? 'animate-pulse' : ''} />
+                      {importingTelnyx ? 'Importing…' : 'Import Telnyx number'}
+                    </Button>
+                  </div>
+                </>
+              )}
             </div>
 
             {phones === null ? (

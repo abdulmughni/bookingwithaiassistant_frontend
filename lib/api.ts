@@ -456,6 +456,23 @@ export const api = {
           name: data.name ?? '',
         }),
       }),
+    importTelnyxNumber: (
+      token: string,
+      data: {
+        number: string
+        telnyx_api_key: string
+        name?: string
+      },
+    ) =>
+      request<import('./types').VoiceConfig>('/api/voice/phone-numbers/telnyx', {
+        token,
+        method: 'POST',
+        body: JSON.stringify({
+          number: data.number,
+          telnyx_api_key: data.telnyx_api_key,
+          name: data.name ?? '',
+        }),
+      }),
     attachPhoneNumber: (token: string, phoneId: string) =>
       request<import('./types').VoiceConfig>(
         `/api/voice/phone-numbers/${encodeURIComponent(phoneId)}/attach`,
@@ -731,6 +748,27 @@ export const api = {
               number: data.number,
               twilio_account_sid: data.twilio_account_sid,
               twilio_auth_token: data.twilio_auth_token,
+              name: data.name ?? '',
+            }),
+          },
+        ),
+      importTelnyxNumber: (
+        token: string,
+        tenantId: string,
+        data: {
+          number: string
+          telnyx_api_key: string
+          name?: string
+        },
+      ) =>
+        request<import('./types').VoiceConfig>(
+          `/api/admin/tenants/${encodeURIComponent(tenantId)}/voice/phone-numbers/telnyx`,
+          {
+            token,
+            method: 'POST',
+            body: JSON.stringify({
+              number: data.number,
+              telnyx_api_key: data.telnyx_api_key,
               name: data.name ?? '',
             }),
           },

@@ -62,6 +62,19 @@ function typeMeta(type: string): { label: string; className: string } {
         className:
           'bg-red-50 text-red-800 ring-red-200 dark:bg-red-500/15 dark:text-red-200 dark:ring-red-500/40',
       }
+    case 'channel.reconnect_required':
+      return {
+        label: 'Reconnect',
+        className:
+          'bg-amber-50 text-amber-800 ring-amber-200 dark:bg-amber-500/15 dark:text-amber-200 dark:ring-amber-500/40',
+      }
+    case 'integration.reconnect_required':
+    case 'integration.disconnected':
+      return {
+        label: 'Reconnect',
+        className:
+          'bg-amber-50 text-amber-800 ring-amber-200 dark:bg-amber-500/15 dark:text-amber-200 dark:ring-amber-500/40',
+      }
     default:
       return {
         label: 'Update',
@@ -88,6 +101,13 @@ export function NotificationBell({ className }: { className?: string }) {
     close()
     if (notif.type === 'emergency.reported' && notif.conversation_id) {
       router.push(`/conversations?id=${encodeURIComponent(notif.conversation_id)}`)
+    } else if (notif.type === 'channel.reconnect_required') {
+      router.push('/accounts')
+    } else if (
+      notif.type === 'integration.reconnect_required' ||
+      notif.type === 'integration.disconnected'
+    ) {
+      router.push('/integrations')
     } else if (notif.booking_id) {
       router.push(`/bookings?booking=${encodeURIComponent(notif.booking_id)}`)
     } else if (notif.conversation_id) {
