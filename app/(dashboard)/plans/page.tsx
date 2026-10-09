@@ -22,8 +22,8 @@ import type { Plan } from '@/lib/types'
 /**
  * Standalone Plans page.
  *
- * Cards are rendered from the plans catalogue. "Book a free demo" opens the
- * existing plan-change request so an admin can review and apply it.
+ * Cards are rendered from the plans catalogue. "Request this plan" opens the
+ * plan-change request so an admin can review and apply it.
  */
 export default function PlansPage() {
   const { data: plans, loading: plansLoading, error: plansError } = useSubscriptionPlans()
@@ -241,17 +241,17 @@ function PlanCard({
       <div className="mt-6 flex-1" />
 
       {current ? (
-        <Button outline disabled className="w-full uppercase tracking-wide">
+        <Button outline disabled className="w-full">
           Current plan
         </Button>
       ) : (
         <Button
-          color="blue"
+          color={featured ? 'brand' : 'dark/zinc'}
           disabled={subscriptionLoading}
           onClick={onSelect}
-          className="w-full uppercase tracking-wide"
+          className="w-full"
         >
-          {subscriptionLoading ? 'Loading…' : 'Book a free demo'}
+          {subscriptionLoading ? 'Loading…' : 'Request this plan'}
         </Button>
       )}
     </div>
