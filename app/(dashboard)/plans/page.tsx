@@ -6,8 +6,6 @@ import clsx from 'clsx'
 import { CheckIcon, StarIcon } from '@heroicons/react/20/solid'
 
 import { Button } from '@/components/button'
-import { Subheading } from '@/components/heading'
-import { Text } from '@/components/text'
 import { Textarea } from '@/components/textarea'
 import {
   Dialog,
@@ -22,12 +20,10 @@ import { api, ApiError } from '@/lib/api'
 import type { Plan } from '@/lib/types'
 
 /**
- * Standalone Plans page (read-only).
+ * Standalone Plans page.
  *
- * Lists the three tiers seeded by ``20260512_plans_subscriptions.sql``. Clients
- * can no longer self-switch plans (no payment integration yet): clicking
- * "Request this plan" opens a modal that submits a plan-change request for an
- * admin to review and apply from the admin dashboard.
+ * Cards are rendered from the plans catalogue. "Book a free demo" opens the
+ * existing plan-change request so an admin can review and apply it.
  */
 export default function PlansPage() {
   const { data: plans, loading: plansLoading, error: plansError } = useSubscriptionPlans()
@@ -70,7 +66,7 @@ export default function PlansPage() {
       <PageHeader
         centered
         title="Plans & pricing"
-        description="Each plan is a prepaid credit pack — a bucket of customer messages and voice minutes you use over the pack's validity period. Submit a request and an administrator will apply your plan change."
+        description="Same complete system on every plan. Just pick the size that fits your shop."
       />
 
       {plansError && (
@@ -79,7 +75,7 @@ export default function PlansPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-3 md:items-stretch">
+      <div className="grid grid-cols-1 gap-6 pt-3 md:grid-cols-3 md:items-stretch">
         {plansLoading && !plans && (
           <>
             <PlanCardSkeleton />
@@ -88,22 +84,17 @@ export default function PlansPage() {
           </>
         )}
 
-        {plans?.map((plan) => (
+        {plans?.map((plan, index) => (
           <PlanCard
             key={plan.id}
             plan={plan}
+            accent={CARD_ACCENTS[index % CARD_ACCENTS.length]}
             current={plan.id === currentPlanId}
             onSelect={() => openRequest(plan)}
             subscriptionLoading={subLoading}
           />
         ))}
       </div>
-
-      <Text className="mt-8 text-center text-xs text-zinc-500 dark:text-zinc-400">
-        All prices are a one-time charge in USD per credit pack. Credits do not
-        reset monthly — they last until used up or the pack expires. Plan changes
-        are applied by an administrator after your request is reviewed.
-      </Text>
 
       <Dialog open={requestPlan !== null} onClose={() => (submitting ? null : setRequestPlan(null))}>
         <DialogTitle>Request plan change</DialogTitle>
@@ -143,107 +134,135 @@ function useSubscriptionPlans() {
 // Single plan card
 // ---------------------------------------------------------------------------
 
+const CARD_ACCENTS = [
+  {
+    name: 'text-blue-600 dark:text-blue-400',
+    price: 'text-blue-600 dark:text-blue-400',
+    border: 'border-blue-200 dark:border-blue-800/70',
+    wash: 'bg-gradient-to-b from-blue-50/90 to-white dark:from-blue-950/30 dark:to-zinc-900',
+    check: 'text-blue-500',
+  },
+  {
+    name: 'text-violet-600 dark:text-violet-300',
+    price: 'text-violet-600 dark:text-violet-300',
+    border: 'border-violet-300 dark:border-violet-700/80',
+    wash: 'bg-gradient-to-b from-violet-50 to-white dark:from-violet-950/40 dark:to-zinc-900',
+    check: 'text-violet-500',
+  },
+  {
+    name: 'text-fuchsia-600 dark:text-fuchsia-400',
+    price: 'text-fuchsia-600 dark:text-fuchsia-400',
+    border: 'border-fuchsia-200 dark:border-fuchsia-800/70',
+    wash: 'bg-gradient-to-b from-fuchsia-50/90 to-white dark:from-fuchsia-950/30 dark:to-zinc-900',
+    check: 'text-fuchsia-500',
+  },
+]
+
 function PlanCard({
   plan,
+  accent,
   current,
   onSelect,
   subscriptionLoading,
 }: {
   plan: Plan
+  accent: (typeof CARD_ACCENTS)[number]
   current: boolean
   onSelect: () => void
   subscriptionLoading: boolean
 }) {
   const featured = plan.is_featured
+  const messagesLabel = plan.messages_unlimited
+    ? 'Unlimited'
+    : `${plan.messages_quota.toLocaleString()}/mo`
 
   return (
     <div
       className={clsx(
-        'relative flex flex-col rounded-2xl border bg-white p-6 shadow-sm transition dark:bg-zinc-900',
-        featured
-          ? 'border-brand-400 ring-1 ring-brand-200/80 md:scale-[1.03] dark:border-brand-600 dark:ring-brand-900/60'
-          : 'border-zinc-200/80 dark:border-zinc-700/80',
+        'relative flex flex-col rounded-3xl border p-6 shadow-sm',
+        accent.border,
+        accent.wash,
+        featured && 'ring-2 ring-violet-400/70 dark:ring-violet-500/50',
       )}
     >
       {featured && (
-        <div className="absolute -top-3 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full bg-brand-600 px-3 py-1 text-xs font-semibold text-white shadow">
+        <div className="absolute -top-3 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full bg-violet-600 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-white shadow">
           <StarIcon className="size-3.5" />
           Most popular
         </div>
       )}
 
-      <div className="flex items-baseline justify-between">
-        <Subheading className="mt-0!">{plan.name}</Subheading>
-        {current && (
-          <span className="rounded-full bg-brand-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-brand-700 dark:bg-brand-500/15 dark:text-brand-300">
-            Current
+      <div className={clsx('text-center', featured && 'pt-2')}>
+        <div className="flex items-center justify-center gap-2">
+          <h3 className={clsx('text-sm font-bold uppercase tracking-[0.16em]', accent.name)}>
+            {plan.name}
+          </h3>
+          {current && (
+            <span className="rounded-full bg-zinc-900/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-600 dark:bg-white/10 dark:text-zinc-300">
+              Current
+            </span>
+          )}
+        </div>
+        <div className="mt-3">
+          <span className={clsx('text-5xl font-bold tracking-tight', accent.price)}>
+            {formatPrice(plan.monthly_price_cents, plan.currency)}
           </span>
-        )}
+          <span className="ml-1 text-sm text-zinc-500 dark:text-zinc-400">/mo</span>
+        </div>
+        {plan.best_for ? (
+          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">{plan.best_for}</p>
+        ) : null}
       </div>
 
-      <div className="mt-3">
-        <span className="text-4xl font-bold tracking-tight text-zinc-950 dark:text-white">
-          {formatPrice(plan.monthly_price_cents, plan.currency)}
-        </span>
-        <span className="ml-1 text-sm text-zinc-500 dark:text-zinc-400">
-          per pack
-        </span>
+      <div className="mt-5">
+        <SpecRow label="Voice minutes" value={`${plan.call_minutes_quota.toLocaleString()}/mo`} />
+        <SpecRow label="Approx. calls" value={plan.approx_calls || '—'} />
+        <SpecRow label="Facebook & Instagram" value={messagesLabel} />
+        <SpecRow label="Spam calls" value={plan.spam_calls_label || 'Free, no minutes'} />
+        <SpecRow label="Extra minutes" value={formatExtraMinute(plan.extra_minute_cents)} />
       </div>
 
-      <div className="mt-3 space-y-1 text-sm">
-        <div className="flex items-center gap-2 text-zinc-700 dark:text-zinc-300">
-          <span className="font-semibold tabular-nums">
-            {plan.messages_quota.toLocaleString()}
-          </span>
-          <span className="text-zinc-500 dark:text-zinc-400">
-            messages included
-          </span>
-        </div>
-        <div className="flex items-center gap-2 text-zinc-700 dark:text-zinc-300">
-          <span className="font-semibold tabular-nums">
-            {plan.call_minutes_quota.toLocaleString()}
-          </span>
-          <span className="text-zinc-500 dark:text-zinc-400">
-            voice minutes included
-          </span>
-        </div>
-        <div className="flex items-center gap-2 text-zinc-700 dark:text-zinc-300">
-          <span className="font-semibold tabular-nums">{plan.validity_days}</span>
-          <span className="text-zinc-500 dark:text-zinc-400">days of validity</span>
-        </div>
-      </div>
-
-      <ul className="mt-5 space-y-2 text-sm text-zinc-700 dark:text-zinc-300">
-        {plan.features.map((feature) => (
-          <li key={feature} className="flex items-start gap-2">
-            <CheckIcon className="mt-0.5 size-4 shrink-0 text-brand-500" />
-            <span>{feature}</span>
-          </li>
-        ))}
-      </ul>
-
-      {plan.best_for && (
-        <p className="mt-4 text-xs italic text-zinc-500 dark:text-zinc-400">
-          Best for: {plan.best_for}
-        </p>
+      {plan.features.length > 0 && (
+        <>
+          <p className="mt-5 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+            Every plan includes:
+          </p>
+          <ul className="mt-3 space-y-2 text-sm text-zinc-700 dark:text-zinc-300">
+            {plan.features.map((feature) => (
+              <li key={feature} className="flex items-start gap-2">
+                <CheckIcon className={clsx('mt-0.5 size-4 shrink-0', accent.check)} />
+                <span>{feature}</span>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
 
       <div className="mt-6 flex-1" />
 
       {current ? (
-        <Button outline disabled className="w-full">
+        <Button outline disabled className="w-full uppercase tracking-wide">
           Current plan
         </Button>
       ) : (
         <Button
-          color={featured ? 'brand' : 'dark/zinc'}
+          color="blue"
           disabled={subscriptionLoading}
           onClick={onSelect}
-          className="w-full"
+          className="w-full uppercase tracking-wide"
         >
-          {subscriptionLoading ? 'Loading…' : 'Request this plan'}
+          {subscriptionLoading ? 'Loading…' : 'Book a free demo'}
         </Button>
       )}
+    </div>
+  )
+}
+
+function SpecRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3 border-b border-zinc-200/80 py-2.5 text-sm last:border-b-0 dark:border-zinc-700/70">
+      <span className="text-zinc-500 dark:text-zinc-400">{label}</span>
+      <span className="text-right font-semibold text-zinc-900 dark:text-white">{value}</span>
     </div>
   )
 }
@@ -273,6 +292,12 @@ function PlanCardSkeleton({ featured = false }: { featured?: boolean }) {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+function formatExtraMinute(cents: number | null | undefined): string {
+  const amount = (cents ?? 66) / 100
+  const digits = Number.isInteger(amount) ? 0 : 2
+  return `$${amount.toFixed(digits)}/min`
+}
 
 function formatPrice(cents: number, currency: string): string {
   const amount = cents / 100
