@@ -156,7 +156,7 @@ type FormState = Pick<
 /** Platform default for Vapi ``startSpeakingPlan.transcriptionEndpointingPlan``. */
 const DEFAULT_TRANSCRIPTION_ENDPOINTING = {
   onPunctuationSeconds: 0.3,
-  onNoPunctuationSeconds: 1.2,
+  onNoPunctuationSeconds: 0.5,
   onNumberSeconds: 0.5,
 } as const
 
@@ -168,7 +168,7 @@ const DEFAULT_FALLBACKS = {
   voice_id: 'cjVigY5qzO86Huf0OWal',
   model_temperature: '0.3',
   start_smart_provider: 'livekit',
-  start_wait_seconds: '0.6',
+  start_wait_seconds: '0.4',
   stop_num_words: '2',
   stop_voice_seconds: '0.2',
   stop_backoff_seconds: '1.0',
@@ -357,7 +357,7 @@ function formToPatch(f: FormState): Partial<VoiceSettings> {
   if (f.start_smart_provider) {
     const smart: Record<string, unknown> = { provider: f.start_smart_provider }
     if (f.start_smart_provider === 'livekit') {
-      smart.waitFunction = '700 + 4000 * x'
+      smart.waitFunction = '300 + 1500 * x'
     }
     startPlan.smartEndpointingPlan = smart
   }
