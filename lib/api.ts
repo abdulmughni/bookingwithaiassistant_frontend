@@ -517,6 +517,16 @@ export const api = {
         `/api/admin/tenants/${encodeURIComponent(tenantId)}`,
         { token },
       ),
+    setWeeklyReportEnabled: (token: string, tenantId: string, enabled: boolean) =>
+      request<{ tenant_id: string; enabled: boolean }>(
+        `/api/admin/tenants/${encodeURIComponent(tenantId)}/weekly-report`,
+        { token, method: 'PATCH', body: JSON.stringify({ enabled }) },
+      ),
+    sendWeeklyReport: (token: string, tenantId: string) =>
+      request<{ sent: boolean; recipient_count: number }>(
+        `/api/admin/tenants/${encodeURIComponent(tenantId)}/weekly-report/send`,
+        { token, method: 'POST' },
+      ),
     getTenantFunnel: (
       token: string,
       tenantId: string,

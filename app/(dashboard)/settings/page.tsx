@@ -166,6 +166,8 @@ export function TenantConfigTab({
   onSaved,
   saveSettings,
   loadTimezones,
+  weeklyReportEnabled,
+  onWeeklyReportChange,
 }: {
   /** Customer edits company name, services and coverage, and scheduling, including timezone. Admin edits every field. */
   mode?: 'customer' | 'admin'
@@ -174,9 +176,18 @@ export function TenantConfigTab({
   onSaved: () => void
   saveSettings?: (token: string, data: Record<string, unknown>) => Promise<Tenant>
   loadTimezones?: (token: string) => Promise<TimezoneChoice[]>
+  /** Admin-only. Omitted on the customer settings page. */
+  weeklyReportEnabled?: boolean
+  onWeeklyReportChange?: (enabled: boolean) => Promise<void>
 }) {
   const isCustomer = mode === 'customer'
   const getToken = useApiToken()
+  const [reportOn, setReportOn] = useState(weeklyReportEnabled !== false)
+  const [reportSaving, setReportSaving] = useState(false)
+
+  useEffect(() => {
+    if (weeklyReportEnabled !== undefined) setReportOn(weeklyReportEnabled)
+  }, [weeklyReportEnabled])
 
   const [name, setName] = useState('')
   const [industryType, setIndustryType] = useState('hvac')
@@ -489,6 +500,7 @@ export function TenantConfigTab({
   }
 
   return (
+    <>
     <form
       onSubmit={(e) => { e.preventDefault(); handleSave() }}
       className="mt-8 max-w-3xl space-y-10"
@@ -724,6 +736,48 @@ export function TenantConfigTab({
         )}
       </div>
     </form>
+
+    {onWeeklyReportChange && (
+      <section className="mt-10 max-w-3xl border-t border-zinc-200 pt-8 dark:border-zinc-700">
+        <Subheading>Weekly report</Subheading>
+        <Text className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+          When this is on, this client gets an email every Monday with the last 7 days:
+          conversations, booking intent, bookings, completed, cancelled, and rescheduled.
+          You can still send one now from the button next to Suspend.
+        </Text>
+        <div className="mt-4 flex items-center gap-3">
+          <button
+            type="button"
+            role="switch"
+            aria-checked={reportOn}
+            disabled={reportSaving}
+            onClick={() => {
+              const next = !reportOn
+              setReportSaving(true)
+              void onWeeklyReportChange(next)
+                .then(() => setReportOn(next))
+                .catch((e) => {
+                  notifyError(e instanceof ApiError ? e.message : 'Could not update the weekly report')
+                })
+                .finally(() => setReportSaving(false))
+            }}
+            className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+              reportOn ? 'bg-brand-600' : 'bg-zinc-300 dark:bg-zinc-600'
+            } ${reportSaving ? 'opacity-60' : ''}`}
+          >
+            <span
+              className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                reportOn ? 'translate-x-5' : 'translate-x-0.5'
+              }`}
+            />
+          </button>
+          <Text className="text-sm text-zinc-700 dark:text-zinc-300">
+            {reportSaving ? 'Saving…' : reportOn ? 'Weekly report is on' : 'Weekly report is off'}
+          </Text>
+        </div>
+      </section>
+    )}
+    </>
   )
 }
 
