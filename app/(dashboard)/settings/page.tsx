@@ -54,6 +54,7 @@ const CUSTOMER_EDITABLE_KEYS = [
   'working_hours',
   'booking_buffers',
   'escalation_rules',
+  'timezone',
 ] as const satisfies readonly (keyof TenantFormSnapshot)[]
 
 type TenantFormSnapshot = {
@@ -166,7 +167,7 @@ export function TenantConfigTab({
   saveSettings,
   loadTimezones,
 }: {
-  /** Customer edits company name, services and coverage, and scheduling. Timezone stays read-only. Admin edits every field. */
+  /** Customer edits company name, services and coverage, and scheduling, including timezone. Admin edits every field. */
   mode?: 'customer' | 'admin'
   tenant: Tenant
   credentials: Credential[]
@@ -379,6 +380,7 @@ export function TenantConfigTab({
       }
       if (maxSim < 1) { notifyError('Max simultaneous bookings must be at least 1'); return }
       if (Number.isNaN(stuck) || Number.isNaN(lowConf)) { notifyError('Escalation rules must be valid numbers'); return }
+      if (!timezone.trim()) { notifyError('Timezone is required'); return }
 
       setSaving(true)
       setSaved(false)
@@ -392,6 +394,7 @@ export function TenantConfigTab({
           service_areas: serviceAreas,
           service_area_zips: serviceAreaZips,
           payment_methods: paymentMethods,
+          timezone: timezone.trim() || 'UTC',
           working_hours: workingHours as Record<string, unknown>,
           booking_buffers: {
             minimum_minutes: minM,
@@ -622,11 +625,9 @@ export function TenantConfigTab({
           <Field>
             <Label>Timezone</Label>
             <Description>
-              {isCustomer
-                ? 'Set by an administrator. Booking times are shown in this timezone.'
-                : 'All booking times are stored in UTC and shown in this timezone. Saved as an IANA name (e.g. America/New_York).'}
+              All booking times are stored in UTC and shown in this timezone. Saved as an IANA name (e.g. America/New_York).
             </Description>
-            <Select disabled={isCustomer} value={timezone} onChange={(e) => setTimezone(e.target.value)}>
+            <Select value={timezone} onChange={(e) => setTimezone(e.target.value)}>
               {timezoneChoices.length === 0 && (
                 <option value={timezone || 'UTC'}>{timezone || 'UTC'}</option>
               )}
@@ -641,11 +642,9 @@ export function TenantConfigTab({
                   <option value={timezone}>{timezone}</option>
                 )}
             </Select>
-            {!isCustomer && (
-              <Text className="mt-1 text-xs text-zinc-500">
-                Will be saved as <code>{timezone || 'UTC'}</code>.
-              </Text>
-            )}
+            <Text className="mt-1 text-xs text-zinc-500">
+              Will be saved as <code>{timezone || 'UTC'}</code>.
+            </Text>
           </Field>
           <Field><WorkingHoursEditor value={workingHours} onChange={setWorkingHours} /></Field>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -756,7 +755,7 @@ export default function SettingsPage() {
     <PageShell>
       <PageHeader
         title="Settings"
-        description="Update your company name, services and coverage, and scheduling. Timezone is set by an administrator."
+        description="Update your company name, services and coverage, and scheduling."
       />
 
       <ReadOnlyBanner />
