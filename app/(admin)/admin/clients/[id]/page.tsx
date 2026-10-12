@@ -12,6 +12,7 @@ import {
   CalendarDaysIcon,
   ChatBubbleLeftRightIcon,
   CheckCircleIcon,
+  EnvelopeIcon,
   ClockIcon,
   CreditCardIcon,
   NoSymbolIcon,
@@ -178,6 +179,7 @@ export default function AdminClientDetailPage() {
   const [showVerifyForDelete, setShowVerifyForDelete] = useState(false)
   const [deleteToken, setDeleteToken] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [sendingReport, setSendingReport] = useState(false)
   const [funnelPeriod, setFunnelPeriod] = useState<'week' | 'month' | 'all'>('month')
   const [funnel, setFunnel] = useState<AdminFunnel | null>(null)
   const [waiveDiagnosticFee, setWaiveDiagnosticFee] = useState(true)
@@ -318,6 +320,24 @@ export default function AdminClientDetailPage() {
     setShowVerifyForLogin(true)
   }, [])
 
+  const handleSendWeeklyReport = useCallback(async () => {
+    setSendingReport(true)
+    try {
+      const token = await getToken()
+      const result = await api.admin.sendWeeklyReport(token, tenantId)
+      const count = result.recipient_count
+      toast.success(
+        count === 1
+          ? 'Weekly report sent to 1 portal user.'
+          : `Weekly report sent to ${count} portal users.`,
+      )
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not send the weekly report.')
+    } finally {
+      setSendingReport(false)
+    }
+  }, [getToken, tenantId])
+
   const handleDelete = useCallback(async () => {
     if (!deleteToken) return
     setDeleting(true)
@@ -390,6 +410,10 @@ export default function AdminClientDetailPage() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <Button outline disabled={sendingReport} onClick={() => { void handleSendWeeklyReport() }}>
+              <EnvelopeIcon />
+              {sendingReport ? 'Sending…' : 'Send weekly report'}
+            </Button>
             {tenant.account_status === 'active' ? (
               <Button color="red" onClick={() => setConfirmStatus('suspend')}>
                 <NoSymbolIcon />
@@ -1055,6 +1079,7 @@ function HeroStat({
 }
 
 function AdminClientSettings({ tenantId }: { tenantId: string }) {
+  const getToken = useApiToken()
   const { data, loading, error, refetch } = useApiData(
     async (token) => {
       const [tenant, credentials] = await Promise.all([
@@ -1094,6 +1119,11 @@ function AdminClientSettings({ tenantId }: { tenantId: string }) {
       }}
       saveSettings={saveSettings}
       loadTimezones={loadTimezones}
+      weeklyReportEnabled={data.tenant.weekly_report_enabled !== false}
+      onWeeklyReportChange={async (enabled) => {
+        const token = await getToken()
+        await api.admin.setWeeklyReportEnabled(token, tenantId, enabled)
+      }}
     />
   )
 }
