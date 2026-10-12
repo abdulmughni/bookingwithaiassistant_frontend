@@ -37,6 +37,8 @@ export interface Tenant {
   confidence_threshold: number
   max_turns: number
   is_active: boolean
+  /** When true, this workspace receives the Monday weekly report. */
+  weekly_report_enabled?: boolean
   /** Admin-managed lifecycle: 'pending' (awaiting activation), 'active', 'suspended'. */
   account_status: AccountStatus
   created_at: string
