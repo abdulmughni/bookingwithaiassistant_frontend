@@ -535,6 +535,8 @@ export interface VoiceConfig {
   platform_configured: boolean
   /** @deprecated alias for platform_configured (kept for legacy frontend builds). */
   has_api_key: boolean
+  /** Backend has TELNYX_API_KEY set — Telnyx numbers can be imported. */
+  telnyx_configured?: boolean
   assistant_id: string
   phone_number_id: string
   webhook_url: string
