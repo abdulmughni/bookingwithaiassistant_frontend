@@ -84,7 +84,6 @@ export type VoiceApiAdapter = {
     token: string,
     data: {
       number: string
-      telnyx_api_key: string
       name?: string
     },
   ) => Promise<VoiceConfig>
@@ -534,7 +533,6 @@ export function VoiceSetupPanel({
   const [importingTwilio, setImportingTwilio] = useState(false)
   const [paidProvider, setPaidProvider] = useState<'twilio' | 'telnyx'>('twilio')
   const [telnyxNumber, setTelnyxNumber] = useState('')
-  const [telnyxApiKey, setTelnyxApiKey] = useState('')
   const [telnyxName, setTelnyxName] = useState('')
   const [importingTelnyx, setImportingTelnyx] = useState(false)
 
@@ -783,9 +781,8 @@ export function VoiceSetupPanel({
       return
     }
     const number = telnyxNumber.trim()
-    const apiKey = telnyxApiKey.trim()
-    if (!number || !apiKey) {
-      notifyError('Phone number and Telnyx API key are required.')
+    if (!number) {
+      notifyError('Phone number is required.')
       return
     }
     setImportingTelnyx(true)
@@ -793,12 +790,10 @@ export function VoiceSetupPanel({
       const token = await getToken()
       await voiceApi.importTelnyxNumber(token, {
         number,
-        telnyx_api_key: apiKey,
         name: telnyxName.trim() || undefined,
       })
       notifySuccess('Telnyx number imported and connected.')
       setTelnyxNumber('')
-      setTelnyxApiKey('')
       setTelnyxName('')
       refetch()
       loadPhones()
@@ -2191,9 +2186,14 @@ export function VoiceSetupPanel({
               ) : (
                 <>
                   <Text className="mt-3 text-xs">
-                    The number must already exist in the Telnyx account. Outbound calling also
-                    needs an Outbound Voice Profile in the Telnyx portal (not configured here).
+                    The number must already exist in the platform Telnyx account. Outbound calling
+                    also needs an Outbound Voice Profile in the Telnyx portal (not configured here).
                   </Text>
+                  {config.telnyx_configured === false ? (
+                    <Text className="mt-2 text-xs text-amber-700 dark:text-amber-400">
+                      TELNYX_API_KEY is not set on the server, so Telnyx imports will fail.
+                    </Text>
+                  ) : null}
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
                     <Field>
                       <Label>Phone number</Label>
@@ -2213,19 +2213,12 @@ export function VoiceSetupPanel({
                         autoComplete="off"
                       />
                     </Field>
-                    <Field className="sm:col-span-2">
-                      <Label>Telnyx API key</Label>
-                      <Input
-                        type="password"
-                        value={telnyxApiKey}
-                        onChange={(e) => setTelnyxApiKey(e.target.value)}
-                        placeholder="KEY••••••••"
-                        autoComplete="new-password"
-                      />
-                    </Field>
                   </div>
                   <div className="mt-4">
-                    <Button onClick={importTelnyxNumber} disabled={importingTelnyx || readOnly}>
+                    <Button
+                      onClick={importTelnyxNumber}
+                      disabled={importingTelnyx || readOnly || config.telnyx_configured === false}
+                    >
                       <PhoneIcon data-slot="icon" className={importingTelnyx ? 'animate-pulse' : ''} />
                       {importingTelnyx ? 'Importing…' : 'Import Telnyx number'}
                     </Button>

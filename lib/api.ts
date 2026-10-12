@@ -460,7 +460,6 @@ export const api = {
       token: string,
       data: {
         number: string
-        telnyx_api_key: string
         name?: string
       },
     ) =>
@@ -469,7 +468,6 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({
           number: data.number,
-          telnyx_api_key: data.telnyx_api_key,
           name: data.name ?? '',
         }),
       }),
@@ -814,7 +812,6 @@ export const api = {
         tenantId: string,
         data: {
           number: string
-          telnyx_api_key: string
           name?: string
         },
       ) =>
@@ -825,7 +822,6 @@ export const api = {
             method: 'POST',
             body: JSON.stringify({
               number: data.number,
-              telnyx_api_key: data.telnyx_api_key,
               name: data.name ?? '',
             }),
           },
