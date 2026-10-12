@@ -606,7 +606,16 @@ export interface Plan {
   /** How long the pack stays usable, in days. */
   validity_days: number
   features: string[]
+  /** Short line under the price, such as "One truck". */
   best_for: string
+  /** Display row, such as "~100-150". */
+  approx_calls: string
+  /** Display row, such as "Free, no minutes". */
+  spam_calls_label: string
+  /** Extra voice minutes price in cents. 66 = $0.66/min. */
+  extra_minute_cents: number
+  /** When true the card says Unlimited. The numeric message cap is unchanged. */
+  messages_unlimited: boolean
   is_featured: boolean
 }
 
@@ -836,6 +845,10 @@ export interface AdminPlan {
   validity_days: number
   features: string[]
   best_for: string
+  approx_calls: string
+  spam_calls_label: string
+  extra_minute_cents: number
+  messages_unlimited: boolean
   is_featured: boolean
   sort_order: number
   is_active: boolean
@@ -852,6 +865,10 @@ export interface PlanWriteBody {
   validity_days: number
   features: string[]
   best_for: string
+  approx_calls: string
+  spam_calls_label: string
+  extra_minute_cents: number
+  messages_unlimited: boolean
   is_featured: boolean
   sort_order: number
   is_active: boolean

@@ -25,6 +25,10 @@ const EMPTY: PlanWriteBody = {
   validity_days: 180,
   features: [],
   best_for: '',
+  approx_calls: '',
+  spam_calls_label: 'Free, no minutes',
+  extra_minute_cents: 66,
+  messages_unlimited: false,
   is_featured: false,
   sort_order: 0,
   is_active: true,
@@ -40,6 +44,10 @@ function planToBody(plan: AdminPlan): PlanWriteBody {
     validity_days: plan.validity_days,
     features: plan.features,
     best_for: plan.best_for,
+    approx_calls: plan.approx_calls ?? '',
+    spam_calls_label: plan.spam_calls_label ?? 'Free, no minutes',
+    extra_minute_cents: plan.extra_minute_cents ?? 66,
+    messages_unlimited: plan.messages_unlimited ?? false,
     is_featured: plan.is_featured,
     sort_order: plan.sort_order,
     is_active: plan.is_active,
@@ -65,6 +73,7 @@ export function PlanFormDialog({
   const isEdit = Boolean(plan)
   const [form, setForm] = useState<PlanWriteBody>(EMPTY)
   const [priceDollars, setPriceDollars] = useState('0')
+  const [extraDollars, setExtraDollars] = useState('0.66')
   const [featuresText, setFeaturesText] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -73,6 +82,7 @@ export function PlanFormDialog({
     const body = plan ? planToBody(plan) : EMPTY
     setForm(body)
     setPriceDollars(String((body.monthly_price_cents / 100) || 0))
+    setExtraDollars(String((body.extra_minute_cents / 100) || 0))
     setFeaturesText(body.features.join('\n'))
   }, [open, plan])
 
@@ -84,10 +94,15 @@ export function PlanFormDialog({
     setBusy(true)
     try {
       const dollars = Number.parseFloat(priceDollars)
+      const extra = Number.parseFloat(extraDollars)
       const body: PlanWriteBody = {
         ...form,
         name: form.name.trim(),
+        best_for: form.best_for.trim(),
+        approx_calls: form.approx_calls.trim(),
+        spam_calls_label: form.spam_calls_label.trim() || 'Free, no minutes',
         monthly_price_cents: Math.max(0, Math.round((Number.isFinite(dollars) ? dollars : 0) * 100)),
+        extra_minute_cents: Math.max(0, Math.round((Number.isFinite(extra) ? extra : 0) * 100)),
         features: featuresText
           .split('\n')
           .map((s) => s.trim())
@@ -153,17 +168,50 @@ export function PlanFormDialog({
             {numberField('validity_days', 'Valid for (days)', 'e.g. 180 ≈ 6 months')}
           </div>
 
-          <Field>
-            <Label>Best for</Label>
-            <Input
-              value={form.best_for}
-              onChange={(e) => set('best_for', e.target.value)}
-              placeholder="Most HVAC, plumbing & roofing companies"
-            />
-          </Field>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field>
+              <Label>Shop size</Label>
+              <Input
+                value={form.best_for}
+                onChange={(e) => set('best_for', e.target.value)}
+                placeholder="One truck"
+              />
+              <p className="mt-1 text-xs text-zinc-500">Shown under the price, such as “One to two trucks”.</p>
+            </Field>
+            <Field>
+              <Label>Approx. calls</Label>
+              <Input
+                value={form.approx_calls}
+                onChange={(e) => set('approx_calls', e.target.value)}
+                placeholder="~100-150"
+              />
+            </Field>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field>
+              <Label>Spam calls</Label>
+              <Input
+                value={form.spam_calls_label}
+                onChange={(e) => set('spam_calls_label', e.target.value)}
+                placeholder="Free, no minutes"
+              />
+            </Field>
+            <Field>
+              <Label>Extra minutes (USD)</Label>
+              <Input
+                type="number"
+                min={0}
+                step="0.01"
+                value={extraDollars}
+                onChange={(e) => setExtraDollars(e.target.value)}
+              />
+              <p className="mt-1 text-xs text-zinc-500">Shown as a per-minute price, such as $0.66/min.</p>
+            </Field>
+          </div>
 
           <Field>
-            <Label>Features (one per line)</Label>
+            <Label>Every plan includes (one per line)</Label>
             <Textarea
               rows={4}
               value={featuresText}
@@ -176,7 +224,7 @@ export function PlanFormDialog({
             {numberField('sort_order', 'Sort order', 'Lower numbers appear first')}
           </div>
 
-          <div className="flex flex-col gap-3 sm:flex-row sm:gap-8">
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:gap-8">
             <label className="flex items-center gap-3">
               <Switch
                 color="amber"
@@ -193,7 +241,22 @@ export function PlanFormDialog({
               />
               <span className="text-sm text-zinc-700 dark:text-zinc-300">Active (visible to clients)</span>
             </label>
+            <label className="flex items-center gap-3">
+              <Switch
+                color="blue"
+                checked={form.messages_unlimited}
+                onChange={(v: boolean) => set('messages_unlimited', v)}
+              />
+              <span className="text-sm text-zinc-700 dark:text-zinc-300">
+                Show Facebook & Instagram as Unlimited
+              </span>
+            </label>
           </div>
+          {form.messages_unlimited ? (
+            <p className="text-xs text-zinc-500">
+              The card says Unlimited. Messages included is still the real cap when this plan is assigned.
+            </p>
+          ) : null}
         </FieldGroup>
       </DialogBody>
       <DialogActions>

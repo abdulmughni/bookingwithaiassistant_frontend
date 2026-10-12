@@ -15,7 +15,6 @@ import { useApiData, useApiToken } from '@/lib/hooks'
 import { ApiError, api } from '@/lib/api'
 import { notifyError, notifySuccess } from '@/lib/notify'
 import type { Credential, Tenant, TimezoneChoice } from '@/lib/types'
-import { DocumentsTab } from './documents-tab'
 import { ReadOnlyBanner, useReadOnlyAccount } from '@/components/account-status-gate'
 import { CostPolicyPicker } from '@/components/cost-policy-picker'
 
@@ -146,15 +145,23 @@ function snapshotFromTenant(
 // ---------------------------------------------------------------------------
 // Tenant Configuration Tab (existing settings)
 // ---------------------------------------------------------------------------
-function TenantConfigTab({
+export function TenantConfigTab({
+  mode = 'customer',
   tenant,
   credentials,
   onSaved,
+  saveSettings,
+  loadTimezones,
 }: {
+  /** Customer sees timezone (read-only) and working hours. Admin edits every field. */
+  mode?: 'customer' | 'admin'
   tenant: Tenant
   credentials: Credential[]
   onSaved: () => void
+  saveSettings?: (token: string, data: Record<string, unknown>) => Promise<Tenant>
+  loadTimezones?: (token: string) => Promise<TimezoneChoice[]>
 }) {
+  const isCustomer = mode === 'customer'
   const getToken = useApiToken()
 
   const [name, setName] = useState('')
@@ -286,10 +293,12 @@ function TenantConfigTab({
     baseline,
   ])
 
-  const isDirty = useMemo(
-    () => JSON.stringify(currentSnapshot) !== JSON.stringify(baseline),
-    [currentSnapshot, baseline],
-  )
+  const isDirty = useMemo(() => {
+    if (isCustomer) {
+      return JSON.stringify(workingHours) !== JSON.stringify(baseline.working_hours)
+    }
+    return JSON.stringify(currentSnapshot) !== JSON.stringify(baseline)
+  }, [isCustomer, workingHours, baseline, currentSnapshot])
 
   useEffect(() => {
     const snap = snapshotFromTenant(tenant, allowedCrmValues)
@@ -326,7 +335,7 @@ function TenantConfigTab({
     ;(async () => {
       try {
         const token = await getToken()
-        const choices = await api.tenants.timezones(token)
+        const choices = await (loadTimezones ?? api.tenants.timezones)(token)
         if (!cancelled) setTimezoneChoices(choices)
       } catch (e) {
         if (!cancelled) {
@@ -339,9 +348,29 @@ function TenantConfigTab({
     return () => {
       cancelled = true
     }
-  }, [getToken])
+  }, [getToken, loadTimezones])
 
   const handleSave = async () => {
+    if (isCustomer) {
+      setSaving(true)
+      setSaved(false)
+      try {
+        const token = await getToken()
+        await (saveSettings ?? api.tenants.update)(token, {
+          working_hours: workingHours as Record<string, unknown>,
+        })
+        notifySuccess('Working hours saved')
+        setSaved(true)
+        onSaved()
+        setTimeout(() => setSaved(false), 3000)
+      } catch (e) {
+        notifyError(e instanceof ApiError ? e.message : 'Could not save working hours')
+      } finally {
+        setSaving(false)
+      }
+      return
+    }
+
     if (!name.trim()) { notifyError('Company name is required'); return }
     if (!industryType.trim()) { notifyError('Industry type is required'); return }
     if (industryType === 'field_service') {
@@ -380,7 +409,7 @@ function TenantConfigTab({
             })()
           : []
 
-      await api.tenants.update(token, {
+      await (saveSettings ?? api.tenants.update)(token, {
         name: name.trim(),
         industry_type: industryType.trim(),
         offered_trades,
@@ -420,6 +449,8 @@ function TenantConfigTab({
       onSubmit={(e) => { e.preventDefault(); handleSave() }}
       className="mt-8 max-w-3xl space-y-10"
     >
+      {!isCustomer && (
+      <>
       <section>
         <Subheading>Organization</Subheading>
         <FieldGroup className="mt-4">
@@ -537,6 +568,8 @@ function TenantConfigTab({
       </section>
 
       <Divider />
+      </>
+      )}
 
       <section>
         <Subheading>Scheduling</Subheading>
@@ -544,10 +577,11 @@ function TenantConfigTab({
           <Field>
             <Label>Timezone</Label>
             <Description>
-              All booking times are stored in UTC and shown to you in this timezone. Pick the one your
-              dispatch team works in. Saved as an IANA name (e.g. <code>America/New_York</code>).
+              {isCustomer
+                ? 'Set by an administrator. Booking times are shown in this timezone.'
+                : 'All booking times are stored in UTC and shown in this timezone. Saved as an IANA name (e.g. America/New_York).'}
             </Description>
-            <Select value={timezone} onChange={(e) => setTimezone(e.target.value)}>
+            <Select disabled={isCustomer} value={timezone} onChange={(e) => setTimezone(e.target.value)}>
               {timezoneChoices.length === 0 && (
                 <option value={timezone || 'UTC'}>{timezone || 'UTC'}</option>
               )}
@@ -562,11 +596,15 @@ function TenantConfigTab({
                   <option value={timezone}>{timezone}</option>
                 )}
             </Select>
-            <Text className="mt-1 text-xs text-zinc-500">
-              Will be saved as <code>{timezone || 'UTC'}</code>.
-            </Text>
+            {!isCustomer && (
+              <Text className="mt-1 text-xs text-zinc-500">
+                Will be saved as <code>{timezone || 'UTC'}</code>.
+              </Text>
+            )}
           </Field>
           <Field><WorkingHoursEditor value={workingHours} onChange={setWorkingHours} /></Field>
+          {!isCustomer && (
+          <>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field><Label>Minimum booking lead time (minutes)</Label><Input type="number" min={0} value={minBookingMinutes} onChange={(e) => setMinBookingMinutes(e.target.value)} /></Field>
             <Field><Label>Default slot duration (minutes)</Label><Input type="number" min={15} value={slotDurationMinutes} onChange={(e) => setSlotDurationMinutes(e.target.value)} /></Field>
@@ -588,9 +626,13 @@ function TenantConfigTab({
             <Field><Label>Escalation: stuck turns</Label><Input type="number" min={1} value={escalationStuckTurns} onChange={(e) => setEscalationStuckTurns(e.target.value)} /></Field>
             <Field><Label>Escalation: low confidence threshold</Label><Input type="number" step="0.01" min={0} max={1} value={escalationLowConfidence} onChange={(e) => setEscalationLowConfidence(e.target.value)} /></Field>
           </div>
+          </>
+          )}
         </FieldGroup>
       </section>
 
+      {!isCustomer && (
+      <>
       <Divider />
 
       <section>
@@ -627,10 +669,12 @@ function TenantConfigTab({
           </div>
         </FieldGroup>
       </section>
+      </>
+      )}
 
       <div className="flex items-center gap-4 pt-4">
         <Button type="submit" disabled={saving || !isDirty}>
-          {saving ? 'Saving...' : 'Save settings'}
+          {saving ? 'Saving...' : isCustomer ? 'Save working hours' : 'Save settings'}
         </Button>
         {isDirty && !saving && (
           <Text className="text-sm text-amber-600 dark:text-amber-400">Unsaved changes</Text>
@@ -671,7 +715,7 @@ export default function SettingsPage() {
     <PageShell>
       <PageHeader
         title="Settings"
-        description="Manage your organization profile, knowledge base documents, and assistant behavior."
+        description="View your timezone and update the hours your team is available."
       />
 
       <ReadOnlyBanner />
@@ -685,22 +729,14 @@ export default function SettingsPage() {
           >
             Tenant Configuration
           </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('documents')}
-            className={settingsTabClass(activeTab === 'documents')}
-          >
-            Knowledge documents
-          </button>
         </nav>
       </div>
 
       {/* Tab content — locked (read-only) until the account is active */}
       <LockWhenReadOnly readOnly={readOnly}>
         {activeTab === 'tenant' && tenant && credentials && (
-          <TenantConfigTab tenant={tenant} credentials={credentials} onSaved={refetch} />
+          <TenantConfigTab mode="customer" tenant={tenant} credentials={credentials} onSaved={refetch} />
         )}
-        {activeTab === 'documents' && <DocumentsTab />}
       </LockWhenReadOnly>
     </PageShell>
   )

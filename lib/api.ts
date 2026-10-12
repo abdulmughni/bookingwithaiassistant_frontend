@@ -667,6 +667,63 @@ export const api = {
         { token, method: 'POST', body: JSON.stringify({ status }) },
       ),
 
+    getTenantSettings: (token: string, tenantId: string) =>
+      request<import('./types').Tenant>(
+        `/api/admin/tenants/${encodeURIComponent(tenantId)}/settings`,
+        { token },
+      ),
+    updateTenantSettings: (token: string, tenantId: string, data: Record<string, unknown>) =>
+      request<import('./types').Tenant>(
+        `/api/admin/tenants/${encodeURIComponent(tenantId)}/settings`,
+        { token, method: 'PATCH', body: JSON.stringify(data) },
+      ),
+    listTenantTimezones: (token: string, tenantId: string) =>
+      request<import('./types').TimezoneChoice[]>(
+        `/api/admin/tenants/${encodeURIComponent(tenantId)}/timezones`,
+        { token },
+      ),
+    listTenantCredentials: (token: string, tenantId: string) =>
+      request<import('./types').Credential[]>(
+        `/api/admin/tenants/${encodeURIComponent(tenantId)}/credentials`,
+        { token },
+      ),
+    knowledge: {
+      docTypes: (token: string, tenantId: string) =>
+        request<import('./types').KnowledgeDocTypeInfo[]>(
+          `/api/admin/tenants/${encodeURIComponent(tenantId)}/knowledge/doc-types`,
+          { token },
+        ),
+      status: (token: string, tenantId: string) =>
+        request<import('./types').KnowledgeStatus>(
+          `/api/admin/tenants/${encodeURIComponent(tenantId)}/knowledge/status`,
+          { token },
+        ),
+      listDocuments: (token: string, tenantId: string) =>
+        request<import('./types').RagDocument[]>(
+          `/api/admin/tenants/${encodeURIComponent(tenantId)}/knowledge/documents`,
+          { token },
+        ),
+      uploadDocument: (token: string, tenantId: string, formData: FormData) =>
+        requestFormData<import('./types').RagDocumentIngestResult>(
+          `/api/admin/tenants/${encodeURIComponent(tenantId)}/knowledge/documents`,
+          token,
+          formData,
+          'POST',
+        ),
+      replaceDocument: (token: string, tenantId: string, documentId: string, formData: FormData) =>
+        requestFormData<import('./types').RagDocumentIngestResult>(
+          `/api/admin/tenants/${encodeURIComponent(tenantId)}/knowledge/documents/${encodeURIComponent(documentId)}`,
+          token,
+          formData,
+          'PUT',
+        ),
+      deleteDocument: (token: string, tenantId: string, documentId: string) =>
+        requestDelete(
+          token,
+          `/api/admin/tenants/${encodeURIComponent(tenantId)}/knowledge/documents/${encodeURIComponent(documentId)}`,
+        ),
+    },
+
     prompts: {
       list: (token: string, tenantId: string) =>
         request<import('./types').PromptConfig[]>(

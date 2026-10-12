@@ -109,17 +109,30 @@ function SectionProgressBar({
   )
 }
 
-export function DocumentsTab() {
+export type KnowledgeApi = {
+  docTypes: (token: string) => Promise<KnowledgeDocTypeInfo[]>
+  status: (token: string) => Promise<KnowledgeStatus>
+  listDocuments: (token: string) => Promise<RagDocument[]>
+  uploadDocument: (token: string, formData: FormData) => Promise<{ title: string; original_filename: string; chunk_count: number }>
+  replaceDocument: (
+    token: string,
+    documentId: string,
+    formData: FormData,
+  ) => Promise<{ title: string; original_filename: string; chunk_count: number }>
+  deleteDocument: (token: string, documentId: string) => Promise<unknown>
+}
+
+export function DocumentsTab({ knowledgeApi = api.knowledge }: { knowledgeApi?: KnowledgeApi }) {
   const getToken = useApiToken()
 
   const fetchBundle = useCallback(async (token: string): Promise<Bundle> => {
     const [docTypes, status, documents] = await Promise.all([
-      api.knowledge.docTypes(token),
-      api.knowledge.status(token),
-      api.knowledge.listDocuments(token),
+      knowledgeApi.docTypes(token),
+      knowledgeApi.status(token),
+      knowledgeApi.listDocuments(token),
     ])
     return { docTypes, status, documents }
-  }, [])
+  }, [knowledgeApi])
 
   const { data, loading, error, refetch } = useApiData(fetchBundle, [])
 
@@ -217,7 +230,7 @@ export function DocumentsTab() {
       fd.append('doc_type', sectionId)
       fd.append('title', title)
       fd.append('file', file)
-      const res = await api.knowledge.uploadDocument(token, fd)
+      const res = await knowledgeApi.uploadDocument(token, fd)
       finishSectionSuccess(sectionId, {
         title: res.title,
         filename: res.original_filename,
@@ -271,7 +284,7 @@ export function DocumentsTab() {
       const fd = new FormData()
       fd.append('title', replaceTitle.trim())
       fd.append('file', replaceFile)
-      const res = await api.knowledge.replaceDocument(token, replaceId, fd)
+      const res = await knowledgeApi.replaceDocument(token, replaceId, fd)
       finishSectionSuccess(replaceSectionId, {
         title: res.title,
         filename: res.original_filename,
@@ -297,7 +310,7 @@ export function DocumentsTab() {
     setDeletingId(id)
     try {
       const token = await getToken()
-      await api.knowledge.deleteDocument(token, id)
+      await knowledgeApi.deleteDocument(token, id)
       notifySuccess('Removed from Pinecone.')
       if (replaceId === id) cancelReplace()
       await refetch()

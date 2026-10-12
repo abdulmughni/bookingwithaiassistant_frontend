@@ -51,6 +51,8 @@ import { PageShell, SkeletonBlock, dashCardClass, settingsTabClass } from '@/com
 import { PromptConfigPanel, type PromptApiAdapter } from '@/components/prompt-config-panel'
 import { CostPolicyPicker } from '@/components/cost-policy-picker'
 import { VoiceSetupPanel, type VoiceApiAdapter } from '@/components/voice-setup-panel'
+import { TenantConfigTab } from '@/app/(dashboard)/settings/page'
+import { DocumentsTab, type KnowledgeApi } from '@/app/(dashboard)/settings/documents-tab'
 import { api, ApiError } from '@/lib/api'
 import { clearVerificationToken, getVerificationToken } from '@/lib/admin-verification'
 import { useApiData, useApiToken, usePlans } from '@/lib/hooks'
@@ -74,10 +76,12 @@ const QUOTA_BADGE: Record<QuotaState, { label: string; color: 'green' | 'amber' 
   no_plan: { label: 'No plan', color: 'zinc' },
 }
 
-type ClientDetailTab = 'details' | 'prompts' | 'voice'
+type ClientDetailTab = 'details' | 'prompts' | 'voice' | 'tenant' | 'documents'
 
 function parseClientTab(value: string | null): ClientDetailTab {
-  if (value === 'prompts' || value === 'voice') return value
+  if (value === 'prompts' || value === 'voice' || value === 'tenant' || value === 'documents') {
+    return value
+  }
   return 'details'
 }
 
@@ -133,6 +137,20 @@ export default function AdminClientDetailPage() {
       detachPhoneNumber: (token, phoneId) =>
         api.admin.voice.detachPhoneNumber(token, tenantId, phoneId),
       listTools: (token) => api.admin.voice.listTools(token, tenantId),
+    }),
+    [tenantId],
+  )
+
+  const knowledgeApi = useMemo<KnowledgeApi>(
+    () => ({
+      docTypes: (token) => api.admin.knowledge.docTypes(token, tenantId),
+      status: (token) => api.admin.knowledge.status(token, tenantId),
+      listDocuments: (token) => api.admin.knowledge.listDocuments(token, tenantId),
+      uploadDocument: (token, formData) => api.admin.knowledge.uploadDocument(token, tenantId, formData),
+      replaceDocument: (token, documentId, formData) =>
+        api.admin.knowledge.replaceDocument(token, tenantId, documentId, formData),
+      deleteDocument: (token, documentId) =>
+        api.admin.knowledge.deleteDocument(token, tenantId, documentId),
     }),
     [tenantId],
   )
@@ -427,6 +445,20 @@ export default function AdminClientDetailPage() {
           >
             Voice Setting
           </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('tenant')}
+            className={settingsTabClass(activeTab === 'tenant')}
+          >
+            Tenant Configuration
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('documents')}
+            className={settingsTabClass(activeTab === 'documents')}
+          >
+            Knowledge documents
+          </button>
         </nav>
       </div>
 
@@ -436,6 +468,12 @@ export default function AdminClientDetailPage() {
 
       {activeTab === 'voice' && (
         <VoiceSetupPanel key={`voice-${tenantId}`} api={voiceApi} />
+      )}
+
+      {activeTab === 'tenant' && <AdminClientSettings tenantId={tenantId} />}
+
+      {activeTab === 'documents' && (
+        <DocumentsTab key={`docs-${tenantId}`} knowledgeApi={knowledgeApi} />
       )}
 
       {activeTab === 'details' && (
@@ -1013,6 +1051,50 @@ function HeroStat({
         {value.toLocaleString()}
       </p>
     </div>
+  )
+}
+
+function AdminClientSettings({ tenantId }: { tenantId: string }) {
+  const { data, loading, error, refetch } = useApiData(
+    async (token) => {
+      const [tenant, credentials] = await Promise.all([
+        api.admin.getTenantSettings(token, tenantId),
+        api.admin.listTenantCredentials(token, tenantId),
+      ])
+      return { tenant, credentials }
+    },
+    [tenantId],
+  )
+  const saveSettings = useCallback(
+    (token: string, body: Record<string, unknown>) =>
+      api.admin.updateTenantSettings(token, tenantId, body),
+    [tenantId],
+  )
+  const loadTimezones = useCallback(
+    (token: string) => api.admin.listTenantTimezones(token, tenantId),
+    [tenantId],
+  )
+
+  if (loading && !data) return <SkeletonBlock className="h-96" />
+  if (error || !data) {
+    return (
+      <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-800/60 dark:bg-red-900/20 dark:text-red-200">
+        {error || 'Could not load tenant settings.'}
+      </div>
+    )
+  }
+
+  return (
+    <TenantConfigTab
+      mode="admin"
+      tenant={data.tenant}
+      credentials={data.credentials}
+      onSaved={() => {
+        void refetch()
+      }}
+      saveSettings={saveSettings}
+      loadTimezones={loadTimezones}
+    />
   )
 }
 
