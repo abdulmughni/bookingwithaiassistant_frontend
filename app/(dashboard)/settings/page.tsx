@@ -43,6 +43,19 @@ function LockWhenReadOnly({
 // ---------------------------------------------------------------------------
 type SettingsTab = 'tenant' | 'documents'
 
+const CUSTOMER_EDITABLE_KEYS = [
+  'name',
+  'service_types',
+  'required_fields',
+  'optional_fields',
+  'service_areas',
+  'service_area_zips',
+  'payment_methods',
+  'working_hours',
+  'booking_buffers',
+  'escalation_rules',
+] as const satisfies readonly (keyof TenantFormSnapshot)[]
+
 type TenantFormSnapshot = {
   name: string
   industry_type: string
@@ -153,7 +166,7 @@ export function TenantConfigTab({
   saveSettings,
   loadTimezones,
 }: {
-  /** Customer sees timezone (read-only) and working hours. Admin edits every field. */
+  /** Customer edits company name, services and coverage, and scheduling. Timezone stays read-only. Admin edits every field. */
   mode?: 'customer' | 'admin'
   tenant: Tenant
   credentials: Credential[]
@@ -295,10 +308,12 @@ export function TenantConfigTab({
 
   const isDirty = useMemo(() => {
     if (isCustomer) {
-      return JSON.stringify(workingHours) !== JSON.stringify(baseline.working_hours)
+      return CUSTOMER_EDITABLE_KEYS.some(
+        (key) => JSON.stringify(currentSnapshot[key]) !== JSON.stringify(baseline[key]),
+      )
     }
     return JSON.stringify(currentSnapshot) !== JSON.stringify(baseline)
-  }, [isCustomer, workingHours, baseline, currentSnapshot])
+  }, [isCustomer, baseline, currentSnapshot])
 
   useEffect(() => {
     const snap = snapshotFromTenant(tenant, allowedCrmValues)
@@ -352,19 +367,45 @@ export function TenantConfigTab({
 
   const handleSave = async () => {
     if (isCustomer) {
+      if (!name.trim()) { notifyError('Company name is required'); return }
+      const minM = parseInt(minBookingMinutes, 10)
+      const slotM = parseInt(slotDurationMinutes, 10)
+      const maxSim = parseInt(maxSimultaneousBookings, 10)
+      const stuck = parseInt(escalationStuckTurns, 10)
+      const lowConf = parseFloat(escalationLowConfidence)
+      if (Number.isNaN(minM) || Number.isNaN(slotM) || Number.isNaN(maxSim)) {
+        notifyError('Booking buffer settings must be valid numbers')
+        return
+      }
+      if (maxSim < 1) { notifyError('Max simultaneous bookings must be at least 1'); return }
+      if (Number.isNaN(stuck) || Number.isNaN(lowConf)) { notifyError('Escalation rules must be valid numbers'); return }
+
       setSaving(true)
       setSaved(false)
       try {
         const token = await getToken()
         await (saveSettings ?? api.tenants.update)(token, {
+          name: name.trim(),
+          service_types: serviceTypes,
+          required_fields: requiredFields,
+          optional_fields: optionalFields,
+          service_areas: serviceAreas,
+          service_area_zips: serviceAreaZips,
+          payment_methods: paymentMethods,
           working_hours: workingHours as Record<string, unknown>,
+          booking_buffers: {
+            minimum_minutes: minM,
+            slot_duration_minutes: slotM,
+            max_simultaneous_bookings: maxSim,
+          },
+          escalation_rules: { stuck_turns: stuck, low_confidence: lowConf },
         })
-        notifySuccess('Working hours saved')
+        notifySuccess('Settings saved')
         setSaved(true)
         onSaved()
         setTimeout(() => setSaved(false), 3000)
       } catch (e) {
-        notifyError(e instanceof ApiError ? e.message : 'Could not save working hours')
+        notifyError(e instanceof ApiError ? e.message : 'Could not save settings')
       } finally {
         setSaving(false)
       }
@@ -449,8 +490,6 @@ export function TenantConfigTab({
       onSubmit={(e) => { e.preventDefault(); handleSave() }}
       className="mt-8 max-w-3xl space-y-10"
     >
-      {!isCustomer && (
-      <>
       <section>
         <Subheading>Organization</Subheading>
         <FieldGroup className="mt-4">
@@ -459,6 +498,8 @@ export function TenantConfigTab({
             <Description>Required — shown to customers where applicable.</Description>
             <Input required value={name} onChange={(e) => setName(e.target.value)} placeholder="Cool Comfort HVAC" />
           </Field>
+          {!isCustomer && (
+          <>
           <Field>
             <Label>Primary industry</Label>
             <Description>
@@ -528,9 +569,13 @@ export function TenantConfigTab({
               </div>
             </Field>
           ) : null}
+          </>
+          )}
         </FieldGroup>
       </section>
 
+      {!isCustomer && (
+      <>
       <Divider />
 
       <section>
@@ -552,6 +597,8 @@ export function TenantConfigTab({
           />
         </div>
       </section>
+      </>
+      )}
 
       <Divider />
 
@@ -568,8 +615,6 @@ export function TenantConfigTab({
       </section>
 
       <Divider />
-      </>
-      )}
 
       <section>
         <Subheading>Scheduling</Subheading>
@@ -603,8 +648,6 @@ export function TenantConfigTab({
             )}
           </Field>
           <Field><WorkingHoursEditor value={workingHours} onChange={setWorkingHours} /></Field>
-          {!isCustomer && (
-          <>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field><Label>Minimum booking lead time (minutes)</Label><Input type="number" min={0} value={minBookingMinutes} onChange={(e) => setMinBookingMinutes(e.target.value)} /></Field>
             <Field><Label>Default slot duration (minutes)</Label><Input type="number" min={15} value={slotDurationMinutes} onChange={(e) => setSlotDurationMinutes(e.target.value)} /></Field>
@@ -626,8 +669,6 @@ export function TenantConfigTab({
             <Field><Label>Escalation: stuck turns</Label><Input type="number" min={1} value={escalationStuckTurns} onChange={(e) => setEscalationStuckTurns(e.target.value)} /></Field>
             <Field><Label>Escalation: low confidence threshold</Label><Input type="number" step="0.01" min={0} max={1} value={escalationLowConfidence} onChange={(e) => setEscalationLowConfidence(e.target.value)} /></Field>
           </div>
-          </>
-          )}
         </FieldGroup>
       </section>
 
@@ -674,7 +715,7 @@ export function TenantConfigTab({
 
       <div className="flex items-center gap-4 pt-4">
         <Button type="submit" disabled={saving || !isDirty}>
-          {saving ? 'Saving...' : isCustomer ? 'Save working hours' : 'Save settings'}
+          {saving ? 'Saving...' : 'Save settings'}
         </Button>
         {isDirty && !saving && (
           <Text className="text-sm text-amber-600 dark:text-amber-400">Unsaved changes</Text>
@@ -715,7 +756,7 @@ export default function SettingsPage() {
     <PageShell>
       <PageHeader
         title="Settings"
-        description="View your timezone and update the hours your team is available."
+        description="Update your company name, services and coverage, and scheduling. Timezone is set by an administrator."
       />
 
       <ReadOnlyBanner />
