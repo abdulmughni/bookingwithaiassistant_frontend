@@ -638,16 +638,30 @@ body {
   color: #fff !important;
 }
 .bookings-calendar .fc-booking-cancelled {
+  --fc-event-text-color: #3f3f46;
   background: rgb(244 244 245) !important;
-  color: #71717a !important;
-  text-decoration: line-through;
+  color: #3f3f46 !important;
   box-shadow: inset 0 0 0 1px #e4e4e7 !important;
   border-left-color: #a1a1aa !important;
 }
+.bookings-calendar .fc-booking-cancelled .fc-event-main,
+.bookings-calendar .fc-booking-cancelled .bc-event__time,
+.bookings-calendar .fc-booking-cancelled .bc-event__title {
+  color: #3f3f46 !important;
+}
+.bookings-calendar .fc-booking-cancelled .bc-event__title {
+  text-decoration: line-through;
+}
 .dark .bookings-calendar .fc-booking-cancelled {
+  --fc-event-text-color: #d4d4d8;
   background: #27272a !important;
-  color: #a1a1aa !important;
+  color: #d4d4d8 !important;
   box-shadow: inset 0 0 0 1px #3f3f46 !important;
+}
+.dark .bookings-calendar .fc-booking-cancelled .fc-event-main,
+.dark .bookings-calendar .fc-booking-cancelled .bc-event__time,
+.dark .bookings-calendar .fc-booking-cancelled .bc-event__title {
+  color: #d4d4d8 !important;
 }
 .bookings-calendar .fc-booking-no-show {
   background: linear-gradient(135deg, #52525b 0%, #a1a1aa 100%) !important;
