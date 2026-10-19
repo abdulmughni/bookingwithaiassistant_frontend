@@ -522,6 +522,8 @@ export interface VoiceSettings {
   /** "off" | "office" | URL to a custom mp3/wav. */
   background_sound?: string
   recording_enabled?: boolean | null
+  /** Vapi ``backgroundDenoisingEnabled``. Separate from the denoising plan. */
+  background_denoising_enabled?: boolean | null
   /** Vapi voicemail detection, e.g. ``{ provider: "vapi" }``. */
   voicemail_detection?: Record<string, unknown>
   voicemail_message?: string

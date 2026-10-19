@@ -150,6 +150,7 @@ type FormState = Pick<
   max_duration_seconds: string
   background_sound: string
   recording_enabled: boolean
+  background_denoising_enabled: boolean
   voicemail_message: string
   end_call_message: string
 }
@@ -175,12 +176,15 @@ const DEFAULT_TRANSCRIPTION_ENDPOINTING = {
   onNumberSeconds: 0.5,
 } as const
 
+const DEFAULT_LIVEKIT_WAIT_FUNCTION =
+  '(20 + 500 * sqrt(x) + 2500 * x^3 + 700 + 4000 * max(0, x-0.5)) / 2'
+
 const DEFAULT_FALLBACKS = {
   transcriber_provider: 'deepgram',
   transcriber_model: 'nova-3',
   transcriber_language: 'en',
-  voice_provider: '11labs',
-  voice_id: 'cjVigY5qzO86Huf0OWal',
+  voice_provider: 'vapi',
+  voice_id: 'Elliot',
   model_temperature: '0.3',
   start_smart_provider: 'livekit',
   start_wait_style: 'aggressive',
@@ -191,7 +195,7 @@ const DEFAULT_FALLBACKS = {
   silence_timeout_seconds: '20',
   max_duration_seconds: '600',
   background_sound: 'off',
-  end_call_phrases: 'take care, goodbye, bye',
+  end_call_phrases: 'Goodbye, bye. Take care. Have a good day.',
   end_call_message: "You're all set — take care!",
 } as const
 
@@ -263,7 +267,7 @@ function settingsToForm(s: VoiceSettings, defaults: VoiceConfig['defaults']): Fo
     first_message: s.first_message || defaults.first_message,
     first_message_mode: s.first_message_mode || 'assistant-speaks-first',
     model_provider: s.model_provider || 'openai',
-    model_name: s.model_name || 'gpt-4o-mini',
+    model_name: s.model_name || 'gpt-4.1',
     model_temperature:
       s.model_temperature !== undefined && s.model_temperature !== null
         ? String(s.model_temperature)
@@ -334,6 +338,7 @@ function settingsToForm(s: VoiceSettings, defaults: VoiceConfig['defaults']): Fo
         : DEFAULT_FALLBACKS.max_duration_seconds,
     background_sound: s.background_sound || DEFAULT_FALLBACKS.background_sound,
     recording_enabled: s.recording_enabled !== false,
+    background_denoising_enabled: s.background_denoising_enabled !== false,
     voicemail_message: s.voicemail_message || '',
     end_call_message: s.end_call_message || DEFAULT_FALLBACKS.end_call_message,
 
@@ -414,6 +419,9 @@ function formToPatch(f: FormState): Partial<VoiceSettings> {
     voice.useSpeakerBoost = f.voice_use_speaker_boost
     voice.optimizeStreamingLatency =
       parseNumberOr(f.voice_optimize_streaming_latency, 3) ?? 3
+  } else if (f.voice_provider === 'vapi') {
+    voice.version = '2'
+    voice.language = 'auto'
   } else {
     const speed = parseNumberOr(f.voice_speed, null)
     if (speed !== null) voice.speed = speed
@@ -438,6 +446,7 @@ function formToPatch(f: FormState): Partial<VoiceSettings> {
     max_duration_seconds: parseNumberOr(f.max_duration_seconds, null) ?? undefined,
     background_sound: f.background_sound,
     recording_enabled: f.recording_enabled,
+    background_denoising_enabled: f.background_denoising_enabled,
     voicemail_detection: f.voicemail_detection_enabled ? { provider: 'vapi' } : {},
     voicemail_message: f.voicemail_message,
     end_call_message: f.end_call_message,
@@ -1258,7 +1267,7 @@ export function VoiceSetupPanel({
                             }
                           />
                           <Description>
-                            e.g. <code>gpt-4o-mini</code>, <code>gpt-4o</code>,{' '}
+                            e.g. <code>gpt-4.1</code>, <code>gpt-4o</code>,{' '}
                             <code>claude-3-5-sonnet</code>.
                           </Description>
                         </Field>
@@ -1731,6 +1740,14 @@ export function VoiceSetupPanel({
                           higher = fewer mid-thought interruptions. Blank = model default.
                         </Description>
                       </Field>
+                      <SwitchTile
+                        label="Background denoising enabled"
+                        description="Vapi’s extra noise filter. On removes steady background noise from the caller audio."
+                        checked={form.background_denoising_enabled}
+                        onChange={(v) =>
+                          setForm({ ...form, background_denoising_enabled: v })
+                        }
+                      />
                       <SwitchTile
                         label="Background denoising"
                         description={
