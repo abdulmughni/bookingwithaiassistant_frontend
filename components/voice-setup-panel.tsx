@@ -149,6 +149,7 @@ type FormState = Pick<
   max_duration_seconds: string
   background_sound: string
   recording_enabled: boolean
+  background_denoising_enabled: boolean
   voicemail_message: string
   end_call_message: string
 }
@@ -320,6 +321,7 @@ function settingsToForm(s: VoiceSettings, defaults: VoiceConfig['defaults']): Fo
         : DEFAULT_FALLBACKS.max_duration_seconds,
     background_sound: s.background_sound || DEFAULT_FALLBACKS.background_sound,
     recording_enabled: s.recording_enabled !== false,
+    background_denoising_enabled: s.background_denoising_enabled !== false,
     voicemail_message: s.voicemail_message || '',
     end_call_message: s.end_call_message || DEFAULT_FALLBACKS.end_call_message,
 
@@ -424,6 +426,7 @@ function formToPatch(f: FormState): Partial<VoiceSettings> {
     max_duration_seconds: parseNumberOr(f.max_duration_seconds, null) ?? undefined,
     background_sound: f.background_sound,
     recording_enabled: f.recording_enabled,
+    background_denoising_enabled: f.background_denoising_enabled,
     voicemail_detection: f.voicemail_detection_enabled ? { provider: 'vapi' } : {},
     voicemail_message: f.voicemail_message,
     end_call_message: f.end_call_message,
@@ -1717,6 +1720,14 @@ export function VoiceSetupPanel({
                           higher = fewer mid-thought interruptions. Blank = model default.
                         </Description>
                       </Field>
+                      <SwitchTile
+                        label="Background denoising enabled"
+                        description="Vapi’s extra noise filter. On removes steady background noise from the caller audio."
+                        checked={form.background_denoising_enabled}
+                        onChange={(v) =>
+                          setForm({ ...form, background_denoising_enabled: v })
+                        }
+                      />
                       <SwitchTile
                         label="Background denoising"
                         description={
