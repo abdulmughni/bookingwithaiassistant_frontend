@@ -139,6 +139,7 @@ type FormState = Pick<
 
   // Speaking timing
   start_smart_provider: string         // livekit | vapi | krisp | deepgram-flux | "" (off)
+  start_wait_style: string             // aggressive | conservative (LiveKit only)
   start_wait_seconds: string
   stop_num_words: string
   stop_voice_seconds: string
@@ -152,6 +153,20 @@ type FormState = Pick<
   background_denoising_enabled: boolean
   voicemail_message: string
   end_call_message: string
+}
+
+/** LiveKit wait functions as shown in the Vapi dashboard. */
+const LIVEKIT_WAIT_FUNCTIONS = {
+  aggressive: '(20 + 500 * sqrt(x) + 2500 * x^3 + 700 + 4000 * max(0, x-0.5)) / 2',
+  conservative: '700 + 4000 * max(0, x-0.5)',
+} as const
+
+function livekitWaitStyle(waitFunction: unknown): string {
+  const saved = String(waitFunction ?? '').trim()
+  const match = (Object.entries(LIVEKIT_WAIT_FUNCTIONS) as [string, string][]).find(
+    ([, formula]) => formula === saved,
+  )
+  return match?.[0] ?? 'aggressive'
 }
 
 /** Platform default for Vapi ``startSpeakingPlan.transcriptionEndpointingPlan``. */
@@ -172,6 +187,7 @@ const DEFAULT_FALLBACKS = {
   voice_id: 'Elliot',
   model_temperature: '0.3',
   start_smart_provider: 'livekit',
+  start_wait_style: 'aggressive',
   start_wait_seconds: '0.4',
   stop_num_words: '2',
   stop_voice_seconds: '0.2',
@@ -294,6 +310,7 @@ function settingsToForm(s: VoiceSettings, defaults: VoiceConfig['defaults']): Fo
         : '',
 
     start_smart_provider: String(smart.provider ?? DEFAULT_FALLBACKS.start_smart_provider),
+    start_wait_style: livekitWaitStyle(smart.waitFunction),
     start_wait_seconds:
       startPlan.waitSeconds !== undefined
         ? String(startPlan.waitSeconds)
@@ -362,7 +379,10 @@ function formToPatch(f: FormState): Partial<VoiceSettings> {
   if (f.start_smart_provider) {
     const smart: Record<string, unknown> = { provider: f.start_smart_provider }
     if (f.start_smart_provider === 'livekit') {
-      smart.waitFunction = DEFAULT_LIVEKIT_WAIT_FUNCTION
+      const style = f.start_wait_style in LIVEKIT_WAIT_FUNCTIONS
+        ? f.start_wait_style
+        : 'aggressive'
+      smart.waitFunction = LIVEKIT_WAIT_FUNCTIONS[style as keyof typeof LIVEKIT_WAIT_FUNCTIONS]
     }
     startPlan.smartEndpointingPlan = smart
   }
@@ -1824,6 +1844,23 @@ export function VoiceSetupPanel({
                         <Description>
                           Detects when the customer finished speaking. Turn off when using
                           <code> flux-*</code> or AssemblyAI (they have their own EOT).
+                        </Description>
+                      </Field>
+                      <Field>
+                        <Label>Response speed</Label>
+                        <Select
+                          value={form.start_wait_style}
+                          disabled={form.start_smart_provider !== 'livekit'}
+                          onChange={(e) =>
+                            setForm({ ...form, start_wait_style: e.target.value })
+                          }
+                        >
+                          <option value="aggressive">Aggressive</option>
+                          <option value="conservative">Conservative</option>
+                        </Select>
+                        <Description>
+                          How quickly the assistant replies after you stop talking.
+                          Used when Smart endpointing is livekit.
                         </Description>
                       </Field>
                       <Field>
