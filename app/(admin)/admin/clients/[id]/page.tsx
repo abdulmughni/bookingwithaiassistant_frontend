@@ -77,13 +77,93 @@ const QUOTA_BADGE: Record<QuotaState, { label: string; color: 'green' | 'amber' 
   no_plan: { label: 'No plan', color: 'zinc' },
 }
 
-type ClientDetailTab = 'details' | 'prompts' | 'voice' | 'tenant' | 'documents'
+type ClientDetailTab = 'details' | 'prompts' | 'voice' | 'voice-json' | 'tenant' | 'documents'
 
 function parseClientTab(value: string | null): ClientDetailTab {
-  if (value === 'prompts' || value === 'voice' || value === 'tenant' || value === 'documents') {
+  if (
+    value === 'prompts' ||
+    value === 'voice' ||
+    value === 'voice-json' ||
+    value === 'tenant' ||
+    value === 'documents'
+  ) {
     return value
   }
   return 'details'
+}
+
+function VoiceJsonTab({ tenantId }: { tenantId: string }) {
+  const getToken = useApiToken()
+  const [loading, setLoading] = useState(false)
+  const [assistantId, setAssistantId] = useState('')
+  const [jsonText, setJsonText] = useState('')
+  const [error, setError] = useState('')
+
+  const load = async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const token = await getToken()
+      const result = await api.admin.voice.vapiAssistant(token, tenantId)
+      setAssistantId(result.assistant_id)
+      setJsonText(JSON.stringify(result.config, null, 2))
+    } catch (err) {
+      setJsonText('')
+      setAssistantId('')
+      setError(err instanceof ApiError ? err.message : 'Could not load the Vapi assistant.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const copy = async () => {
+    if (!jsonText) return
+    try {
+      await navigator.clipboard.writeText(jsonText)
+      toast.success('JSON copied')
+    } catch {
+      toast.error('Could not copy. Select the text and copy it manually.')
+    }
+  }
+
+  return (
+    <section className={`${dashCardClass} p-5`}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-semibold text-zinc-950 dark:text-white">
+            Voice setting JSON
+          </h2>
+          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+            Live assistant settings from Vapi. This view does not change the assistant.
+          </p>
+          {assistantId && (
+            <p className="mt-2 font-mono text-xs text-zinc-500 dark:text-zinc-400">
+              {assistantId}
+            </p>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button outline onClick={load} disabled={loading}>
+            <ArrowPathIcon className={loading ? 'animate-spin' : ''} />
+            {loading ? 'Loading…' : jsonText ? 'Refresh' : 'Load from Vapi'}
+          </Button>
+          <Button outline onClick={copy} disabled={!jsonText}>
+            Copy JSON
+          </Button>
+        </div>
+      </div>
+      {error && (
+        <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>
+      )}
+      <textarea
+        readOnly
+        value={jsonText}
+        placeholder="Click Load from Vapi to show this assistant’s settings."
+        spellCheck={false}
+        className="mt-4 h-[32rem] w-full resize-y rounded-xl border border-zinc-200 bg-zinc-50 p-4 font-mono text-xs leading-5 text-zinc-900 outline-none dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+      />
+    </section>
+  )
 }
 
 export default function AdminClientDetailPage() {
@@ -471,6 +551,13 @@ export default function AdminClientDetailPage() {
           </button>
           <button
             type="button"
+            onClick={() => setActiveTab('voice-json')}
+            className={settingsTabClass(activeTab === 'voice-json')}
+          >
+            Voice setting JSON
+          </button>
+          <button
+            type="button"
             onClick={() => setActiveTab('tenant')}
             className={settingsTabClass(activeTab === 'tenant')}
           >
@@ -493,6 +580,8 @@ export default function AdminClientDetailPage() {
       {activeTab === 'voice' && (
         <VoiceSetupPanel key={`voice-${tenantId}`} api={voiceApi} />
       )}
+
+      {activeTab === 'voice-json' && <VoiceJsonTab tenantId={tenantId} />}
 
       {activeTab === 'tenant' && <AdminClientSettings tenantId={tenantId} />}
 

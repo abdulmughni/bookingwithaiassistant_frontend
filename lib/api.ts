@@ -781,6 +781,11 @@ export const api = {
           `/api/admin/tenants/${encodeURIComponent(tenantId)}/voice/sync`,
           { token, method: 'POST' },
         ),
+      vapiAssistant: (token: string, tenantId: string) =>
+        request<{ assistant_id: string; config: Record<string, unknown> }>(
+          `/api/admin/tenants/${encodeURIComponent(tenantId)}/voice/vapi-assistant`,
+          { token },
+        ),
       deleteAssistant: (token: string, tenantId: string) =>
         request<import('./types').VoiceConfig>(
           `/api/admin/tenants/${encodeURIComponent(tenantId)}/voice/assistant`,
