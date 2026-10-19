@@ -156,26 +156,29 @@ type FormState = Pick<
 /** Platform default for Vapi ``startSpeakingPlan.transcriptionEndpointingPlan``. */
 const DEFAULT_TRANSCRIPTION_ENDPOINTING = {
   onPunctuationSeconds: 0.3,
-  onNoPunctuationSeconds: 1.2,
+  onNoPunctuationSeconds: 0.5,
   onNumberSeconds: 0.5,
 } as const
+
+const DEFAULT_LIVEKIT_WAIT_FUNCTION =
+  '(20 + 500 * sqrt(x) + 2500 * x^3 + 700 + 4000 * max(0, x-0.5)) / 2'
 
 const DEFAULT_FALLBACKS = {
   transcriber_provider: 'deepgram',
   transcriber_model: 'nova-3',
   transcriber_language: 'en',
-  voice_provider: '11labs',
-  voice_id: 'cjVigY5qzO86Huf0OWal',
+  voice_provider: 'vapi',
+  voice_id: 'Elliot',
   model_temperature: '0.3',
   start_smart_provider: 'livekit',
-  start_wait_seconds: '0.6',
+  start_wait_seconds: '0.4',
   stop_num_words: '2',
   stop_voice_seconds: '0.2',
   stop_backoff_seconds: '1.0',
   silence_timeout_seconds: '20',
   max_duration_seconds: '600',
   background_sound: 'off',
-  end_call_phrases: 'take care, goodbye, bye',
+  end_call_phrases: 'Goodbye, bye. Take care. Have a good day.',
   end_call_message: "You're all set — take care!",
 } as const
 
@@ -247,7 +250,7 @@ function settingsToForm(s: VoiceSettings, defaults: VoiceConfig['defaults']): Fo
     first_message: s.first_message || defaults.first_message,
     first_message_mode: s.first_message_mode || 'assistant-speaks-first',
     model_provider: s.model_provider || 'openai',
-    model_name: s.model_name || 'gpt-4o-mini',
+    model_name: s.model_name || 'gpt-4.1',
     model_temperature:
       s.model_temperature !== undefined && s.model_temperature !== null
         ? String(s.model_temperature)
@@ -357,7 +360,7 @@ function formToPatch(f: FormState): Partial<VoiceSettings> {
   if (f.start_smart_provider) {
     const smart: Record<string, unknown> = { provider: f.start_smart_provider }
     if (f.start_smart_provider === 'livekit') {
-      smart.waitFunction = '700 + 4000 * x'
+      smart.waitFunction = DEFAULT_LIVEKIT_WAIT_FUNCTION
     }
     startPlan.smartEndpointingPlan = smart
   }
@@ -394,6 +397,9 @@ function formToPatch(f: FormState): Partial<VoiceSettings> {
     voice.useSpeakerBoost = f.voice_use_speaker_boost
     voice.optimizeStreamingLatency =
       parseNumberOr(f.voice_optimize_streaming_latency, 3) ?? 3
+  } else if (f.voice_provider === 'vapi') {
+    voice.version = '2'
+    voice.language = 'auto'
   } else {
     const speed = parseNumberOr(f.voice_speed, null)
     if (speed !== null) voice.speed = speed
@@ -1238,7 +1244,7 @@ export function VoiceSetupPanel({
                             }
                           />
                           <Description>
-                            e.g. <code>gpt-4o-mini</code>, <code>gpt-4o</code>,{' '}
+                            e.g. <code>gpt-4.1</code>, <code>gpt-4o</code>,{' '}
                             <code>claude-3-5-sonnet</code>.
                           </Description>
                         </Field>
