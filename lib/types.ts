@@ -71,6 +71,10 @@ export interface TenantStats {
   upcoming_bookings: number
   active_conversations: number
   total_channel_accounts: number
+  /** Present when the dashboard asked for a start and end date. */
+  daily?: { date: string; count: number }[]
+  range_start?: string | null
+  range_end?: string | null
 }
 
 export interface ChannelAccount {

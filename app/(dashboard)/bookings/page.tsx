@@ -27,6 +27,7 @@ import { useApiData, useApiToken, useTenantTimezone } from '@/lib/hooks'
 import { api } from '@/lib/api'
 import { notifyError, notifySuccess } from '@/lib/notify'
 import { slotDurationMinutesFromBuffers } from '@/lib/booking-calendar'
+import { decodeBookingId } from '@/lib/booking-link'
 import { formatDateTime, statusColor } from '@/lib/utils'
 import type { Booking, Tenant } from '@/lib/types'
 
@@ -171,9 +172,12 @@ function BookingsPageInner() {
   const durationMinutes = slotDurationMinutesFromBuffers(tenant?.booking_buffers)
   const calendarTz = (tenant?.timezone || tenantTz || 'UTC').trim() || 'UTC'
 
-  // Deep link: /bookings?booking=<id> opens the details dialog (from the bell).
+  // Deep link: /bookings?booking=<id> (bell) or /bookings?b=<token> (email).
   useEffect(() => {
-    const id = (searchParams.get('booking') || '').trim()
+    const encoded = (searchParams.get('b') || '').trim()
+    const id =
+      (searchParams.get('booking') || '').trim() ||
+      (encoded ? decodeBookingId(encoded) || '' : '')
     if (!id || deepLinkedRef.current === id) return
 
     let cancelled = false
@@ -206,10 +210,11 @@ function BookingsPageInner() {
 
   const closeDetails = () => {
     setSelectedBooking(null)
-    if (searchParams.get('booking')) {
+    if (searchParams.get('booking') || searchParams.get('b')) {
       deepLinkedRef.current = null
       const params = new URLSearchParams(searchParams.toString())
       params.delete('booking')
+      params.delete('b')
       const q = params.toString()
       router.replace(q ? `/bookings?${q}` : '/bookings', { scroll: false })
     }

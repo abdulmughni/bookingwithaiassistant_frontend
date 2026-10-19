@@ -1,7 +1,8 @@
 'use client'
 
-import { useMemo } from 'react'
-import { useUser } from '@clerk/nextjs'
+import { Suspense, useEffect, useMemo, useState } from 'react'
+import { useAuth, useUser } from '@clerk/nextjs'
+import { useRouter, useSearchParams } from 'next/navigation'
 import clsx from 'clsx'
 import {
   ArrowUpRightIcon,
@@ -12,12 +13,20 @@ import {
 } from '@heroicons/react/24/outline'
 import { Button } from '@/components/button'
 import { PageHeader, PageShell } from '@/components/dashboard-ui'
+import { Input } from '@/components/input'
 import { Badge } from '@/components/badge'
 import { Card, CardBody } from '@/components/card'
 import { SourceBadge } from '@/components/channel-icon'
 import { useApiData, useTenantTimezone } from '@/lib/hooks'
 import { api } from '@/lib/api'
 import { formatDateTime, statusColor } from '@/lib/utils'
+import {
+  decodeReportRange,
+  encodeReportRange,
+  formatRangeLabel,
+  presetRange,
+  rangeDayCount,
+} from '@/lib/report-range'
 import type { TenantStats, Booking } from '@/lib/types'
 
 // ---------------------------------------------------------------------------
@@ -132,16 +141,62 @@ function KpiCard({
 // Weekly bar chart (dependency-free)
 // ---------------------------------------------------------------------------
 
+function seriesFromDaily(
+  daily: { date: string; count: number }[],
+  tz: string,
+) {
+  const today = dayKeyInTz(new Date(), tz)
+  if (daily.length > 45) {
+    const months = new Map<string, { key: string; label: string; isToday: boolean; count: number }>()
+    for (const row of daily) {
+      const month = row.date.slice(0, 7)
+      const label = new Date(`${row.date}T12:00:00Z`).toLocaleDateString('en-US', {
+        month: 'short',
+        timeZone: 'UTC',
+      })
+      const current = months.get(month) ?? {
+        key: month,
+        label,
+        isToday: today.startsWith(month),
+        count: 0,
+      }
+      current.count += row.count
+      months.set(month, current)
+    }
+    return [...months.values()]
+  }
+  return daily.map((row) => ({
+    key: row.date,
+    label:
+      daily.length > 14
+        ? row.date.slice(8)
+        : new Date(`${row.date}T12:00:00Z`).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            timeZone: 'UTC',
+          }),
+    isToday: row.date === today,
+    count: row.count,
+  }))
+}
+
 function WeeklyBarChart({
   bookings,
   tz,
   loading,
+  series,
+  subtitle,
 }: {
   bookings: Booking[] | null
   tz: string
   loading: boolean
+  series?: { key: string; label: string; isToday: boolean; count: number }[] | null
+  subtitle?: string
 }) {
-  const { days, max, total } = useWeeklySeries(bookings, tz)
+  const weekly = useWeeklySeries(bookings, tz)
+  const days = series ?? weekly.days
+  const max = series ? Math.max(1, ...series.map((d) => d.count)) : weekly.max
+  const total = series ? series.reduce((sum, day) => sum + day.count, 0) : weekly.total
 
   return (
     <Card className="h-full border-zinc-200/80 dark:border-zinc-700/80">
@@ -152,7 +207,7 @@ function WeeklyBarChart({
               Booking activity
             </h3>
             <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">
-              New bookings · last 7 days
+              {subtitle ?? 'New bookings · last 7 days'}
             </p>
           </div>
           <Badge color="blue" className="text-xs">
@@ -471,13 +526,55 @@ function UpcomingList({
 // Page
 // ---------------------------------------------------------------------------
 
-export default function DashboardPage() {
+function DashboardPageInner() {
   const { user } = useUser()
+  const { orgId } = useAuth()
+  const router = useRouter()
+  const search = useSearchParams()
   const tenantTz = useTenantTimezone()
+  const linkToken = search.get('r')
+  const decoded = useMemo(
+    () => (linkToken ? decodeReportRange(linkToken) : null),
+    [linkToken],
+  )
+  const pendingLink = Boolean(linkToken) && !orgId
+  const linkIgnored = Boolean(
+    decoded?.tenantId && orgId && decoded.tenantId !== orgId,
+  )
+  const range =
+    decoded && orgId && !linkIgnored
+      ? { start: decoded.start, end: decoded.end }
+      : null
+  const today = dayKeyInTz(new Date(), tenantTz)
+  const presets = {
+    week: presetRange('week', today),
+    month: presetRange('month', today),
+    year: presetRange('year', today),
+  }
 
   const { data: stats, loading: statsLoading } = useApiData<TenantStats>(
-    (token) => api.tenants.stats(token),
+    (token) => {
+      if (pendingLink) return Promise.resolve(null as unknown as TenantStats)
+      return api.tenants.stats(token, range ?? undefined)
+    },
+    [pendingLink, range?.start ?? '', range?.end ?? ''],
   )
+  const statsView = pendingLink ? null : stats
+  const statsBusy = statsLoading || pendingLink
+
+  const [draftStart, setDraftStart] = useState(range?.start ?? '')
+  const [draftEnd, setDraftEnd] = useState(range?.end ?? '')
+  useEffect(() => {
+    setDraftStart(range?.start ?? '')
+    setDraftEnd(range?.end ?? '')
+  }, [range?.start, range?.end])
+
+  function openRange(start: string, end: string) {
+    if (!orgId || !start || !end || end < start) return
+    if (rangeDayCount(start, end) > 366) return
+    const token = encodeReportRange(start, end, orgId)
+    router.replace(`/?r=${encodeURIComponent(token)}`)
+  }
 
   const { data: upcoming, loading: upcomingLoading } = useApiData<Booking[]>(
     (token) => api.bookings.upcoming(token),
@@ -509,9 +606,77 @@ export default function DashboardPage() {
         </Button>
       </PageHeader>
 
+      <div className="flex flex-col gap-3 rounded-2xl border border-zinc-200/80 bg-white p-4 dark:border-zinc-700/80 dark:bg-zinc-900/80 sm:flex-row sm:flex-wrap sm:items-end">
+        <div className="flex flex-wrap gap-2">
+          {(
+            [
+              ['week', 'Week'],
+              ['month', 'Month'],
+              ['year', 'Year'],
+            ] as const
+          ).map(([kind, label]) => {
+            const selected =
+              range?.start === presets[kind].start && range?.end === presets[kind].end
+            return (
+              <button
+                key={kind}
+                type="button"
+                onClick={() => openRange(presets[kind].start, presets[kind].end)}
+                className={clsx(
+                  'rounded-lg px-3 py-1.5 text-sm font-semibold',
+                  selected
+                    ? 'bg-brand-500 text-white'
+                    : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700',
+                )}
+              >
+                {label}
+              </button>
+            )
+          })}
+        </div>
+        <label className="flex flex-col gap-1 text-xs font-medium text-zinc-500">
+          Start date
+          <Input
+            type="date"
+            value={draftStart}
+            onChange={(event) => {
+              const next = event.target.value
+              setDraftStart(next)
+              openRange(next, draftEnd)
+            }}
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-xs font-medium text-zinc-500">
+          End date
+          <Input
+            type="date"
+            value={draftEnd}
+            onChange={(event) => {
+              const next = event.target.value
+              setDraftEnd(next)
+              openRange(draftStart, next)
+            }}
+          />
+        </label>
+        {range && (
+          <button
+            type="button"
+            onClick={() => router.replace('/')}
+            className="rounded-lg px-3 py-1.5 text-sm font-semibold text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
+          >
+            Clear
+          </button>
+        )}
+        {range && (
+          <p className="text-sm text-zinc-500 dark:text-zinc-400 sm:ml-auto">
+            {formatRangeLabel(range.start, range.end)}
+          </p>
+        )}
+      </div>
+
       {/* KPI cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {statsLoading ? (
+        {statsBusy ? (
           Array.from({ length: 4 }).map((_, i) => (
             <div
               key={i}
@@ -522,27 +687,31 @@ export default function DashboardPage() {
           <>
             <KpiCard
               label="Total bookings"
-              value={stats?.total_bookings ?? 0}
-              hint={`${stats?.confirmed_bookings ?? 0} confirmed`}
+              value={statsView?.total_bookings ?? 0}
+              hint={`${statsView?.confirmed_bookings ?? 0} confirmed`}
               icon={<CalendarDaysIcon className="size-4" />}
               highlight
             />
             <KpiCard
               label="Completed"
-              value={stats?.completed_bookings ?? 0}
-              hint={`${stats?.cancelled_bookings ?? 0} cancelled`}
+              value={statsView?.completed_bookings ?? 0}
+              hint={`${statsView?.cancelled_bookings ?? 0} cancelled`}
               icon={<CheckCircleIcon className="size-4" />}
             />
             <KpiCard
               label="Upcoming"
-              value={stats?.upcoming_bookings ?? 0}
+              value={statsView?.upcoming_bookings ?? 0}
               hint="Scheduled ahead"
               icon={<ClockIcon className="size-4" />}
             />
             <KpiCard
-              label="Active conversations"
-              value={stats?.active_conversations ?? 0}
-              hint={`${stats?.total_channel_accounts ?? 0} channels`}
+              label={range ? 'Conversations' : 'Active conversations'}
+              value={statsView?.active_conversations ?? 0}
+              hint={
+                range
+                  ? 'Started in this range'
+                  : `${statsView?.total_channel_accounts ?? 0} channels`
+              }
               icon={<ChatBubbleLeftRightIcon className="size-4" />}
             />
           </>
@@ -552,10 +721,22 @@ export default function DashboardPage() {
       {/* Chart + gauge */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <WeeklyBarChart bookings={allBookings} tz={tenantTz} loading={allLoading} />
+          <WeeklyBarChart
+            bookings={allBookings}
+            tz={tenantTz}
+            loading={range ? statsBusy : allLoading}
+            series={
+              range && statsView?.daily
+                ? seriesFromDaily(statsView.daily, tenantTz)
+                : null
+            }
+            subtitle={
+              range ? `New bookings · ${formatRangeLabel(range.start, range.end)}` : undefined
+            }
+          />
         </div>
         <div>
-          <CompletionGauge stats={stats} loading={statsLoading} />
+          <CompletionGauge stats={statsView} loading={statsBusy} />
         </div>
       </div>
 
@@ -577,5 +758,19 @@ export default function DashboardPage() {
         </div>
       </div>
     </PageShell>
+  )
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense
+      fallback={
+        <PageShell>
+          <div className="h-24 animate-pulse rounded-2xl bg-zinc-100 dark:bg-zinc-800" />
+        </PageShell>
+      }
+    >
+      <DashboardPageInner />
+    </Suspense>
   )
 }

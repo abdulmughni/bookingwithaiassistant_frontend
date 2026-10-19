@@ -103,7 +103,13 @@ export const api = {
     me: (token: string) => request<import('./types').Tenant>('/api/tenants/me', { token }),
     update: (token: string, data: Record<string, unknown>) =>
       request<import('./types').Tenant>('/api/tenants/me', { token, method: 'PATCH', body: JSON.stringify(data) }),
-    stats: (token: string) => request<import('./types').TenantStats>('/api/tenants/me/stats', { token }),
+    stats: (token: string, range?: { start: string; end: string }) => {
+      const q =
+        range?.start && range?.end
+          ? `?start=${encodeURIComponent(range.start)}&end=${encodeURIComponent(range.end)}`
+          : ''
+      return request<import('./types').TenantStats>(`/api/tenants/me/stats${q}`, { token })
+    },
     timezones: (token: string) =>
       request<import('./types').TimezoneChoice[]>('/api/tenants/timezones', { token }),
   },
@@ -774,6 +780,11 @@ export const api = {
         request<import('./types').VoiceSyncResponse>(
           `/api/admin/tenants/${encodeURIComponent(tenantId)}/voice/sync`,
           { token, method: 'POST' },
+        ),
+      vapiAssistant: (token: string, tenantId: string) =>
+        request<{ assistant_id: string; config: Record<string, unknown> }>(
+          `/api/admin/tenants/${encodeURIComponent(tenantId)}/voice/vapi-assistant`,
+          { token },
         ),
       deleteAssistant: (token: string, tenantId: string) =>
         request<import('./types').VoiceConfig>(
