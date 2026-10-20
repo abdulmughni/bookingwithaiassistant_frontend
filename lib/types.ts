@@ -506,6 +506,14 @@ export interface VoiceSettings {
   first_message: string
   /** assistant-speaks-first | assistant-speaks-first-with-model-generated-message | assistant-waits-for-user */
   first_message_mode?: string
+  /** Spoken name in {{AGENT_NAME}}. Blank uses the platform default. */
+  agent_name?: string
+  /** Life-threatening cases and the exact 911 line. Fills {{EMERGENCY_STOP_AND_911}}. */
+  emergency_stop_and_911?: string
+  /** Urgent cases and the safe step. Fills {{EMERGENCY_URGENT}}. */
+  emergency_urgent?: string
+  /** Short urgent list used while booking. Fills {{URGENT_CONDITIONS}}. */
+  urgent_conditions?: string
   model_provider: string
   model_name: string
   /** LLM sampling temperature (0–2). Platform default 0.3. */
@@ -551,7 +559,14 @@ export interface VoiceConfig {
   has_webhook_secret: boolean
   last_synced_at: string | null
   settings: VoiceSettings
-  defaults: { system_prompt: string; first_message: string }
+  defaults: {
+    system_prompt: string
+    first_message: string
+    agent_name?: string
+    emergency_stop_and_911?: string
+    emergency_urgent?: string
+    urgent_conditions?: string
+  }
 }
 
 export interface VoicePhoneNumber {

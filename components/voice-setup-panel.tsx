@@ -107,6 +107,10 @@ type FormState = Pick<
 > & {
   // Channel basics
   first_message_mode: string
+  agent_name: string
+  emergency_stop_and_911: string
+  emergency_urgent: string
+  urgent_conditions: string
   model_temperature: string
   voicemail_detection_enabled: boolean
   voice_provider: string
@@ -265,6 +269,11 @@ function settingsToForm(s: VoiceSettings, defaults: VoiceConfig['defaults']): Fo
   return {
     system_prompt: s.system_prompt || defaults.system_prompt,
     first_message: s.first_message || defaults.first_message,
+    agent_name: s.agent_name || defaults.agent_name || 'Sam',
+    emergency_stop_and_911:
+      s.emergency_stop_and_911 || defaults.emergency_stop_and_911 || '',
+    emergency_urgent: s.emergency_urgent || defaults.emergency_urgent || '',
+    urgent_conditions: s.urgent_conditions || defaults.urgent_conditions || '',
     first_message_mode: s.first_message_mode || 'assistant-speaks-first',
     model_provider: s.model_provider || 'openai',
     model_name: s.model_name || 'gpt-4.1',
@@ -430,6 +439,10 @@ function formToPatch(f: FormState): Partial<VoiceSettings> {
   return {
     system_prompt: f.system_prompt,
     first_message: f.first_message,
+    agent_name: f.agent_name,
+    emergency_stop_and_911: f.emergency_stop_and_911,
+    emergency_urgent: f.emergency_urgent,
+    urgent_conditions: f.urgent_conditions,
     first_message_mode: f.first_message_mode,
     model_provider: f.model_provider,
     model_name: f.model_name,
@@ -1216,6 +1229,58 @@ export function VoiceSetupPanel({
                       ) : null
                     }
                   >
+                    <FieldGroup>
+                      <Field>
+                        <Label>Agent name</Label>
+                        <Input
+                          value={form.agent_name}
+                          onChange={(e) => setForm({ ...form, agent_name: e.target.value })}
+                        />
+                        <Description>
+                          Fills <code>{'{{AGENT_NAME}}'}</code> in the greeting and the prompt.
+                        </Description>
+                      </Field>
+                      <Field>
+                        <Label>Stop and call 911</Label>
+                        <Textarea
+                          rows={4}
+                          value={form.emergency_stop_and_911}
+                          onChange={(e) =>
+                            setForm({ ...form, emergency_stop_and_911: e.target.value })
+                          }
+                        />
+                        <Description>
+                          Life-threatening cases and the exact words to say. Fire and smoke stay
+                          in the prompt.
+                        </Description>
+                      </Field>
+                      <Field>
+                        <Label>Urgent, book now</Label>
+                        <Textarea
+                          rows={4}
+                          value={form.emergency_urgent}
+                          onChange={(e) =>
+                            setForm({ ...form, emergency_urgent: e.target.value })
+                          }
+                        />
+                        <Description>
+                          Urgent situations and the one safe step, if there is one.
+                        </Description>
+                      </Field>
+                      <Field>
+                        <Label>Urgent conditions</Label>
+                        <Textarea
+                          rows={2}
+                          value={form.urgent_conditions}
+                          onChange={(e) =>
+                            setForm({ ...form, urgent_conditions: e.target.value })
+                          }
+                        />
+                        <Description>
+                          Short list spoken when offering the earliest urgent slot.
+                        </Description>
+                      </Field>
+                    </FieldGroup>
                     <Field>
                       <Label className="sr-only">System prompt</Label>
                       <Textarea
