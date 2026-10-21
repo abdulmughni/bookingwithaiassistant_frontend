@@ -11,7 +11,7 @@ export interface Tenant {
   service_areas: string[]
   service_area_zips: string[]
   supported_regions: string[]
-  /** When industry is field_service: subset of hvac | plumbing | electrical. Empty = all three. */
+  /** When industry is field_service: subset of hvac | plumbing | electrical | roofing. Empty = all of them. */
   offered_trades?: string[]
   /** IANA timezone (e.g. "America/New_York"). Authoritative source for booking conversions. */
   timezone: string

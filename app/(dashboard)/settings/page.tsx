@@ -86,23 +86,30 @@ function resolveIndustryType(raw: string): string {
   return raw === 'general' ? 'field_service' : raw || 'hvac'
 }
 
-function resolveOfferedTrades(tenant: Tenant): { hvac: boolean; plumbing: boolean; electrical: boolean } {
+function resolveOfferedTrades(tenant: Tenant): {
+  hvac: boolean
+  plumbing: boolean
+  electrical: boolean
+  roofing: boolean
+} {
   const ind = resolveIndustryType(tenant.industry_type || 'hvac')
   const ot = tenant.offered_trades || []
   if (ind === 'field_service' || ind === 'general') {
     if (ot.length === 0) {
-      return { hvac: true, plumbing: true, electrical: true }
+      return { hvac: true, plumbing: true, electrical: true, roofing: true }
     }
     return {
       hvac: ot.includes('hvac'),
       plumbing: ot.includes('plumbing'),
       electrical: ot.includes('electrical'),
+      roofing: ot.includes('roofing'),
     }
   }
   return {
     hvac: ind === 'hvac',
     plumbing: ind === 'plumbing',
     electrical: ind === 'electrical',
+    roofing: ind === 'roofing',
   }
 }
 
@@ -126,6 +133,7 @@ function snapshotFromTenant(
             if (trades.hvac) picks.push('hvac')
             if (trades.plumbing) picks.push('plumbing')
             if (trades.electrical) picks.push('electrical')
+            if (trades.roofing) picks.push('roofing')
             return picks
           })()
         : [],
@@ -191,10 +199,11 @@ export function TenantConfigTab({
 
   const [name, setName] = useState('')
   const [industryType, setIndustryType] = useState('hvac')
-  /** Checkboxes for multi-trade (field_service); empty array in API means "all three". */
+  /** Checkboxes for multi-trade (field_service); empty array in API means every trade. */
   const [offeredHvac, setOfferedHvac] = useState(true)
   const [offeredPlumbing, setOfferedPlumbing] = useState(true)
   const [offeredElectrical, setOfferedElectrical] = useState(true)
+  const [offeredRoofing, setOfferedRoofing] = useState(true)
 
   const [serviceTypes, setServiceTypes] = useState<string[]>([])
   const [requiredFields, setRequiredFields] = useState<string[]>([])
@@ -263,6 +272,7 @@ export function TenantConfigTab({
               if (offeredHvac) picks.push('hvac')
               if (offeredPlumbing) picks.push('plumbing')
               if (offeredElectrical) picks.push('electrical')
+              if (offeredRoofing) picks.push('roofing')
               return picks
             })()
           : [],
@@ -297,6 +307,7 @@ export function TenantConfigTab({
     offeredHvac,
     offeredPlumbing,
     offeredElectrical,
+    offeredRoofing,
     serviceTypes,
     requiredFields,
     optionalFields,
@@ -335,6 +346,7 @@ export function TenantConfigTab({
     setOfferedHvac(trades.hvac)
     setOfferedPlumbing(trades.plumbing)
     setOfferedElectrical(trades.electrical)
+    setOfferedRoofing(trades.roofing)
     setServiceTypes([...snap.service_types])
     setRequiredFields([...snap.required_fields])
     setOptionalFields([...snap.optional_fields])
@@ -429,8 +441,8 @@ export function TenantConfigTab({
     if (!name.trim()) { notifyError('Company name is required'); return }
     if (!industryType.trim()) { notifyError('Industry type is required'); return }
     if (industryType === 'field_service') {
-      const n = [offeredHvac, offeredPlumbing, offeredElectrical].filter(Boolean).length
-      if (n === 0) { notifyError('Select at least one trade (HVAC, plumbing, or electrical)'); return }
+      const n = [offeredHvac, offeredPlumbing, offeredElectrical, offeredRoofing].filter(Boolean).length
+      if (n === 0) { notifyError('Select at least one trade (HVAC, plumbing, electrical, or roofing)'); return }
     }
     const minM = parseInt(minBookingMinutes, 10)
     const slotM = parseInt(slotDurationMinutes, 10)
@@ -460,6 +472,7 @@ export function TenantConfigTab({
               if (offeredHvac) picks.push('hvac')
               if (offeredPlumbing) picks.push('plumbing')
               if (offeredElectrical) picks.push('electrical')
+              if (offeredRoofing) picks.push('roofing')
               return picks
             })()
           : []
@@ -531,24 +544,34 @@ export function TenantConfigTab({
                   setOfferedHvac(true)
                   setOfferedPlumbing(false)
                   setOfferedElectrical(false)
+                  setOfferedRoofing(false)
                 } else if (v === 'plumbing') {
                   setOfferedHvac(false)
                   setOfferedPlumbing(true)
                   setOfferedElectrical(false)
+                  setOfferedRoofing(false)
                 } else if (v === 'electrical') {
                   setOfferedHvac(false)
                   setOfferedPlumbing(false)
                   setOfferedElectrical(true)
+                  setOfferedRoofing(false)
+                } else if (v === 'roofing') {
+                  setOfferedHvac(false)
+                  setOfferedPlumbing(false)
+                  setOfferedElectrical(false)
+                  setOfferedRoofing(true)
                 } else if (v === 'field_service') {
                   setOfferedHvac(true)
                   setOfferedPlumbing(true)
                   setOfferedElectrical(true)
+                  setOfferedRoofing(true)
                 }
               }}
             >
               <option value="hvac">HVAC only</option>
               <option value="plumbing">Plumbing only</option>
               <option value="electrical">Electrical only</option>
+              <option value="roofing">Roofing only</option>
               <option value="field_service">Field service (multi-trade)</option>
             </Select>
           </Field>
@@ -556,8 +579,8 @@ export function TenantConfigTab({
             <Field>
               <Label>Trades you offer</Label>
               <Description>
-                Pick every trade your team dispatches. All three checked is saved as three explicit values in your
-                tenant record (not an empty list). Uncheck services you do not provide — the AI only merges playbooks
+                Pick every trade your team dispatches. Every box you leave checked is saved on the
+                tenant record. Uncheck services you do not provide — the AI only merges playbooks
                 for the trades you select.
               </Description>
               <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
@@ -580,6 +603,14 @@ export function TenantConfigTab({
                     onChange={(e) => setOfferedElectrical(e.target.checked)}
                   />
                   Electrical
+                </label>
+                <label className="flex cursor-pointer items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={offeredRoofing}
+                    onChange={(e) => setOfferedRoofing(e.target.checked)}
+                  />
+                  Roofing
                 </label>
               </div>
             </Field>
