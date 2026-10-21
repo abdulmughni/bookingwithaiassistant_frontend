@@ -90,6 +90,7 @@ const INDUSTRY_LABEL: Record<string, string> = {
   hvac: 'HVAC only',
   plumbing: 'Plumbing only',
   electrical: 'Electrical only',
+  roofing: 'Roofing only',
   field_service: 'Field service (multi-trade)',
   general: 'Field service (multi-trade)',
 }
