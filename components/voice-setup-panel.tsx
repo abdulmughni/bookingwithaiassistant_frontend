@@ -110,7 +110,6 @@ type FormState = Pick<
   agent_name: string
   emergency_stop_and_911: string
   emergency_urgent: string
-  urgent_conditions: string
   model_temperature: string
   voicemail_detection_enabled: boolean
   voice_provider: string
@@ -273,7 +272,6 @@ function settingsToForm(s: VoiceSettings, defaults: VoiceConfig['defaults']): Fo
     emergency_stop_and_911:
       s.emergency_stop_and_911 || defaults.emergency_stop_and_911 || '',
     emergency_urgent: s.emergency_urgent || defaults.emergency_urgent || '',
-    urgent_conditions: s.urgent_conditions || defaults.urgent_conditions || '',
     first_message_mode: s.first_message_mode || 'assistant-speaks-first',
     model_provider: s.model_provider || 'openai',
     model_name: s.model_name || 'gpt-4.1',
@@ -442,7 +440,6 @@ function formToPatch(f: FormState): Partial<VoiceSettings> {
     agent_name: f.agent_name,
     emergency_stop_and_911: f.emergency_stop_and_911,
     emergency_urgent: f.emergency_urgent,
-    urgent_conditions: f.urgent_conditions,
     first_message_mode: f.first_message_mode,
     model_provider: f.model_provider,
     model_name: f.model_name,
@@ -1265,19 +1262,6 @@ export function VoiceSetupPanel({
                         />
                         <Description>
                           Urgent situations and the one safe step, if there is one.
-                        </Description>
-                      </Field>
-                      <Field>
-                        <Label>Urgent conditions</Label>
-                        <Textarea
-                          rows={2}
-                          value={form.urgent_conditions}
-                          onChange={(e) =>
-                            setForm({ ...form, urgent_conditions: e.target.value })
-                          }
-                        />
-                        <Description>
-                          Short list spoken when offering the earliest urgent slot.
                         </Description>
                       </Field>
                     </FieldGroup>

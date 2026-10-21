@@ -512,8 +512,6 @@ export interface VoiceSettings {
   emergency_stop_and_911?: string
   /** Urgent cases and the safe step. Fills {{EMERGENCY_URGENT}}. */
   emergency_urgent?: string
-  /** Short urgent list used while booking. Fills {{URGENT_CONDITIONS}}. */
-  urgent_conditions?: string
   model_provider: string
   model_name: string
   /** LLM sampling temperature (0–2). Platform default 0.3. */
@@ -565,7 +563,6 @@ export interface VoiceConfig {
     agent_name?: string
     emergency_stop_and_911?: string
     emergency_urgent?: string
-    urgent_conditions?: string
   }
 }
 
