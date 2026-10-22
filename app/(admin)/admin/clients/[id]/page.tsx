@@ -213,10 +213,12 @@ export default function AdminClientDetailPage() {
         api.admin.voice.importTwilioNumber(token, tenantId, data),
       importTelnyxNumber: (token, data) =>
         api.admin.voice.importTelnyxNumber(token, tenantId, data),
-      attachPhoneNumber: (token, phoneId) =>
-        api.admin.voice.attachPhoneNumber(token, tenantId, phoneId),
+      attachPhoneNumber: (token, phoneId, replace) =>
+        api.admin.voice.attachPhoneNumber(token, tenantId, phoneId, replace),
       detachPhoneNumber: (token, phoneId) =>
         api.admin.voice.detachPhoneNumber(token, tenantId, phoneId),
+      deletePhoneNumber: (token, phoneId) =>
+        api.admin.voice.deletePhoneNumber(token, tenantId, phoneId),
       listTools: (token) => api.admin.voice.listTools(token, tenantId),
     }),
     [tenantId],

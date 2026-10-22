@@ -40,6 +40,7 @@ import { Textarea } from '@/components/textarea'
 import { Select } from '@/components/select'
 import { Switch } from '@/components/switch'
 import { Card, CardBody } from '@/components/card'
+import { Dialog, DialogActions, DialogDescription, DialogTitle } from '@/components/dialog'
 import { Field, FieldGroup, Label, Description } from '@/components/fieldset'
 import {
   Table,
@@ -87,8 +88,9 @@ export type VoiceApiAdapter = {
       name?: string
     },
   ) => Promise<VoiceConfig>
-  attachPhoneNumber: (token: string, phoneId: string) => Promise<VoiceConfig>
+  attachPhoneNumber: (token: string, phoneId: string, replace?: boolean) => Promise<VoiceConfig>
   detachPhoneNumber: (token: string, phoneId: string) => Promise<VoiceConfig>
+  deletePhoneNumber: (token: string, phoneId: string) => Promise<VoiceConfig>
   listTools: (token: string) => Promise<VoiceToolsResponse>
 }
 
@@ -561,6 +563,9 @@ export function VoiceSetupPanel({
   const [syncing, setSyncing] = useState(false)
   const [phones, setPhones] = useState<VoicePhoneNumber[] | null>(null)
   const [phonesLoading, setPhonesLoading] = useState(false)
+  const [phonePrompt, setPhonePrompt] = useState<
+    { kind: 'swap' | 'delete'; phone: VoicePhoneNumber } | null
+  >(null)
   const [pendingPhoneId, setPendingPhoneId] = useState<string | null>(null)
   const [freeAreaCode, setFreeAreaCode] = useState('')
   const [creatingFree, setCreatingFree] = useState(false)
@@ -671,13 +676,22 @@ export function VoiceSetupPanel({
     (config as VoiceConfig | null)?.platform_configured ?? config?.has_api_key,
   )
 
+  // After the number list loads, a saved id that is not in this tenant's
+  // numbers is not the live line. Avoids treating a shared account number
+  // as bound before the form is refreshed.
+  const boundPhoneId = useMemo(() => {
+    const id = config?.phone_number_id || ''
+    if (!id || phones === null) return id
+    return phones.some((p) => p.id === id) ? id : ''
+  }, [config?.phone_number_id, phones])
+
   const status: { color: 'lime' | 'amber' | 'zinc' | 'red'; label: string } = useMemo(() => {
     if (!config) return { color: 'zinc', label: 'Loading' }
     if (!platformReady) return { color: 'red', label: 'Voice disabled' }
     if (!config.assistant_id) return { color: 'amber', label: 'Sync needed' }
-    if (!config.phone_number_id) return { color: 'amber', label: 'Bind a phone' }
+    if (!boundPhoneId) return { color: 'amber', label: 'Bind a phone' }
     return { color: 'lime', label: 'Live' }
-  }, [config, platformReady])
+  }, [config, platformReady, boundPhoneId])
 
   const saveAndSync = async () => {
     if (!form) return
@@ -843,7 +857,7 @@ export function VoiceSetupPanel({
     }
   }
 
-  const attachPhone = async (id: string) => {
+  const attachPhone = async (id: string, replace = false) => {
     if (readOnly) {
       notifyError('Settings are locked until your account is activated.')
       return
@@ -851,9 +865,10 @@ export function VoiceSetupPanel({
     setPendingPhoneId(id)
     try {
       const token = await getToken()
-      await voiceApi.attachPhoneNumber(token, id)
-      notifySuccess('Phone number connected.')
+      await voiceApi.attachPhoneNumber(token, id, replace)
+      notifySuccess(replace ? 'Calls moved to this number.' : 'Phone number connected.')
       setSelectedFreeId('')
+      setPhonePrompt(null)
       refetch()
       loadPhones()
     } catch (e) {
@@ -863,7 +878,15 @@ export function VoiceSetupPanel({
     }
   }
 
-  const detachPhone = async (id: string) => {
+  const requestBind = (phone: VoicePhoneNumber) => {
+    if (boundPhoneId && boundPhoneId !== phone.id) {
+      setPhonePrompt({ kind: 'swap', phone })
+      return
+    }
+    void attachPhone(phone.id)
+  }
+
+  const deletePhone = async (id: string) => {
     if (readOnly) {
       notifyError('Settings are locked until your account is activated.')
       return
@@ -871,12 +894,13 @@ export function VoiceSetupPanel({
     setPendingPhoneId(id)
     try {
       const token = await getToken()
-      await voiceApi.detachPhoneNumber(token, id)
-      notifySuccess('Phone number detached.')
+      await voiceApi.deletePhoneNumber(token, id)
+      notifySuccess('Phone number deleted.')
+      setPhonePrompt(null)
       refetch()
       loadPhones()
     } catch (e) {
-      notifyError(e instanceof ApiError ? e.message : 'Detach failed')
+      notifyError(e instanceof ApiError ? e.message : 'Delete failed')
     } finally {
       setPendingPhoneId(null)
     }
@@ -933,7 +957,7 @@ export function VoiceSetupPanel({
       (p.provider || '').toLowerCase() === 'vapi' &&
       !p.assistant_id &&
       !p.server_url &&
-      p.id !== config.phone_number_id,
+      p.id !== boundPhoneId,
   )
 
   return (
@@ -1034,14 +1058,14 @@ export function VoiceSetupPanel({
               accent="brand"
               label="Phone number"
               value={
-                config.phone_number_id ? (
-                  <code className="text-xs font-medium">{config.phone_number_id}</code>
+                boundPhoneId ? (
+                  <code className="text-xs font-medium">{boundPhoneId}</code>
                 ) : (
                   <span className="text-zinc-500">Not bound</span>
                 )
               }
               hint={
-                config.phone_number_id
+                boundPhoneId
                   ? 'Inbound calls reach this assistant'
                   : 'Bind a number from the table below'
               }
@@ -2152,8 +2176,9 @@ export function VoiceSetupPanel({
                     Get a free test number
                   </p>
                   <Text className="mt-0.5 text-xs">
-                    Vapi provides free US numbers for testing (call limits apply). Enter a US
-                    area code and we&apos;ll create one and connect it to your assistant.
+                    Vapi provides free US numbers for testing (call limits apply). The first
+                    number connects automatically. If one is already bound, the new number
+                    is added and you choose when to switch.
                   </Text>
                 </div>
                 <div className="flex items-end gap-2">
@@ -2199,7 +2224,10 @@ export function VoiceSetupPanel({
                       </Select>
                     </Field>
                     <Button
-                      onClick={() => selectedFreeId && attachPhone(selectedFreeId)}
+                      onClick={() => {
+                        const picked = availableFreeNumbers.find((p) => p.id === selectedFreeId)
+                        if (picked) requestBind(picked)
+                      }}
                       disabled={!selectedFreeId || pendingPhoneId === selectedFreeId || readOnly}
                     >
                       {pendingPhoneId === selectedFreeId ? 'Connecting…' : 'Connect'}
@@ -2332,12 +2360,11 @@ export function VoiceSetupPanel({
 
             {phones === null ? (
               <div className="mt-5 rounded-xl border border-dashed border-zinc-300 bg-zinc-50/40 px-4 py-10 text-center text-sm text-zinc-500 dark:border-zinc-700 dark:bg-zinc-900/40">
-                Click <em>Load</em> to fetch the phone numbers in your Vapi account.
+                Click <em>Load</em> to fetch the numbers added for this client.
               </div>
             ) : phones.length === 0 ? (
               <div className="mt-5 rounded-xl border border-dashed border-zinc-300 bg-zinc-50/40 px-4 py-10 text-center text-sm text-zinc-500 dark:border-zinc-700 dark:bg-zinc-900/40">
-                No phone numbers found in this Vapi account. Provision one in the Vapi dashboard,
-                then refresh.
+                No numbers added for this client yet. Create a free test number or import one above.
               </div>
             ) : (
               <div className="mt-5 overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800">
@@ -2356,7 +2383,7 @@ export function VoiceSetupPanel({
                       // Numbers now bind via the Server URL pattern (no static
                       // assistant), so our number is identified by the stored
                       // phone_number_id, not by assistant_id.
-                      const boundToUs = p.id === config.phone_number_id
+                      const boundToUs = p.id === boundPhoneId
                       const boundToOther =
                         !boundToUs && Boolean(p.assistant_id)
                       return (
@@ -2383,22 +2410,28 @@ export function VoiceSetupPanel({
                             )}
                           </TableCell>
                           <TableCell className="text-right">
-                            {boundToUs ? (
-                              <Button
-                                outline
-                                onClick={() => detachPhone(p.id)}
-                                disabled={pendingPhoneId === p.id || readOnly}
-                              >
-                                Detach
-                              </Button>
-                            ) : (
-                              <Button
-                                onClick={() => attachPhone(p.id)}
-                                disabled={pendingPhoneId === p.id || readOnly}
-                              >
-                                Bind
-                              </Button>
-                            )}
+                            <div className="flex justify-end gap-2">
+                              {boundToUs ? (
+                                <span className="text-xs text-zinc-500">Answers calls</span>
+                              ) : (
+                                <Button
+                                  onClick={() => requestBind(p)}
+                                  disabled={pendingPhoneId === p.id || readOnly}
+                                >
+                                  Bind
+                                </Button>
+                              )}
+                              {!boundToUs ? (
+                                <Button
+                                  outline
+                                  onClick={() => setPhonePrompt({ kind: 'delete', phone: p })}
+                                  disabled={pendingPhoneId === p.id || readOnly}
+                                >
+                                  <TrashIcon data-slot="icon" />
+                                  Delete
+                                </Button>
+                              ) : null}
+                            </div>
                           </TableCell>
                         </TableRow>
                       )
@@ -2407,6 +2440,39 @@ export function VoiceSetupPanel({
                 </Table>
               </div>
             )}
+            <Dialog
+              size="md"
+              open={phonePrompt !== null}
+              onClose={() => {
+                if (pendingPhoneId) return
+                setPhonePrompt(null)
+              }}
+            >
+              <DialogTitle>
+                {phonePrompt?.kind === 'delete' ? 'Delete this number?' : 'Switch the live number?'}
+              </DialogTitle>
+              <DialogDescription>
+                {phonePrompt?.kind === 'delete'
+                  ? `Delete ${phonePrompt.phone.number || 'this number'} from this client and from Vapi. This cannot be undone.`
+                  : 'This assistant already has a number bound. Detach that number and bind this one? Calls will move to the new number.'}
+              </DialogDescription>
+              <DialogActions>
+                <Button plain disabled={pendingPhoneId !== null} onClick={() => setPhonePrompt(null)}>
+                  Cancel
+                </Button>
+                <Button
+                  color={phonePrompt?.kind === 'delete' ? 'red' : 'brand'}
+                  disabled={pendingPhoneId !== null || !phonePrompt}
+                  onClick={() => {
+                    if (!phonePrompt) return
+                    if (phonePrompt.kind === 'delete') void deletePhone(phonePrompt.phone.id)
+                    else void attachPhone(phonePrompt.phone.id, true)
+                  }}
+                >
+                  {pendingPhoneId ? 'Working…' : phonePrompt?.kind === 'delete' ? 'Delete' : 'Detach and bind'}
+                </Button>
+              </DialogActions>
+            </Dialog>
           </CardBody>
         </Card>
       )}
