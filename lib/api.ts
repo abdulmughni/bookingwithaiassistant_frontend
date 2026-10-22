@@ -477,15 +477,20 @@ export const api = {
           name: data.name ?? '',
         }),
       }),
-    attachPhoneNumber: (token: string, phoneId: string) =>
+    attachPhoneNumber: (token: string, phoneId: string, replace = false) =>
       request<import('./types').VoiceConfig>(
-        `/api/voice/phone-numbers/${encodeURIComponent(phoneId)}/attach`,
+        `/api/voice/phone-numbers/${encodeURIComponent(phoneId)}/attach${replace ? '?replace=true' : ''}`,
         { token, method: 'POST' },
       ),
     detachPhoneNumber: (token: string, phoneId: string) =>
       request<import('./types').VoiceConfig>(
         `/api/voice/phone-numbers/${encodeURIComponent(phoneId)}/detach`,
         { token, method: 'POST' },
+      ),
+    deletePhoneNumber: (token: string, phoneId: string) =>
+      request<import('./types').VoiceConfig>(
+        `/api/voice/phone-numbers/${encodeURIComponent(phoneId)}`,
+        { token, method: 'DELETE' },
       ),
     listTools: (token: string) =>
       request<import('./types').VoiceToolsResponse>('/api/voice/tools', { token }),
@@ -847,15 +852,20 @@ export const api = {
             }),
           },
         ),
-      attachPhoneNumber: (token: string, tenantId: string, phoneId: string) =>
+      attachPhoneNumber: (token: string, tenantId: string, phoneId: string, replace = false) =>
         request<import('./types').VoiceConfig>(
-          `/api/admin/tenants/${encodeURIComponent(tenantId)}/voice/phone-numbers/${encodeURIComponent(phoneId)}/attach`,
+          `/api/admin/tenants/${encodeURIComponent(tenantId)}/voice/phone-numbers/${encodeURIComponent(phoneId)}/attach${replace ? '?replace=true' : ''}`,
           { token, method: 'POST' },
         ),
       detachPhoneNumber: (token: string, tenantId: string, phoneId: string) =>
         request<import('./types').VoiceConfig>(
           `/api/admin/tenants/${encodeURIComponent(tenantId)}/voice/phone-numbers/${encodeURIComponent(phoneId)}/detach`,
           { token, method: 'POST' },
+        ),
+      deletePhoneNumber: (token: string, tenantId: string, phoneId: string) =>
+        request<import('./types').VoiceConfig>(
+          `/api/admin/tenants/${encodeURIComponent(tenantId)}/voice/phone-numbers/${encodeURIComponent(phoneId)}`,
+          { token, method: 'DELETE' },
         ),
       listTools: (token: string, tenantId: string) =>
         request<import('./types').VoiceToolsResponse>(
