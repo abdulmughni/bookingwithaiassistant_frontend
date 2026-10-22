@@ -564,7 +564,7 @@ export function VoiceSetupPanel({
   const [phones, setPhones] = useState<VoicePhoneNumber[] | null>(null)
   const [phonesLoading, setPhonesLoading] = useState(false)
   const [phonePrompt, setPhonePrompt] = useState<
-    { kind: 'swap' | 'delete'; phone: VoicePhoneNumber } | null
+    { kind: 'swap' | 'delete' | 'unbind'; phone: VoicePhoneNumber } | null
   >(null)
   const [pendingPhoneId, setPendingPhoneId] = useState<string | null>(null)
   const [freeAreaCode, setFreeAreaCode] = useState('')
@@ -884,6 +884,26 @@ export function VoiceSetupPanel({
       return
     }
     void attachPhone(phone.id)
+  }
+
+  const unbindPhone = async (id: string) => {
+    if (readOnly) {
+      notifyError('Settings are locked until your account is activated.')
+      return
+    }
+    setPendingPhoneId(id)
+    try {
+      const token = await getToken()
+      await voiceApi.detachPhoneNumber(token, id)
+      notifySuccess('Number unbound. Calls stop until you bind a number.')
+      setPhonePrompt(null)
+      refetch()
+      loadPhones()
+    } catch (e) {
+      notifyError(e instanceof ApiError ? e.message : 'Unbind failed')
+    } finally {
+      setPendingPhoneId(null)
+    }
   }
 
   const deletePhone = async (id: string) => {
@@ -2412,7 +2432,13 @@ export function VoiceSetupPanel({
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-2">
                               {boundToUs ? (
-                                <span className="text-xs text-zinc-500">Answers calls</span>
+                                <Button
+                                  outline
+                                  onClick={() => setPhonePrompt({ kind: 'unbind', phone: p })}
+                                  disabled={pendingPhoneId === p.id || readOnly}
+                                >
+                                  Unbind
+                                </Button>
                               ) : (
                                 <Button
                                   onClick={() => requestBind(p)}
@@ -2421,16 +2447,14 @@ export function VoiceSetupPanel({
                                   Bind
                                 </Button>
                               )}
-                              {!boundToUs ? (
-                                <Button
-                                  outline
-                                  onClick={() => setPhonePrompt({ kind: 'delete', phone: p })}
-                                  disabled={pendingPhoneId === p.id || readOnly}
-                                >
-                                  <TrashIcon data-slot="icon" />
-                                  Delete
-                                </Button>
-                              ) : null}
+                              <Button
+                                outline
+                                onClick={() => setPhonePrompt({ kind: 'delete', phone: p })}
+                                disabled={pendingPhoneId === p.id || readOnly}
+                              >
+                                <TrashIcon data-slot="icon" />
+                                Delete
+                              </Button>
                             </div>
                           </TableCell>
                         </TableRow>
@@ -2449,27 +2473,44 @@ export function VoiceSetupPanel({
               }}
             >
               <DialogTitle>
-                {phonePrompt?.kind === 'delete' ? 'Delete this number?' : 'Switch the live number?'}
+                {phonePrompt?.kind === 'delete'
+                  ? 'Delete this number?'
+                  : phonePrompt?.kind === 'unbind'
+                    ? 'Unbind this number?'
+                    : 'Switch the live number?'}
               </DialogTitle>
               <DialogDescription>
                 {phonePrompt?.kind === 'delete'
-                  ? `Delete ${phonePrompt.phone.number || 'this number'} from this client and from Vapi. This cannot be undone.`
-                  : 'This assistant already has a number bound. Detach that number and bind this one? Calls will move to the new number.'}
+                  ? `Delete ${phonePrompt.phone.number || 'this number'} from this client and from Vapi. This cannot be undone.${
+                      phonePrompt.phone.id === boundPhoneId
+                        ? ' Calls stop until you add and bind another number.'
+                        : ''
+                    }`
+                  : phonePrompt?.kind === 'unbind'
+                    ? `Unbind ${phonePrompt.phone.number || 'this number'}? It stays on this client, but calls stop until you bind a number again.`
+                    : 'This assistant already has a number bound. Detach that number and bind this one? Calls will move to the new number.'}
               </DialogDescription>
               <DialogActions>
                 <Button plain disabled={pendingPhoneId !== null} onClick={() => setPhonePrompt(null)}>
                   Cancel
                 </Button>
                 <Button
-                  color={phonePrompt?.kind === 'delete' ? 'red' : 'brand'}
+                  color={phonePrompt?.kind === 'swap' ? 'brand' : 'red'}
                   disabled={pendingPhoneId !== null || !phonePrompt}
                   onClick={() => {
                     if (!phonePrompt) return
                     if (phonePrompt.kind === 'delete') void deletePhone(phonePrompt.phone.id)
+                    else if (phonePrompt.kind === 'unbind') void unbindPhone(phonePrompt.phone.id)
                     else void attachPhone(phonePrompt.phone.id, true)
                   }}
                 >
-                  {pendingPhoneId ? 'Working…' : phonePrompt?.kind === 'delete' ? 'Delete' : 'Detach and bind'}
+                  {pendingPhoneId
+                    ? 'Working…'
+                    : phonePrompt?.kind === 'delete'
+                      ? 'Delete'
+                      : phonePrompt?.kind === 'unbind'
+                        ? 'Unbind'
+                        : 'Detach and bind'}
                 </Button>
               </DialogActions>
             </Dialog>
