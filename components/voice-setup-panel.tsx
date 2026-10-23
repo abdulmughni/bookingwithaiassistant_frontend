@@ -125,7 +125,7 @@ type FormState = Pick<
   voice_style: string
   voice_use_speaker_boost: boolean
   voice_optimize_streaming_latency: string
-  voice_speed: string // kept for non-11labs / legacy; not shown for 11labs
+  voice_speed: string
 
   // Transcriber (Deepgram)
   transcriber_provider: string
@@ -188,14 +188,14 @@ const DEFAULT_FALLBACKS = {
   transcriber_provider: 'deepgram',
   transcriber_model: 'nova-3',
   transcriber_language: 'en',
-  voice_provider: 'vapi',
-  voice_id: 'Elliot',
+  voice_provider: '11labs',
+  voice_id: 'cjVigY5qzO86Huf0OWal',
   model_temperature: '0.3',
-  start_smart_provider: 'livekit',
+  start_smart_provider: 'vapi',
   start_wait_style: 'aggressive',
-  start_wait_seconds: '0.4',
+  start_wait_seconds: '0.6',
   stop_num_words: '2',
-  stop_voice_seconds: '0.2',
+  stop_voice_seconds: '0.3',
   stop_backoff_seconds: '1.0',
   silence_timeout_seconds: '20',
   max_duration_seconds: '600',
@@ -211,6 +211,7 @@ const ELEVENLABS_DEFAULTS = {
   stability: '0.5',
   similarityBoost: '0.75',
   style: '0',
+  speed: '1.1',
   useSpeakerBoost: true,
   optimizeStreamingLatency: '3',
 } as const
@@ -302,7 +303,7 @@ function settingsToForm(s: VoiceSettings, defaults: VoiceConfig['defaults']): Fo
     voice_optimize_streaming_latency:
       stringOrEmpty(voice.optimizeStreamingLatency) ||
       ELEVENLABS_DEFAULTS.optimizeStreamingLatency,
-    voice_speed: stringOrEmpty(voice.speed),
+    voice_speed: stringOrEmpty(voice.speed) || ELEVENLABS_DEFAULTS.speed,
 
     transcriber_provider: String(transcriber.provider ?? DEFAULT_FALLBACKS.transcriber_provider),
     transcriber_model: String(transcriber.model ?? DEFAULT_FALLBACKS.transcriber_model),
@@ -425,6 +426,8 @@ function formToPatch(f: FormState): Partial<VoiceSettings> {
     voice.stability = parseNumberOr(f.voice_stability, 0.5)
     voice.similarityBoost = parseNumberOr(f.voice_similarity_boost, 0.75)
     voice.style = parseNumberOr(f.voice_style, 0) ?? 0
+    const speed = parseNumberOr(f.voice_speed, 1.1) ?? 1.1
+    voice.speed = Math.min(1.2, Math.max(0.7, speed))
     voice.useSpeakerBoost = f.voice_use_speaker_boost
     voice.optimizeStreamingLatency =
       parseNumberOr(f.voice_optimize_streaming_latency, 3) ?? 3
@@ -1425,6 +1428,7 @@ export function VoiceSetupPanel({
                                 voice_stability: ELEVENLABS_DEFAULTS.stability,
                                 voice_similarity_boost: ELEVENLABS_DEFAULTS.similarityBoost,
                                 voice_style: ELEVENLABS_DEFAULTS.style,
+                                voice_speed: ELEVENLABS_DEFAULTS.speed,
                                 voice_use_speaker_boost: ELEVENLABS_DEFAULTS.useSpeakerBoost,
                                 voice_optimize_streaming_latency:
                                   ELEVENLABS_DEFAULTS.optimizeStreamingLatency,
@@ -1594,6 +1598,34 @@ export function VoiceSetupPanel({
                             placeholder="0"
                             hint="Default 0. Amplifies stylistic traits (can add latency)."
                           />
+                          <Field className="sm:col-span-2">
+                            <div className="flex items-center justify-between gap-3">
+                              <Label>Speed</Label>
+                              <Input
+                                type="number"
+                                min={0.7}
+                                max={1.2}
+                                step={0.1}
+                                value={form.voice_speed}
+                                onChange={(e) => setForm({ ...form, voice_speed: e.target.value })}
+                                className="w-20"
+                              />
+                            </div>
+                            <input
+                              type="range"
+                              min={0.7}
+                              max={1.2}
+                              step={0.1}
+                              value={(() => {
+                                const n = Number(form.voice_speed)
+                                if (!Number.isFinite(n)) return 1.1
+                                return Math.min(1.2, Math.max(0.7, n))
+                              })()}
+                              onChange={(e) => setForm({ ...form, voice_speed: e.target.value })}
+                              className="mt-2 h-2 w-full cursor-pointer appearance-none rounded-full bg-zinc-200 accent-sky-500 dark:bg-zinc-700"
+                            />
+                            <Description>Default 1.1. Lower is slower, higher is faster. Range 0.7–1.2.</Description>
+                          </Field>
                           <Field>
                             <Label>Streaming latency (0–4)</Label>
                             <Select
@@ -1969,7 +2001,7 @@ export function VoiceSetupPanel({
                           }
                         />
                         <Description>
-                          0.4 standard, 0.6–0.8 healthcare/formal, 0.0–0.2 fast.
+                          0.6 standard. 0.0–0.2 is faster. 0.8 is slower.
                         </Description>
                       </Field>
                     </div>
@@ -2003,7 +2035,7 @@ export function VoiceSetupPanel({
                           }
                         />
                         <Description>
-                          VAD threshold (only used when words = 0). 0.2 balanced.
+                          VAD threshold (only used when words = 0). 0.3 balanced.
                         </Description>
                       </Field>
                       <Field>
