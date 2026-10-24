@@ -210,6 +210,9 @@ export function useAccountStatus() {
 export function useIsAdmin() {
   const getToken = useApiToken()
   const [isAdmin, setIsAdmin] = useState(false)
+  const [isAgency, setIsAgency] = useState(false)
+  const [role, setRole] = useState<'super_admin' | 'agency' | 'client' | 'none'>('none')
+  const [tenantId, setTenantId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -218,9 +221,19 @@ export function useIsAdmin() {
       try {
         const token = await getToken()
         const me = await api.admin.me(token)
-        if (!cancelled) setIsAdmin(Boolean(me?.is_admin))
+        if (cancelled) return
+        const nextRole = me?.role ?? (me?.is_admin ? 'super_admin' : 'none')
+        setRole(nextRole)
+        setIsAdmin(nextRole === 'super_admin')
+        setIsAgency(nextRole === 'agency')
+        setTenantId(me?.tenant_id ?? null)
       } catch {
-        if (!cancelled) setIsAdmin(false)
+        if (!cancelled) {
+          setIsAdmin(false)
+          setIsAgency(false)
+          setRole('none')
+          setTenantId(null)
+        }
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -230,7 +243,32 @@ export function useIsAdmin() {
     }
   }, [getToken])
 
-  return { isAdmin, loading }
+  return { isAdmin, isAgency, role, tenantId, loading }
+}
+
+/** Logo and two colors for the signed-in agency, or for a client's parent agency. */
+export function useAgencyBrand(enabled = true) {
+  const getToken = useApiToken()
+  const [brand, setBrand] = useState<import('./types').SessionBrand | null>(null)
+
+  const load = useCallback(async () => {
+    if (!enabled) return
+    try {
+      const token = await getToken()
+      setBrand(await api.brand.me(token))
+    } catch {
+      setBrand(null)
+    }
+  }, [enabled, getToken])
+
+  useEffect(() => {
+    void load()
+    const onChange = () => void load()
+    window.addEventListener('agency-brand-changed', onChange)
+    return () => window.removeEventListener('agency-brand-changed', onChange)
+  }, [load])
+
+  return brand
 }
 
 /** Catalogue of pricing tiers (rendered on /plans). Fetches once. */

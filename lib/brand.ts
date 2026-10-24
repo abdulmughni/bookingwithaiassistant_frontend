@@ -7,6 +7,14 @@ export const brandLogoClass =
 
 export const brandGradientClass = 'bg-linear-to-br from-brand-500 to-brand-700'
 
+/** Turn a stored `/api/brand/logo/...` path into a URL the browser can load. */
+export function brandAssetUrl(path: string | null | undefined): string | null {
+  if (!path) return null
+  if (path.startsWith('http://') || path.startsWith('https://')) return path
+  const base = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'
+  return `${base}${path}`
+}
+
 export const brandHeroBgClass =
   'bg-linear-to-br from-brand-50 via-white to-brand-50/60 dark:from-brand-950/30 dark:via-zinc-900 dark:to-brand-950/20'
 

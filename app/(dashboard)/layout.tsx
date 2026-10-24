@@ -17,7 +17,7 @@ import {
 } from '@/components/sidebar'
 import { Navbar, NavbarSpacer } from '@/components/navbar'
 import { isNavGroupCurrent, isNavHrefCurrent, mainNavItems } from '@/lib/navigation'
-import { useIsAdmin } from '@/lib/hooks'
+import { useAgencyBrand, useIsAdmin } from '@/lib/hooks'
 import { ArrowRightStartOnRectangleIcon } from '@heroicons/react/20/solid'
 import {
   NavbarOrganizationSwitcher,
@@ -33,6 +33,8 @@ import { ClientOpsBanners } from '@/components/client-ops-banners'
 import { NotificationBell } from '@/components/notification-bell'
 import { RealtimeProvider } from '@/lib/realtime'
 import { BrandLogo } from '@/components/brand-logo'
+import { BrandTheme } from '@/components/brand-theme'
+import { brandAssetUrl } from '@/lib/brand'
 
 export default function DashboardLayout({
   children,
@@ -44,7 +46,8 @@ export default function DashboardLayout({
   const { user } = useUser()
   const { actor } = useAuth()
   const { signOut } = useClerk()
-  const { isAdmin, loading: adminLoading } = useIsAdmin()
+  const { isAdmin, isAgency, loading: adminLoading } = useIsAdmin()
+  const brand = useAgencyBrand(!adminLoading && !isAdmin && !isAgency)
 
   const fullBleedPage =
     pathname === '/conversations' || pathname.startsWith('/conversations/')
@@ -56,9 +59,12 @@ export default function DashboardLayout({
     if (!adminLoading && isAdmin && !impersonating) {
       router.replace('/admin')
     }
-  }, [adminLoading, isAdmin, impersonating, router])
+    if (!adminLoading && isAgency && !impersonating) {
+      router.replace('/admin/clients')
+    }
+  }, [adminLoading, isAdmin, isAgency, impersonating, router])
 
-  if ((adminLoading || isAdmin) && !impersonating) {
+  if ((adminLoading || isAdmin || isAgency) && !impersonating) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950">
         <div className="size-8 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-900 dark:border-zinc-700 dark:border-t-white" />
@@ -70,6 +76,7 @@ export default function DashboardLayout({
     <OrganizationGate>
       <AccountStatusGate>
       <RealtimeProvider>
+      <BrandTheme primary={brand?.primary_color} primaryDark={brand?.primary_dark_color} />
       <SidebarLayout
       contentViewportLocked={fullBleedPage}
       desktopHeader={<NotificationBell />}
@@ -87,7 +94,13 @@ export default function DashboardLayout({
             <SidebarSection>
               <SidebarItem href="/">
                 <span className="flex min-w-0 items-center">
-                  <BrandLogo height={31} priority className="max-w-44.5" />
+                  <BrandLogo
+                    height={31}
+                    priority
+                    className="max-w-44.5"
+                    src={brandAssetUrl(brand?.logo_url)}
+                    alt={brand?.company_name || 'Logo'}
+                  />
                 </span>
               </SidebarItem>
             </SidebarSection>
