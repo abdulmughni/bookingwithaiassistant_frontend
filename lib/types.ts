@@ -690,6 +690,35 @@ export interface PlanChangeRequestResult {
 export interface AdminMe {
   is_admin: boolean
   user_id: string
+  role?: 'super_admin' | 'agency' | 'client' | 'none'
+  tenant_id?: string | null
+}
+
+export interface AgencySummary {
+  id: string
+  name: string
+  email: string | null
+  client_count: number
+  logo_url: string | null
+  primary_color: string | null
+  primary_dark_color: string | null
+}
+
+export interface InviteResult {
+  tenant_id: string
+  email: string
+  company_name: string
+  kind: string
+}
+
+export interface AgencyBrandColors {
+  logo_url: string | null
+  primary_color: string | null
+  primary_dark_color: string | null
+}
+
+export interface SessionBrand extends AgencyBrandColors {
+  company_name: string | null
 }
 
 export interface AdminPlanInfo {
@@ -728,6 +757,8 @@ export interface AdminTenant {
   last_activity_at?: string | null
   bookings_this_month?: number
   industry_type?: string | null
+  parent_tenant_id?: string | null
+  parent_name?: string | null
 }
 
 export interface AdminAlert {

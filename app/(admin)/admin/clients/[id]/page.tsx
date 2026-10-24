@@ -56,7 +56,7 @@ import { TenantConfigTab } from '@/app/(dashboard)/settings/page'
 import { DocumentsTab, type KnowledgeApi } from '@/app/(dashboard)/settings/documents-tab'
 import { api, ApiError } from '@/lib/api'
 import { clearVerificationToken, getVerificationToken } from '@/lib/admin-verification'
-import { useApiData, useApiToken, usePlans } from '@/lib/hooks'
+import { useApiData, useApiToken, useIsAdmin, usePlans } from '@/lib/hooks'
 import type { AdminFunnel, AdminOrgMember, ClientLoginCredentials, QuotaState } from '@/lib/types'
 
 const CHANNEL_LABEL: Record<string, string> = {
@@ -173,6 +173,7 @@ export default function AdminClientDetailPage() {
   const searchParams = useSearchParams()
   const activeTab = parseClientTab(searchParams.get('tab'))
   const getToken = useApiToken()
+  const { isAgency } = useIsAdmin()
   const { data: plans } = usePlans()
 
   const setActiveTab = useCallback(
@@ -507,10 +508,12 @@ export default function AdminClientDetailPage() {
                 Activate
               </Button>
             )}
-            <Button outline disabled={fetchingLogin} onClick={handleGetClientLogin}>
-              <ArrowTopRightOnSquareIcon />
-              {fetchingLogin ? 'Loading…' : 'Client login credentials'}
-            </Button>
+            {!isAgency ? (
+              <Button outline disabled={fetchingLogin} onClick={handleGetClientLogin}>
+                <ArrowTopRightOnSquareIcon />
+                {fetchingLogin ? 'Loading…' : 'Client login credentials'}
+              </Button>
+            ) : null}
           </div>
         </div>
 
@@ -909,8 +912,9 @@ export default function AdminClientDetailPage() {
               </span>
             </div>
             <p className="mt-1 text-sm text-zinc-500">
-              Organization members — always visible here. Use &quot;Client login credentials&quot; to
-              copy sign-in details for testing in a separate tab.
+              {isAgency
+                ? 'People who can sign in to this client.'
+                : 'Organization members — always visible here. Use "Client login credentials" to copy sign-in details for testing in a separate tab.'}
             </p>
 
             <ul className="mt-4 space-y-3">
@@ -958,7 +962,7 @@ export default function AdminClientDetailPage() {
         </ul>
       </section>
 
-      {/* Danger zone */}
+      {!isAgency ? (
       <section className="rounded-2xl border border-red-200 bg-red-50/50 p-5 sm:p-6 dark:border-red-900/50 dark:bg-red-950/20">
         <h3 className="text-base font-semibold text-red-700 dark:text-red-400">Danger zone</h3>
         <p className="mt-0.5 text-sm text-red-600/80 dark:text-red-300/80">
@@ -981,6 +985,7 @@ export default function AdminClientDetailPage() {
           </Button>
         </div>
       </section>
+      ) : null}
         </>
       )}
 

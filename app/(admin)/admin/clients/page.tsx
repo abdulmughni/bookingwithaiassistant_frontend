@@ -5,6 +5,9 @@ import { useSearchParams } from 'next/navigation'
 import { ChevronRightIcon, MagnifyingGlassIcon } from '@heroicons/react/20/solid'
 import clsx from 'clsx'
 
+import { toast } from 'sonner'
+
+import { InviteCompanyDialog } from '@/components/admin/invite-company-dialog'
 import { Button } from '@/components/button'
 import { Input, InputGroup } from '@/components/input'
 import { Select } from '@/components/select'
@@ -20,7 +23,7 @@ import { PageHeader, PageShell, SkeletonBlock, dashCardClass } from '@/component
 import { HealthDot, relativeActivity } from '@/components/admin/ops'
 import { StatusBadge, UsageBar, formatDate } from '@/components/admin/shared'
 import { api } from '@/lib/api'
-import { useApiData } from '@/lib/hooks'
+import { useApiData, useIsAdmin } from '@/lib/hooks'
 import type { AccountStatus } from '@/lib/types'
 
 type HealthFilter = 'all' | 'red' | 'yellow' | 'green'
@@ -41,6 +44,8 @@ function ClientsPageInner() {
       ? statusParam
       : 'all'
 
+  const { isAgency, tenantId } = useIsAdmin()
+  const [inviteOpen, setInviteOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<AccountStatus | 'all'>(initialStatus)
   const [healthFilter, setHealthFilter] = useState<HealthFilter>('all')
@@ -71,8 +76,17 @@ function ClientsPageInner() {
     <PageShell>
       <PageHeader
         title="Clients"
-        description="Health-sorted client list. Click a row for funnel, bookings, and usage detail."
+        description={
+          isAgency
+            ? 'Your clients. Open one to set up voice, phone numbers, prompts, and knowledge.'
+            : 'Health-sorted client list. Click a row for funnel, bookings, and usage detail.'
+        }
       >
+        {isAgency && tenantId ? (
+          <Button color="brand" onClick={() => setInviteOpen(true)}>
+            Invite client
+          </Button>
+        ) : null}
         <Button outline onClick={() => void refetch()}>
           Refresh
         </Button>
@@ -171,6 +185,11 @@ function ClientsPageInner() {
                     </TableCell>
                     <TableCell>
                       <div className="font-medium text-zinc-950 dark:text-white">{t.name}</div>
+                      {!isAgency ? (
+                        <div className="text-xs text-zinc-400">
+                          {t.parent_name || 'Unassigned'}
+                        </div>
+                      ) : null}
                       <div className="font-mono text-xs text-zinc-400">{t.id}</div>
                     </TableCell>
                     <TableCell className="capitalize text-zinc-600 dark:text-zinc-300">
@@ -222,6 +241,20 @@ function ClientsPageInner() {
           </Table>
         </div>
       </div>
+      {isAgency && tenantId ? (
+        <InviteCompanyDialog
+          open={inviteOpen}
+          onClose={() => setInviteOpen(false)}
+          title="Invite a client"
+          description="They get their own login. You manage their setup from this list."
+          submitLabel="Send invitation"
+          onSubmit={async (token, input) => {
+            await api.admin.inviteClient(token, tenantId, input)
+            toast.success('Invitation sent')
+            await refetch()
+          }}
+        />
+      ) : null}
     </PageShell>
   )
 }

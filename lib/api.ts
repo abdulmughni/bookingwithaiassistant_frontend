@@ -1,4 +1,4 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'
+export const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'
 
 /** Sent on every backend fetch so ngrok does not inject its HTML interstitial. */
 const NGROK_BROWSER_HEADER: Record<string, string> = {
@@ -521,8 +521,70 @@ export const api = {
     me: (token: string) => request<import('./types').AdminMe>('/api/admin/me', { token }),
     overview: (token: string) =>
       request<import('./types').AdminOverview>('/api/admin/overview', { token }),
-    listTenants: (token: string) =>
-      request<import('./types').AdminTenant[]>('/api/admin/tenants', { token }),
+    listTenants: (
+      token: string,
+      query?: { parentId?: string; unassigned?: boolean },
+    ) => {
+      const params = new URLSearchParams()
+      if (query?.parentId) params.set('parent_id', query.parentId)
+      if (query?.unassigned) params.set('unassigned', 'true')
+      const qs = params.toString()
+      return request<import('./types').AdminTenant[]>(
+        `/api/admin/tenants${qs ? `?${qs}` : ''}`,
+        { token },
+      )
+    },
+    listAgencies: (token: string) =>
+      request<import('./types').AgencySummary[]>('/api/admin/agencies', { token }),
+    getAgency: (token: string, agencyId: string) =>
+      request<import('./types').AgencySummary>(
+        `/api/admin/agencies/${encodeURIComponent(agencyId)}`,
+        { token },
+      ),
+    inviteAgency: (token: string, body: { company_name: string; email: string }) =>
+      request<import('./types').InviteResult>('/api/admin/agencies/invite', {
+        token,
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    renameAgency: (token: string, agencyId: string, name: string) =>
+      request<import('./types').AgencySummary>(
+        `/api/admin/agencies/${encodeURIComponent(agencyId)}`,
+        { token, method: 'PATCH', body: JSON.stringify({ name }) },
+      ),
+    inviteClient: (
+      token: string,
+      agencyId: string,
+      body: { company_name: string; email: string },
+    ) =>
+      request<import('./types').InviteResult>(
+        `/api/admin/agencies/${encodeURIComponent(agencyId)}/clients/invite`,
+        { token, method: 'POST', body: JSON.stringify(body) },
+      ),
+    attachClient: (token: string, agencyId: string, clientId: string) =>
+      request<void>(
+        `/api/admin/agencies/${encodeURIComponent(agencyId)}/clients/${encodeURIComponent(clientId)}/attach`,
+        { token, method: 'POST' },
+      ),
+    saveBrandColors: (
+      token: string,
+      agencyId: string,
+      colors: { primary_color: string; primary_dark_color: string },
+    ) =>
+      request<import('./types').AgencyBrandColors>(
+        `/api/admin/agencies/${encodeURIComponent(agencyId)}/brand`,
+        { token, method: 'PUT', body: JSON.stringify(colors) },
+      ),
+    uploadBrandLogo: (token: string, agencyId: string, file: File) => {
+      const form = new FormData()
+      form.append('file', file)
+      return requestFormData<import('./types').AgencyBrandColors>(
+        `/api/admin/agencies/${encodeURIComponent(agencyId)}/brand/logo`,
+        token,
+        form,
+        'POST',
+      )
+    },
     getTenant: (token: string, tenantId: string) =>
       request<import('./types').AdminTenantDetail>(
         `/api/admin/tenants/${encodeURIComponent(tenantId)}`,
@@ -873,6 +935,10 @@ export const api = {
           { token },
         ),
     },
+  },
+
+  brand: {
+    me: (token: string) => request<import('./types').SessionBrand>('/api/brand/me', { token }),
   },
 
   credentials: {

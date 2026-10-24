@@ -4,10 +4,12 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 import { useAuth, useUser, UserButton } from '@clerk/nextjs'
 import {
+  BuildingOffice2Icon,
   ChartBarSquareIcon,
   CreditCardIcon,
   InboxArrowDownIcon,
   ShieldCheckIcon,
+  SwatchIcon,
   UsersIcon,
 } from '@heroicons/react/20/solid'
 
@@ -23,23 +25,39 @@ import {
   SidebarSpacer,
 } from '@/components/sidebar'
 import { SidebarLayout } from '@/components/sidebar-layout'
-import { useIsAdmin } from '@/lib/hooks'
 import { BrandLogo } from '@/components/brand-logo'
-import { brandGradientClass } from '@/lib/brand'
+import { BrandTheme } from '@/components/brand-theme'
+import { brandAssetUrl, brandGradientClass } from '@/lib/brand'
+import { useAgencyBrand, useIsAdmin } from '@/lib/hooks'
 
-const adminNav = [
+const superAdminNav = [
   { label: 'Overview', href: '/admin', icon: ChartBarSquareIcon, exact: true },
+  { label: 'Agencies', href: '/admin/agencies', icon: BuildingOffice2Icon, exact: false },
   { label: 'Clients', href: '/admin/clients', icon: UsersIcon, exact: false },
   { label: 'Plans', href: '/admin/plans', icon: CreditCardIcon, exact: false },
   { label: 'Plan requests', href: '/admin/requests', icon: InboxArrowDownIcon, exact: false },
 ]
 
+const agencyNav = [
+  { label: 'Clients', href: '/admin/clients', icon: UsersIcon, exact: false },
+  { label: 'Brand', href: '/admin/brand', icon: SwatchIcon, exact: false },
+]
+
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { isLoaded, userId } = useAuth()
   const { user } = useUser()
-  const { isAdmin, loading } = useIsAdmin()
+  const { isAdmin, isAgency, loading } = useIsAdmin()
+  const brand = useAgencyBrand(isAgency)
   const router = useRouter()
   const pathname = usePathname()
+  const allowed = isAdmin || isAgency
+  const agencyBlocked =
+    isAgency &&
+    (pathname === '/admin' ||
+      pathname.startsWith('/admin/plans') ||
+      pathname.startsWith('/admin/requests') ||
+      pathname.startsWith('/admin/agencies'))
+  const nav = isAgency ? agencyNav : superAdminNav
 
   const adminName =
     (user ? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() : '') ||
@@ -51,12 +69,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       router.replace('/')
       return
     }
-    if (isLoaded && userId && !loading && !isAdmin) {
+    if (isLoaded && userId && !loading && !allowed) {
       router.replace('/')
     }
-  }, [isLoaded, userId, loading, isAdmin, router])
+    if (isLoaded && userId && !loading && agencyBlocked) {
+      router.replace('/admin/clients')
+    }
+  }, [isLoaded, userId, loading, allowed, agencyBlocked, router])
 
-  if (!isLoaded || loading || !isAdmin) {
+  if (!isLoaded || loading || !allowed || agencyBlocked) {
     return (
       <div className="flex min-h-svh flex-col items-center justify-center gap-3 bg-zinc-50 dark:bg-zinc-950">
         <div className={`flex size-12 items-center justify-center rounded-2xl ${brandGradientClass}`}>
@@ -79,16 +100,22 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <Sidebar>
           <SidebarHeader>
             <div className="flex flex-col gap-0 px-2 py-0.5">
-              <BrandLogo height={31} priority className="max-w-44.5" />
+              <BrandLogo
+                height={31}
+                priority
+                className="max-w-44.5"
+                src={isAgency ? brandAssetUrl(brand?.logo_url) : null}
+                alt={brand?.company_name || 'Logo'}
+              />
               <p className="truncate pl-[25px] text-[10px] font-medium leading-tight text-zinc-500 dark:text-zinc-400">
-                Admin Console
+                {isAgency ? 'Agency' : 'Admin Console'}
               </p>
             </div>
           </SidebarHeader>
 
           <SidebarBody>
             <SidebarSection>
-              {adminNav.map((item) => (
+              {nav.map((item) => (
                 <SidebarItem
                   key={item.href}
                   href={item.href}
@@ -113,7 +140,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                       {adminName}
                     </p>
                     <span className="inline-flex shrink-0 items-center rounded-md bg-brand-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-700 dark:text-brand-300">
-                      Admin
+                      {isAgency ? 'Agency' : 'Admin'}
                     </span>
                   </div>
                   <p className="truncate text-xs text-zinc-500">
@@ -126,6 +153,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </Sidebar>
       }
     >
+      {isAgency ? (
+        <BrandTheme primary={brand?.primary_color} primaryDark={brand?.primary_dark_color} />
+      ) : null}
       <div className="min-h-full bg-zinc-50/90 px-4 py-6 sm:px-6 lg:px-8 lg:py-8 dark:bg-zinc-950">
         {children}
       </div>

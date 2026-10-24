@@ -6,10 +6,25 @@ type BrandLogoProps = {
   /** Image height in px — width scales to preserve aspect ratio. */
   height?: number
   priority?: boolean
+  /** Agency logo. When set, this replaces the Beyonds Logic wordmark. */
+  src?: string | null
+  alt?: string
 }
 
 /** Full Beyonds Logic wordmark logo (icon + text in one PNG). */
-export function BrandLogo({ className, height = 28, priority = false }: BrandLogoProps) {
+export function BrandLogo({ className, height = 28, priority = false, src, alt }: BrandLogoProps) {
+  if (src) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={src}
+        alt={alt || 'Logo'}
+        className={clsx('w-auto object-contain object-left', className)}
+        style={{ height, width: 'auto', maxWidth: '100%' }}
+      />
+    )
+  }
+
   // Source asset is wide; keep a generous width so Next Image doesn't crop.
   const width = Math.round(height * 4.2)
 
