@@ -76,7 +76,7 @@ export default function DashboardLayout({
     <OrganizationGate>
       <AccountStatusGate>
       <RealtimeProvider>
-      <BrandTheme primary={brand?.primary_color} primaryDark={brand?.primary_dark_color} />
+      <BrandTheme theme={brand?.theme} />
       <SidebarLayout
       contentViewportLocked={fullBleedPage}
       desktopHeader={<NotificationBell />}

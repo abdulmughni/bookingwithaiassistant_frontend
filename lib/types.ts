@@ -702,6 +702,7 @@ export interface AgencySummary {
   logo_url: string | null
   primary_color: string | null
   primary_dark_color: string | null
+  theme?: import('./brand-presets').BrandThemeColors | null
 }
 
 export interface InviteResult {
@@ -715,6 +716,7 @@ export interface AgencyBrandColors {
   logo_url: string | null
   primary_color: string | null
   primary_dark_color: string | null
+  theme: import('./brand-presets').BrandThemeColors | null
 }
 
 export interface SessionBrand extends AgencyBrandColors {

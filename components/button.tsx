@@ -124,8 +124,8 @@ const styles = {
       '[--btn-icon:var(--color-white)]/60 data-active:[--btn-icon:var(--color-white)]/80 data-hover:[--btn-icon:var(--color-white)]/80',
     ],
     brand: [
-      'text-white [--btn-hover-overlay:var(--color-white)]/10 [--btn-bg:var(--color-brand-600)] [--btn-border:var(--color-brand-700)]/90',
-      '[--btn-icon:var(--color-white)]/60 data-active:[--btn-icon:var(--color-white)]/80 data-hover:[--btn-icon:var(--color-white)]/80',
+      'text-[var(--brand-button-text,white)] [--btn-hover-overlay:var(--color-white)]/10 [--btn-bg:var(--color-brand-600)] [--btn-border:var(--color-brand-700)]/90',
+      '[--btn-icon:var(--brand-button-text,white)]/80 data-active:[--btn-icon:var(--brand-button-text,white)] data-hover:[--btn-icon:var(--brand-button-text,white)]',
     ],
     teal: [
       'text-white [--btn-hover-overlay:var(--color-white)]/10 [--btn-bg:var(--color-teal-600)] [--btn-border:var(--color-teal-700)]/90',
