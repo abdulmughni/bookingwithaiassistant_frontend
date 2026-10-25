@@ -99,16 +99,20 @@ export function ShellBrand({
 
 /** Full Beyonds Logic wordmark logo (icon + text in one PNG). */
 export function BrandLogo({ className, height = 28, priority = false, src, alt }: BrandLogoProps) {
-  const image = useBrandImage(src)
+  const image = useBrandImage(src && !src.startsWith('http') ? src : null)
   if (src) {
-    if (!image) return null
+    const shown = src.startsWith('http') ? src : image
+    if (!shown) return null
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
-        src={image}
+        src={shown}
         alt={alt || ''}
         className={clsx('w-auto object-contain object-left', className)}
         style={{ height, width: 'auto' }}
+        onError={(event) => {
+          event.currentTarget.style.display = 'none'
+        }}
       />
     )
   }

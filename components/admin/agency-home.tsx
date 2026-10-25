@@ -1,7 +1,13 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
+import {
+  CalendarDaysIcon,
+  ChatBubbleLeftRightIcon,
+  EnvelopeIcon,
+  PhoneIcon,
+} from '@heroicons/react/20/solid'
 
 import {
   AgencyRangeChart,
@@ -9,18 +15,23 @@ import {
   DashboardCard,
   RecentActivityList,
   attentionReason,
-  messagesRemaining,
-  minutesRemaining,
 } from '@/components/admin/agency-dashboard'
+import { AdminAlertPanel } from '@/components/admin/ops'
 import { PageHeader, PageShell, SkeletonBlock, dashCardClass } from '@/components/dashboard-ui'
 import { api } from '@/lib/api'
 import { useApiData } from '@/lib/hooks'
-import type { AdminTenant } from '@/lib/types'
+import type { AdminAlert, AdminTenant } from '@/lib/types'
+
+function alertKey(alert: Pick<AdminAlert, 'tenant_id' | 'rule_key'>) {
+  return `${alert.tenant_id}:${alert.rule_key}`
+}
 
 export function AgencyHome() {
   const [days, setDays] = useState<7 | 30>(30)
+  const [sessionDismissed, setSessionDismissed] = useState<Set<string>>(() => new Set())
   const clientsQuery = useApiData((token) => api.admin.listTenants(token), [])
   const activityQuery = useApiData((token) => api.admin.agencyActivity(token, days), [days])
+  const alertsQuery = useApiData((token) => api.admin.agencyAlerts(token), [])
   const clients = clientsQuery.data ?? []
   const attention = clients
     .map((client) => ({ client, reason: attentionReason(client) }))
@@ -30,12 +41,14 @@ export function AgencyHome() {
     for (const row of activityQuery.data?.clients ?? []) map.set(row.tenant_id, row)
     return map
   }, [activityQuery.data])
-  const minuteUsed = clients.reduce((sum, client) => sum + (client.usage?.call_minutes_used ?? 0), 0)
-  const minuteLeft = clients.reduce((sum, client) => sum + minutesRemaining(client), 0)
-  const messageUsed = clients.reduce((sum, client) => sum + (client.usage?.messages_used ?? 0), 0)
-  const finiteMessages = clients.map(messagesRemaining).filter((value): value is number => value !== null)
-  const anyUnlimited = clients.some((client) => client.plan?.messages_unlimited)
-  const bookings = clients.reduce((sum, client) => sum + (client.bookings_this_month ?? 0), 0)
+  const visibleAlerts = useMemo(
+    () => (alertsQuery.data ?? []).filter((alert) => !sessionDismissed.has(alertKey(alert))),
+    [alertsQuery.data, sessionDismissed],
+  )
+  const bookings = clients.reduce((sum, client) => sum + (client.bookings_count ?? 0), 0)
+  const conversations = clients.reduce((sum, client) => sum + (client.conversations_count ?? 0), 0)
+  const calls = (activityQuery.data?.series ?? []).reduce((sum, point) => sum + point.calls, 0)
+  const messages = (activityQuery.data?.series ?? []).reduce((sum, point) => sum + point.messages, 0)
   const active = clients.filter((client) => client.account_status === 'active').length
   const pending = clients.filter((client) => client.account_status === 'pending').length
   const suspended = clients.filter((client) => client.account_status === 'suspended').length
@@ -53,22 +66,32 @@ export function AgencyHome() {
     <PageShell>
       <PageHeader title="Overview" description="Your clients, their usage, and what needs a look." />
       {clientsQuery.error ? <p className="text-sm text-red-600">{clientsQuery.error}</p> : null}
+      {alertsQuery.error ? <p className="text-sm text-red-600">{alertsQuery.error}</p> : null}
+      {!alertsQuery.loading && !alertsQuery.error ? (
+      <AdminAlertPanel
+        alerts={visibleAlerts}
+        onDismiss={(alert) =>
+          setSessionDismissed((prev) => {
+            const next = new Set(prev)
+            next.add(alertKey(alert))
+            return next
+          })
+        }
+      />
+      ) : null}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        <Kpi href="/admin/clients" label="Clients" value={`${active} active · ${pending} pending · ${suspended} suspended`} />
-        <Kpi href="/admin/activity" label="Bookings this month" value={String(bookings)} />
-        <Kpi href="/admin/credits" label="Call minutes" value={`${minuteUsed} used · ${minuteLeft} remaining`} />
-        <Kpi
-          href="/admin/credits"
-          label="Messages"
-          value={
-            anyUnlimited
-              ? `${messageUsed} used · ${finiteMessages.reduce((sum, value) => sum + value, 0)} remaining on limited packs`
-              : `${messageUsed} used · ${finiteMessages.reduce((sum, value) => sum + value, 0)} remaining`
-          }
-        />
-        <Kpi href="/admin/credits" label="Minutes remaining" value={String(minuteLeft)} />
-        <Kpi href="/admin/clients" label="Needs attention" value={String(attention.length)} />
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard label="Total clients" value={clients.length} href="/admin/clients" />
+        <StatCard label="Active" value={active} href="/admin/clients" accent="text-emerald-600 dark:text-emerald-400" />
+        <StatCard label="Pending activation" value={pending} href="/admin/clients" accent="text-amber-600 dark:text-amber-400" />
+        <StatCard label="Suspended" value={suspended} href="/admin/clients" accent="text-red-600 dark:text-red-400" />
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <TotalCard icon={<CalendarDaysIcon className="size-5" />} label="Bookings (all time)" value={bookings} />
+        <TotalCard icon={<ChatBubbleLeftRightIcon className="size-5" />} label="Conversations" value={conversations} />
+        <TotalCard icon={<PhoneIcon className="size-5" />} label={`Calls (last ${days} days)`} value={calls} />
+        <TotalCard icon={<EnvelopeIcon className="size-5" />} label={`Messages (last ${days} days)`} value={messages} />
       </div>
 
       <DashboardCard title="Booking activity">
@@ -120,12 +143,38 @@ export function AgencyHome() {
   )
 }
 
-function Kpi({ href, label, value }: { href: string; label: string; value: string }) {
+function StatCard({
+  label,
+  value,
+  href,
+  accent,
+}: {
+  label: string
+  value: number
+  href: string
+  accent?: string
+}) {
   return (
     <Link href={href} className={`${dashCardClass} block p-5 transition-shadow hover:shadow-md`}>
-      <p className="text-sm text-zinc-500">{label}</p>
-      <p className="mt-1 text-lg font-semibold text-zinc-950 dark:text-white">{value}</p>
+      <p className="text-sm text-zinc-500 dark:text-zinc-400">{label}</p>
+      <p className={`mt-1 text-3xl font-semibold tabular-nums ${accent ?? 'text-zinc-950 dark:text-white'}`}>
+        {value.toLocaleString()}
+      </p>
     </Link>
+  )
+}
+
+function TotalCard({ icon, label, value }: { icon: ReactNode; label: string; value: number }) {
+  return (
+    <div className={`${dashCardClass} flex items-center gap-4 p-5`}>
+      <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400">
+        {icon}
+      </span>
+      <div className="min-w-0">
+        <p className="truncate text-sm text-zinc-500 dark:text-zinc-400">{label}</p>
+        <p className="text-xl font-semibold tabular-nums text-zinc-950 dark:text-white">{value.toLocaleString()}</p>
+      </div>
+    </div>
   )
 }
 

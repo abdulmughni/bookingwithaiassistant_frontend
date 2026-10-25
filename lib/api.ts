@@ -523,6 +523,40 @@ export const api = {
       request<import('./types').AdminOverview>('/api/admin/overview', { token }),
     agencyActivity: (token: string, days: 7 | 30) =>
       request<import('./types').AgencyActivity>(`/api/admin/agency/activity?days=${days}`, { token }),
+    agencyAlerts: (token: string) =>
+      request<import('./types').AdminAlert[]>('/api/admin/agency/alerts', { token }),
+    agencyNotifications: (token: string) =>
+      request<import('./types').AgencyNotificationList>('/api/admin/agency/notifications', { token }),
+    agencyNotificationRead: (token: string, id: string) =>
+      request<null>(`/api/admin/agency/notifications/${encodeURIComponent(id)}/read`, {
+        token,
+        method: 'POST',
+      }),
+    agencyNotificationsReadAll: (token: string) =>
+      request<null>('/api/admin/agency/notifications/read-all', { token, method: 'POST' }),
+    agencyNotificationRemove: (token: string, id: string) =>
+      requestDelete(token, `/api/admin/agency/notifications/${encodeURIComponent(id)}`),
+    agencyNotificationsClear: (token: string) =>
+      requestDelete(token, '/api/admin/agency/notifications'),
+    listAgencyPlans: (token: string) =>
+      request<import('./types').AdminPlan[]>('/api/admin/agency/plans', { token }),
+    createAgencyPlan: (token: string, data: import('./types').PlanWriteBody) =>
+      request<import('./types').AdminPlan>('/api/admin/agency/plans', {
+        token,
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    updateAgencyPlan: (token: string, planId: string, data: import('./types').PlanWriteBody) =>
+      request<import('./types').AdminPlan>(`/api/admin/agency/plans/${encodeURIComponent(planId)}`, {
+        token,
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+    deleteAgencyPlan: (token: string, planId: string) =>
+      request<import('./types').DeletePlanResult>(
+        `/api/admin/agency/plans/${encodeURIComponent(planId)}`,
+        { token, method: 'DELETE' },
+      ),
     listSetupRequests: (token: string) =>
       request<import('./types').SetupRequest[]>('/api/admin/agency/setup-requests', { token }),
     getSetupRequest: (token: string, tenantId: string) =>

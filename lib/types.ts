@@ -277,6 +277,16 @@ export interface NotificationList {
   unread_count: number
 }
 
+export interface AgencyNotification extends Notification {
+  tenant_id: string
+  tenant_name: string
+}
+
+export interface AgencyNotificationList {
+  items: AgencyNotification[]
+  unread_count: number
+}
+
 // ---------------------------------------------------------------------------
 // Realtime WebSocket events (server -> client)
 // ---------------------------------------------------------------------------
