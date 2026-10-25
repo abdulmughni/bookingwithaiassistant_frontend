@@ -37,6 +37,8 @@ import { Textarea } from '@/components/textarea'
 import { ConfirmActionDialog } from '@/components/admin/confirm-action-dialog'
 import { ClientLoginDialog } from '@/components/admin/client-login-dialog'
 import { VerifyIdentityDialog } from '@/components/admin/verify-identity-dialog'
+import { AgencyClientProfile } from '@/components/admin/agency-client-profile'
+import { SetupRequestCard } from '@/components/admin/setup-request-card'
 import { FunnelBlock, HealthDot } from '@/components/admin/ops'
 import { ConfirmDeleteDialog } from '@/components/confirm-delete-dialog'
 import {
@@ -166,7 +168,7 @@ function VoiceJsonTab({ tenantId }: { tenantId: string }) {
   )
 }
 
-export default function AdminClientDetailPage() {
+function SuperAdminClientDetail() {
   const params = useParams<{ id: string }>()
   const tenantId = decodeURIComponent(params.id)
   const router = useRouter()
@@ -601,6 +603,7 @@ export default function AdminClientDetailPage() {
         period={funnelPeriod}
         onPeriodChange={setFunnelPeriod}
       />
+      <SetupRequestCard tenantId={tenantId} canRequest={false} canEdit />
 
       {/* AI channel toggles */}
       {(tenant.channel_accounts?.length ?? 0) > 0 && (
@@ -1267,4 +1270,18 @@ function MemberCard({ member }: { member: AdminOrgMember }) {
       </div>
     </li>
   )
+}
+
+export default function AdminClientDetailPage() {
+  const { isAgency, loading } = useIsAdmin()
+  if (loading) {
+    return (
+      <PageShell>
+        <SkeletonBlock className="h-10 w-48" />
+        <SkeletonBlock className="h-40" />
+      </PageShell>
+    )
+  }
+  if (isAgency) return <AgencyClientProfile />
+  return <SuperAdminClientDetail />
 }

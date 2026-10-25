@@ -1,54 +1,46 @@
 'use client'
 
-import type { ReactNode } from 'react'
+import { useMemo, useState } from 'react'
 import Link from 'next/link'
 
-import { StatusBadge, formatDateTime } from '@/components/admin/shared'
+import {
+  AgencyRangeChart,
+  ClientPerformanceTable,
+  DashboardCard,
+  RecentActivityList,
+  attentionReason,
+  messagesRemaining,
+  minutesRemaining,
+} from '@/components/admin/agency-dashboard'
 import { PageHeader, PageShell, SkeletonBlock, dashCardClass } from '@/components/dashboard-ui'
 import { api } from '@/lib/api'
 import { useApiData } from '@/lib/hooks'
 import type { AdminTenant } from '@/lib/types'
 
-const WEEK_MS = 7 * 24 * 60 * 60 * 1000
-
-function quietSince(client: AdminTenant, now: number) {
-  if (!client.last_activity_at) return true
-  const at = new Date(client.last_activity_at).getTime()
-  return Number.isNaN(at) || now - at > WEEK_MS
-}
-
-function minuteRatio(client: AdminTenant) {
-  const quota = client.usage?.call_minutes_quota ?? 0
-  if (quota <= 0) return 0
-  return (client.usage?.call_minutes_used ?? 0) / quota
-}
-
 export function AgencyHome() {
-  const { data, loading, error } = useApiData((token) => api.admin.listTenants(token), [])
-  const clients = data ?? []
-  const now = Date.now()
+  const [days, setDays] = useState<7 | 30>(30)
+  const clientsQuery = useApiData((token) => api.admin.listTenants(token), [])
+  const activityQuery = useApiData((token) => api.admin.agencyActivity(token, days), [days])
+  const clients = clientsQuery.data ?? []
+  const attention = clients
+    .map((client) => ({ client, reason: attentionReason(client) }))
+    .filter((item): item is { client: AdminTenant; reason: string } => item.reason !== null)
+  const counts = useMemo(() => {
+    const map = new Map<string, { bookings: number; calls: number; messages: number }>()
+    for (const row of activityQuery.data?.clients ?? []) map.set(row.tenant_id, row)
+    return map
+  }, [activityQuery.data])
+  const minuteUsed = clients.reduce((sum, client) => sum + (client.usage?.call_minutes_used ?? 0), 0)
+  const minuteLeft = clients.reduce((sum, client) => sum + minutesRemaining(client), 0)
+  const messageUsed = clients.reduce((sum, client) => sum + (client.usage?.messages_used ?? 0), 0)
+  const finiteMessages = clients.map(messagesRemaining).filter((value): value is number => value !== null)
+  const anyUnlimited = clients.some((client) => client.plan?.messages_unlimited)
+  const bookings = clients.reduce((sum, client) => sum + (client.bookings_this_month ?? 0), 0)
   const active = clients.filter((client) => client.account_status === 'active').length
   const pending = clients.filter((client) => client.account_status === 'pending').length
   const suspended = clients.filter((client) => client.account_status === 'suspended').length
-  const bookings = clients.reduce((sum, client) => sum + (client.bookings_this_month ?? 0), 0)
-  const minutes = clients.reduce((sum, client) => sum + (client.usage?.call_minutes_used ?? 0), 0)
-  const nearLimit = [...clients]
-    .filter((client) => (client.usage?.call_minutes_quota ?? 0) > 0)
-    .sort((a, b) => minuteRatio(b) - minuteRatio(a))
-    .slice(0, 5)
-  const attention = clients.filter(
-    (client) =>
-      client.account_status === 'suspended' ||
-      client.account_status === 'pending' ||
-      quietSince(client, now),
-  )
-  const recent = [...clients].sort((a, b) => {
-    const left = a.last_activity_at ? new Date(a.last_activity_at).getTime() : 0
-    const right = b.last_activity_at ? new Date(b.last_activity_at).getTime() : 0
-    return right - left
-  })
 
-  if (loading) {
+  if (clientsQuery.loading) {
     return (
       <PageShell>
         <SkeletonBlock className="h-10 w-48" />
@@ -59,98 +51,101 @@ export function AgencyHome() {
 
   return (
     <PageShell>
-      <PageHeader title="Home" description="Your clients, this month." />
-      {error ? <p className="text-sm text-red-600">{error}</p> : null}
+      <PageHeader title="Overview" description="Your clients, their usage, and what needs a look." />
+      {clientsQuery.error ? <p className="text-sm text-red-600">{clientsQuery.error}</p> : null}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Stat label="Clients" value={`${active} active · ${pending} pending · ${suspended} suspended`} />
-        <Stat label="Bookings this month" value={String(bookings)} />
-        <Stat label="Call minutes this month" value={String(minutes)} />
-        <Stat label="Needs attention" value={String(attention.length)} />
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <Kpi href="/admin/clients" label="Clients" value={`${active} active · ${pending} pending · ${suspended} suspended`} />
+        <Kpi href="/admin/activity" label="Bookings this month" value={String(bookings)} />
+        <Kpi href="/admin/credits" label="Call minutes" value={`${minuteUsed} used · ${minuteLeft} remaining`} />
+        <Kpi
+          href="/admin/credits"
+          label="Messages"
+          value={
+            anyUnlimited
+              ? `${messageUsed} used · ${finiteMessages.reduce((sum, value) => sum + value, 0)} remaining on limited packs`
+              : `${messageUsed} used · ${finiteMessages.reduce((sum, value) => sum + value, 0)} remaining`
+          }
+        />
+        <Kpi href="/admin/credits" label="Minutes remaining" value={String(minuteLeft)} />
+        <Kpi href="/admin/clients" label="Needs attention" value={String(attention.length)} />
       </div>
 
-      <section className={`${dashCardClass} p-5`}>
-        <h2 className="text-sm font-semibold text-zinc-950 dark:text-white">Closest to the minute limit</h2>
-        {nearLimit.length === 0 ? (
-          <p className="mt-3 text-sm text-zinc-500">No clients have a minute limit yet.</p>
+      <DashboardCard title="Booking activity">
+        <RangeToggle days={days} onChange={setDays} />
+        {activityQuery.loading ? (
+          <SkeletonBlock className="mt-4 h-64" />
+        ) : activityQuery.error ? (
+          <p className="mt-3 text-sm text-red-600">{activityQuery.error}</p>
         ) : (
-          <ul className="mt-3 divide-y divide-zinc-100 dark:divide-zinc-800">
-            {nearLimit.map((client) => (
-              <li key={client.id}>
-                <ClientLink client={client}>
-                  <span>
-                    {client.usage.call_minutes_used} / {client.usage.call_minutes_quota} min
-                  </span>
-                </ClientLink>
-              </li>
-            ))}
-          </ul>
+          <div className="mt-4">
+            <AgencyRangeChart series={activityQuery.data?.series ?? []} />
+          </div>
         )}
-      </section>
+      </DashboardCard>
 
-      <section className={`${dashCardClass} p-5`}>
-        <h2 className="text-sm font-semibold text-zinc-950 dark:text-white">Needs attention</h2>
-        {attention.length === 0 ? (
-          <p className="mt-3 text-sm text-zinc-500">Everyone is active and has been in touch this week.</p>
-        ) : (
-          <ul className="mt-3 divide-y divide-zinc-100 dark:divide-zinc-800">
-            {attention.map((client) => (
-              <li key={client.id}>
-                <ClientLink client={client}>
-                  <span className="text-zinc-500">
-                    {client.account_status === 'suspended'
-                      ? 'Suspended'
-                      : client.account_status === 'pending'
-                        ? 'Pending'
-                        : 'No activity in 7 days'}
-                  </span>
-                </ClientLink>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      <div className="grid gap-4 xl:grid-cols-2">
+        <DashboardCard title="Client performance">
+          <ClientPerformanceTable clients={clients} counts={counts} />
+        </DashboardCard>
+        <DashboardCard title="Needs attention">
+          {attention.length === 0 ? (
+            <p className="text-sm text-zinc-500">Nothing is waiting.</p>
+          ) : (
+            <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
+              {attention.map(({ client, reason }) => (
+                <li key={client.id}>
+                  <Link
+                    href={`/admin/clients/${encodeURIComponent(client.id)}`}
+                    className="flex items-center justify-between gap-3 py-3 text-sm"
+                  >
+                    <span className="truncate font-medium text-zinc-950 dark:text-white">{client.name}</span>
+                    <span className="shrink-0 text-zinc-500">{reason}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </DashboardCard>
+      </div>
 
-      <section className={`${dashCardClass} p-5`}>
-        <h2 className="text-sm font-semibold text-zinc-950 dark:text-white">Recent activity</h2>
-        {recent.length === 0 ? (
-          <p className="mt-3 text-sm text-zinc-500">No clients yet. Invite one from Clients.</p>
+      <DashboardCard title="Recent activity">
+        {activityQuery.loading ? (
+          <SkeletonBlock className="h-24" />
         ) : (
-          <ul className="mt-3 divide-y divide-zinc-100 dark:divide-zinc-800">
-            {recent.map((client) => (
-              <li key={client.id}>
-                <ClientLink client={client}>
-                  <span className="flex items-center gap-3">
-                    <StatusBadge status={client.account_status} />
-                    <span className="text-zinc-500">{formatDateTime(client.last_activity_at)}</span>
-                  </span>
-                </ClientLink>
-              </li>
-            ))}
-          </ul>
+          <RecentActivityList events={activityQuery.data?.recent ?? []} />
         )}
-      </section>
+      </DashboardCard>
     </PageShell>
   )
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Kpi({ href, label, value }: { href: string; label: string; value: string }) {
   return (
-    <div className={`${dashCardClass} p-5`}>
+    <Link href={href} className={`${dashCardClass} block p-5 transition-shadow hover:shadow-md`}>
       <p className="text-sm text-zinc-500">{label}</p>
       <p className="mt-1 text-lg font-semibold text-zinc-950 dark:text-white">{value}</p>
-    </div>
+    </Link>
   )
 }
 
-function ClientLink({ client, children }: { client: AdminTenant; children: ReactNode }) {
+export function RangeToggle({ days, onChange }: { days: 7 | 30; onChange: (days: 7 | 30) => void }) {
   return (
-    <Link
-      href={`/admin/clients/${encodeURIComponent(client.id)}`}
-      className="flex items-center justify-between gap-3 py-3 text-sm font-medium text-zinc-950 hover:text-brand-700 dark:text-white"
-    >
-      <span className="truncate">{client.name}</span>
-      {children}
-    </Link>
+    <div className="flex gap-2">
+      {([7, 30] as const).map((option) => (
+        <button
+          key={option}
+          type="button"
+          onClick={() => onChange(option)}
+          className={
+            days === option
+              ? 'rounded-full bg-zinc-950 px-3 py-1 text-xs font-medium text-white dark:bg-white dark:text-zinc-950'
+              : 'rounded-full px-3 py-1 text-xs font-medium text-zinc-600 ring-1 ring-zinc-200 dark:text-zinc-300 dark:ring-zinc-700'
+          }
+        >
+          Last {option} days
+        </button>
+      ))}
+    </div>
   )
 }
