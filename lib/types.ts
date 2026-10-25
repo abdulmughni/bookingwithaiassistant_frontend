@@ -692,6 +692,7 @@ export interface AdminMe {
   user_id: string
   role?: 'super_admin' | 'agency' | 'client' | 'none'
   tenant_id?: string | null
+  agency_staff?: boolean
 }
 
 export interface AgencySummary {
@@ -730,6 +731,7 @@ export interface AdminPlanInfo {
   messages_quota: number
   call_minutes_quota: number
   validity_days: number
+  messages_unlimited?: boolean
 }
 
 export interface AdminUsageInfo {
@@ -761,6 +763,58 @@ export interface AdminTenant {
   industry_type?: string | null
   parent_tenant_id?: string | null
   parent_name?: string | null
+  subscription_started_at?: string | null
+}
+
+export interface AgencyActivityPoint {
+  date: string
+  bookings: number
+  calls: number
+  messages: number
+}
+
+export interface AgencyActivityClient {
+  tenant_id: string
+  bookings: number
+  calls: number
+  messages: number
+}
+
+export interface AgencyActivityEvent {
+  at: string
+  kind: string
+  title: string
+  tenant_id: string
+  tenant_name: string
+}
+
+export interface AgencyActivity {
+  days: number
+  series: AgencyActivityPoint[]
+  clients: AgencyActivityClient[]
+  recent: AgencyActivityEvent[]
+}
+
+export interface SetupRequest {
+  tenant_id: string
+  agency_id: string
+  status: 'requested' | 'configuring' | 'testing' | 'ready'
+  setup_fee_cents: number | null
+  note: string | null
+  tenant_name: string | null
+  updated_at: string | null
+}
+
+export interface AgencyStaffMember {
+  id: string
+  email: string
+  name: string | null
+  role: 'owner' | 'staff'
+}
+
+export interface AgencyStaffList {
+  owner: AgencyStaffMember | null
+  staff: AgencyStaffMember[]
 }
 
 export interface AdminAlert {

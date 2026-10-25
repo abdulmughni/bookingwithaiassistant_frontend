@@ -213,6 +213,7 @@ export function useIsAdmin() {
   const [isAgency, setIsAgency] = useState(false)
   const [role, setRole] = useState<'super_admin' | 'agency' | 'client' | 'none'>('none')
   const [tenantId, setTenantId] = useState<string | null>(null)
+  const [isAgencyStaff, setIsAgencyStaff] = useState(false)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -226,11 +227,13 @@ export function useIsAdmin() {
         setRole(nextRole)
         setIsAdmin(nextRole === 'super_admin')
         setIsAgency(nextRole === 'agency')
+        setIsAgencyStaff(nextRole === 'agency' && Boolean(me?.agency_staff))
         setTenantId(me?.tenant_id ?? null)
       } catch {
         if (!cancelled) {
           setIsAdmin(false)
           setIsAgency(false)
+          setIsAgencyStaff(false)
           setRole('none')
           setTenantId(null)
         }
@@ -243,7 +246,7 @@ export function useIsAdmin() {
     }
   }, [getToken])
 
-  return { isAdmin, isAgency, role, tenantId, loading }
+  return { isAdmin, isAgency, isAgencyStaff, role, tenantId, loading }
 }
 
 /** Logo and two colors for the signed-in agency, or for a client's parent agency. */

@@ -521,6 +521,42 @@ export const api = {
     me: (token: string) => request<import('./types').AdminMe>('/api/admin/me', { token }),
     overview: (token: string) =>
       request<import('./types').AdminOverview>('/api/admin/overview', { token }),
+    agencyActivity: (token: string, days: 7 | 30) =>
+      request<import('./types').AgencyActivity>(`/api/admin/agency/activity?days=${days}`, { token }),
+    listSetupRequests: (token: string) =>
+      request<import('./types').SetupRequest[]>('/api/admin/agency/setup-requests', { token }),
+    getSetupRequest: (token: string, tenantId: string) =>
+      request<import('./types').SetupRequest | null>(
+        `/api/admin/tenants/${encodeURIComponent(tenantId)}/setup-request`,
+        { token },
+      ),
+    requestSetup: (token: string, tenantId: string, note?: string) =>
+      request<import('./types').SetupRequest>(
+        `/api/admin/tenants/${encodeURIComponent(tenantId)}/setup-request`,
+        { token, method: 'POST', body: JSON.stringify({ note: note || null }) },
+      ),
+    updateSetupRequest: (
+      token: string,
+      tenantId: string,
+      data: { status?: string; setup_fee_cents?: number; note?: string },
+    ) =>
+      request<import('./types').SetupRequest>(
+        `/api/admin/tenants/${encodeURIComponent(tenantId)}/setup-request`,
+        { token, method: 'PATCH', body: JSON.stringify(data) },
+      ),
+    listStaff: (token: string) =>
+      request<import('./types').AgencyStaffList>('/api/admin/agency/staff', { token }),
+    inviteStaff: (token: string, email: string) =>
+      request<import('./types').AgencyStaffMember>('/api/admin/agency/staff', {
+        token,
+        method: 'POST',
+        body: JSON.stringify({ email }),
+      }),
+    removeStaff: (token: string, staffId: string) =>
+      request<void>(`/api/admin/agency/staff/${encodeURIComponent(staffId)}`, {
+        token,
+        method: 'DELETE',
+      }),
     listTenants: (
       token: string,
       query?: { parentId?: string; unassigned?: boolean },

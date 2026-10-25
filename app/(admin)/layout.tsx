@@ -4,13 +4,16 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 import { useAuth, useUser, UserButton } from '@clerk/nextjs'
 import {
+  BanknotesIcon,
   BuildingOffice2Icon,
   ChartBarSquareIcon,
+  Cog6ToothIcon,
   CreditCardIcon,
   HomeIcon,
   InboxArrowDownIcon,
   ShieldCheckIcon,
   SwatchIcon,
+  UserGroupIcon,
   UsersIcon,
 } from '@heroicons/react/20/solid'
 
@@ -40,9 +43,14 @@ const superAdminNav = [
 ]
 
 const agencyNav = [
-  { label: 'Home', href: '/admin', icon: HomeIcon, exact: true },
-  { label: 'Clients', href: '/admin/clients', icon: UsersIcon, exact: false },
-  { label: 'Brand', href: '/admin/brand', icon: SwatchIcon, exact: false },
+  { label: 'Overview', href: '/admin', icon: HomeIcon, exact: true },
+  { label: 'My Clients', href: '/admin/clients', icon: UsersIcon, exact: false },
+  { label: 'Client Activity', href: '/admin/activity', icon: ChartBarSquareIcon, exact: false },
+  { label: 'Plans & Credits', href: '/admin/credits', icon: CreditCardIcon, exact: false },
+  { label: 'Billing', href: '/admin/billing', icon: BanknotesIcon, exact: false },
+  { label: 'Branding', href: '/admin/brand', icon: SwatchIcon, exact: false },
+  { label: 'Team', href: '/admin/team', icon: UserGroupIcon, exact: false },
+  { label: 'Settings', href: '/admin/settings', icon: Cog6ToothIcon, exact: false },
 ]
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

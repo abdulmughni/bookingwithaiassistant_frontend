@@ -44,11 +44,14 @@ function ClientsPageInner() {
       ? statusParam
       : 'all'
 
-  const { isAgency, tenantId } = useIsAdmin()
+  const { isAgency, isAgencyStaff, tenantId } = useIsAdmin()
   const [inviteOpen, setInviteOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<AccountStatus | 'all'>(initialStatus)
   const [healthFilter, setHealthFilter] = useState<HealthFilter>('all')
+  const [industryFilter, setIndustryFilter] = useState('all')
+  const [planFilter, setPlanFilter] = useState('all')
+  const [page, setPage] = useState(1)
 
   const { data: tenants, loading, error, refetch } = useApiData(
     (token) => api.admin.listTenants(token),
@@ -61,6 +64,8 @@ function ClientsPageInner() {
     return tenants.filter((t) => {
       if (statusFilter !== 'all' && t.account_status !== statusFilter) return false
       if (healthFilter !== 'all' && (t.health ?? 'green') !== healthFilter) return false
+      if (industryFilter !== 'all' && (t.industry_type ?? '') !== industryFilter) return false
+      if (planFilter !== 'all' && (t.plan?.name ?? 'No pack') !== planFilter) return false
       if (!q) return true
       return (
         t.name.toLowerCase().includes(q) ||
@@ -70,19 +75,26 @@ function ClientsPageInner() {
         (t.industry_type ?? '').toLowerCase().includes(q)
       )
     })
-  }, [tenants, search, statusFilter, healthFilter])
+  }, [tenants, search, statusFilter, healthFilter, industryFilter, planFilter])
+
+  const pageSize = 10
+  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize))
+  const currentPage = Math.min(page, pageCount)
+  const pageRows = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+  const industries = Array.from(new Set((tenants ?? []).map((t) => t.industry_type).filter(Boolean))) as string[]
+  const plans = Array.from(new Set((tenants ?? []).map((t) => t.plan?.name ?? 'No pack')))
 
   return (
     <PageShell>
       <PageHeader
-        title="Clients"
+        title={isAgency ? 'My Clients' : 'Clients'}
         description={
           isAgency
-            ? 'Your clients. Open one to set up voice, phone numbers, prompts, and knowledge.'
+            ? 'Invite a client, then open them for usage, bookings, and company details. AI setup stays with the platform.'
             : 'Health-sorted client list. Click a row for funnel, bookings, and usage detail.'
         }
       >
-        {isAgency && tenantId ? (
+        {isAgency && tenantId && !isAgencyStaff ? (
           <Button color="brand" onClick={() => setInviteOpen(true)}>
             Invite client
           </Button>
@@ -106,7 +118,10 @@ function ClientsPageInner() {
               <Input
                 placeholder="Search by name, ID, trade, or plan…"
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => {
+                  setSearch(e.target.value)
+                  setPage(1)
+                }}
               />
             </InputGroup>
           </div>
@@ -114,7 +129,10 @@ function ClientsPageInner() {
             aria-label="Filter by status"
             className="max-w-44"
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as AccountStatus | 'all')}
+            onChange={(e) => {
+              setStatusFilter(e.target.value as AccountStatus | 'all')
+              setPage(1)
+            }}
           >
             <option value="all">All statuses</option>
             <option value="active">Active</option>
@@ -125,13 +143,52 @@ function ClientsPageInner() {
             aria-label="Filter by health"
             className="max-w-40"
             value={healthFilter}
-            onChange={(e) => setHealthFilter(e.target.value as HealthFilter)}
+            onChange={(e) => {
+              setHealthFilter(e.target.value as HealthFilter)
+              setPage(1)
+            }}
           >
             <option value="all">All health</option>
             <option value="red">Red</option>
             <option value="yellow">Yellow</option>
             <option value="green">Green</option>
           </Select>
+          {isAgency ? (
+            <>
+              <Select
+                aria-label="Filter by industry"
+                className="max-w-44"
+                value={industryFilter}
+                onChange={(e) => {
+                  setIndustryFilter(e.target.value)
+                  setPage(1)
+                }}
+              >
+                <option value="all">All industries</option>
+                {industries.map((industry) => (
+                  <option key={industry} value={industry}>
+                    {industry}
+                  </option>
+                ))}
+              </Select>
+              <Select
+                aria-label="Filter by plan"
+                className="max-w-44"
+                value={planFilter}
+                onChange={(e) => {
+                  setPlanFilter(e.target.value)
+                  setPage(1)
+                }}
+              >
+                <option value="all">All packs</option>
+                {plans.map((plan) => (
+                  <option key={plan} value={plan}>
+                    {plan}
+                  </option>
+                ))}
+              </Select>
+            </>
+          ) : null}
           <span className="text-sm text-zinc-500">
             {tenants ? `${filtered.length} of ${tenants.length}` : ''}
           </span>
@@ -171,7 +228,7 @@ function ClientsPageInner() {
                   </TableCell>
                 </TableRow>
               )}
-              {filtered.map((t) => {
+              {pageRows.map((t) => {
                 const activity = relativeActivity(t.last_activity_at)
                 return (
                   <TableRow
@@ -241,6 +298,19 @@ function ClientsPageInner() {
           </Table>
         </div>
       </div>
+      {pageCount > 1 ? (
+        <div className="flex items-center justify-between gap-3">
+          <Button outline disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>
+            Previous
+          </Button>
+          <span className="text-sm text-zinc-500">
+            Page {currentPage} of {pageCount}
+          </span>
+          <Button outline disabled={currentPage >= pageCount} onClick={() => setPage(currentPage + 1)}>
+            Next
+          </Button>
+        </div>
+      ) : null}
       {isAgency && tenantId ? (
         <InviteCompanyDialog
           open={inviteOpen}
