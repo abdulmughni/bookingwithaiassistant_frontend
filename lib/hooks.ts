@@ -250,14 +250,22 @@ export function useIsAdmin() {
 export function useAgencyBrand(enabled = true) {
   const getToken = useApiToken()
   const [brand, setBrand] = useState<import('./types').SessionBrand | null>(null)
+  const [loading, setLoading] = useState(enabled)
 
   const load = useCallback(async () => {
-    if (!enabled) return
+    if (!enabled) {
+      setBrand(null)
+      setLoading(false)
+      return
+    }
+    setLoading(true)
     try {
       const token = await getToken()
       setBrand(await api.brand.me(token))
     } catch {
       setBrand(null)
+    } finally {
+      setLoading(false)
     }
   }, [enabled, getToken])
 
@@ -268,7 +276,7 @@ export function useAgencyBrand(enabled = true) {
     return () => window.removeEventListener('agency-brand-changed', onChange)
   }, [load])
 
-  return brand
+  return { brand, loading }
 }
 
 /** Catalogue of pricing tiers (rendered on /plans). Fetches once. */

@@ -84,7 +84,13 @@ function BrandPreview({
   )
 }
 
-export function AgencyBrandForm({ agencyId }: { agencyId: string }) {
+export function AgencyBrandForm({
+  agencyId,
+  showLogo = true,
+}: {
+  agencyId?: string
+  showLogo?: boolean
+}) {
   const getToken = useApiToken()
   const [colors, setColors] = useState<BrandThemeColors>(CURRENT_THEME)
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
@@ -96,7 +102,14 @@ export function AgencyBrandForm({ agencyId }: { agencyId: string }) {
     ;(async () => {
       try {
         const token = await getToken()
-        const agency = await api.admin.getAgency(token, agencyId)
+        if (!showLogo) {
+          const mine = await api.brand.me(token)
+          if (cancelled) return
+          if (mine.theme) setColors(mine.theme)
+          setLogoUrl(mine.logo_url)
+          return
+        }
+        const agency = await api.admin.getAgency(token, agencyId ?? '')
         if (cancelled) return
         if (agency.theme) setColors(agency.theme)
         setLogoUrl(agency.logo_url)
@@ -107,7 +120,7 @@ export function AgencyBrandForm({ agencyId }: { agencyId: string }) {
     return () => {
       cancelled = true
     }
-  }, [agencyId, getToken])
+  }, [agencyId, getToken, showLogo])
 
   function setColor(key: keyof BrandThemeColors, value: string) {
     setColors((current) => ({ ...current, [key]: value }))
@@ -125,7 +138,9 @@ export function AgencyBrandForm({ agencyId }: { agencyId: string }) {
     setSavingColors(true)
     try {
       const token = await getToken()
-      const saved = await api.admin.saveBrandColors(token, agencyId, theme)
+      const saved = showLogo
+        ? await api.admin.saveBrandColors(token, agencyId ?? '', theme)
+        : await api.brand.saveTheme(token, theme)
       if (saved.theme) setColors(saved.theme)
       window.dispatchEvent(new Event('agency-brand-changed'))
       toast.success('Colors saved')
@@ -141,7 +156,7 @@ export function AgencyBrandForm({ agencyId }: { agencyId: string }) {
     setSavingLogo(true)
     try {
       const token = await getToken()
-      const saved = await api.admin.uploadBrandLogo(token, agencyId, file)
+      const saved = await api.admin.uploadBrandLogo(token, agencyId ?? '', file)
       setLogoUrl(saved.logo_url)
       window.dispatchEvent(new Event('agency-brand-changed'))
       toast.success('Logo saved')
@@ -156,7 +171,7 @@ export function AgencyBrandForm({ agencyId }: { agencyId: string }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center gap-4">
+      {showLogo ? <div className="flex flex-wrap items-center gap-4">
         <div className="flex size-16 items-center justify-center overflow-hidden rounded-xl border border-zinc-200 bg-white">
           {preview ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -177,7 +192,7 @@ export function AgencyBrandForm({ agencyId }: { agencyId: string }) {
           />
           {savingLogo ? <p className="mt-1 text-xs text-zinc-500">Uploading…</p> : null}
         </div>
-      </div>
+      </div> : null}
 
       <div>
         <p className="text-sm font-medium text-zinc-950 dark:text-white">Presets</p>

@@ -14,8 +14,9 @@ import { Button } from '@/components/button'
 import { PageHeader, PageShell, SkeletonBlock, dashCardClass } from '@/components/dashboard-ui'
 import { AdminAlertPanel, FunnelBlock, HealthDot } from '@/components/admin/ops'
 import { StatusBadge, formatDate } from '@/components/admin/shared'
+import { AgencyHome } from '@/components/admin/agency-home'
 import { api } from '@/lib/api'
-import { useApiData } from '@/lib/hooks'
+import { useApiData, useIsAdmin } from '@/lib/hooks'
 import type { AdminAlert } from '@/lib/types'
 
 /** Session-only dashboard dismiss keys (not persisted). */
@@ -23,7 +24,7 @@ function alertKey(a: Pick<AdminAlert, 'tenant_id' | 'rule_key'>) {
   return `${a.tenant_id}:${a.rule_key}`
 }
 
-export default function AdminOverviewPage() {
+function SuperAdminOverview() {
   const { data, loading, error, refetch } = useApiData((token) => api.admin.overview(token), [])
   const [sessionDismissed, setSessionDismissed] = useState<Set<string>>(() => new Set())
 
@@ -271,4 +272,18 @@ function TotalCard({
       </div>
     </div>
   )
+}
+
+export default function AdminOverviewPage() {
+  const { isAgency, loading } = useIsAdmin()
+  if (loading) {
+    return (
+      <PageShell>
+        <SkeletonBlock className="h-10 w-48" />
+        <SkeletonBlock className="h-40" />
+      </PageShell>
+    )
+  }
+  if (isAgency) return <AgencyHome />
+  return <SuperAdminOverview />
 }
