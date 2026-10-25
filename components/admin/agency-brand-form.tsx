@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 
+import { BrandLogo } from '@/components/brand-logo'
 import { Button } from '@/components/button'
 import { Input } from '@/components/input'
 import { ApiError, api } from '@/lib/api'
@@ -40,8 +41,7 @@ function BrandPreview({
           style={{ background: colors.soft_background }}
         >
           {logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={logoUrl} alt="" className="h-6 w-auto object-contain object-left" />
+            <BrandLogo src={logoUrl} alt="" height={24} className="max-w-16" />
           ) : (
             <div className="h-6 w-10 rounded" style={{ background: colors.primary }} />
           )}
@@ -174,8 +174,7 @@ export function AgencyBrandForm({
       {showLogo ? <div className="flex flex-wrap items-center gap-4">
         <div className="flex size-16 items-center justify-center overflow-hidden rounded-xl border border-zinc-200 bg-white">
           {preview ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={preview} alt="Agency logo" className="max-h-12 max-w-14 object-contain" />
+            <BrandLogo src={preview} alt="" height={48} className="max-h-12 max-w-14" />
           ) : (
             <span className="text-[10px] font-medium text-zinc-400">Logo</span>
           )}

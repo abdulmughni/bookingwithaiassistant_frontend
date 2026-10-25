@@ -1,5 +1,59 @@
+'use client'
+
+import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import clsx from 'clsx'
+
+/**
+ * A plain <img> does not send the header that skips the ngrok warning page,
+ * so the logo URL comes back as HTML and the browser draws a broken image.
+ * Fetch it the same way API calls do, then show the bytes.
+ */
+async function looksLikeImage(blob: Blob) {
+  const head = new Uint8Array(await blob.slice(0, 12).arrayBuffer())
+  const png = head[0] === 0x89 && head[1] === 0x50
+  const jpg = head[0] === 0xff && head[1] === 0xd8
+  const webp = head[0] === 0x52 && head[1] === 0x49 && head[8] === 0x57
+  return png || jpg || webp
+}
+
+function useBrandImage(src?: string | null) {
+  const [url, setUrl] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!src) {
+      setUrl(null)
+      return
+    }
+    if (src.startsWith('/') || src.startsWith('blob:') || src.startsWith('data:')) {
+      setUrl(src)
+      return
+    }
+    let cancelled = false
+    let objectUrl: string | null = null
+    ;(async () => {
+      try {
+        const res = await fetch(src, {
+          headers: { 'ngrok-skip-browser-warning': 'true' },
+        })
+        if (!res.ok) return
+        const blob = await res.blob()
+        const kind = blob.type || res.headers.get('content-type') || ''
+        if (!kind.startsWith('image/') && !(await looksLikeImage(blob))) return
+        objectUrl = URL.createObjectURL(blob)
+        if (!cancelled) setUrl(objectUrl)
+      } catch {
+        /* Leave the slot empty instead of a broken image. */
+      }
+    })()
+    return () => {
+      cancelled = true
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+  }, [src])
+
+  return url
+}
 
 type BrandLogoProps = {
   className?: string
@@ -32,7 +86,7 @@ export function ShellBrand({
   return (
     <span className="flex min-w-0 items-center gap-2">
       {logoUrl ? (
-        <BrandLogo src={logoUrl} alt={name || 'Logo'} height={height} className="max-w-28 shrink-0" />
+        <BrandLogo src={logoUrl} alt="" height={height} className="max-w-28 shrink-0" />
       ) : null}
       {name ? (
         <span className="truncate text-sm font-semibold leading-tight text-zinc-950 dark:text-white">
@@ -45,14 +99,16 @@ export function ShellBrand({
 
 /** Full Beyonds Logic wordmark logo (icon + text in one PNG). */
 export function BrandLogo({ className, height = 28, priority = false, src, alt }: BrandLogoProps) {
+  const image = useBrandImage(src)
   if (src) {
+    if (!image) return null
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
-        src={src}
-        alt={alt || 'Logo'}
+        src={image}
+        alt={alt || ''}
         className={clsx('w-auto object-contain object-left', className)}
-        style={{ height, width: 'auto', maxWidth: '100%' }}
+        style={{ height, width: 'auto' }}
       />
     )
   }
