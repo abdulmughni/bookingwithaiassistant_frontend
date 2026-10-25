@@ -32,7 +32,7 @@ import { JobberReconnectBanner } from '@/components/jobber-reconnect-banner'
 import { ClientOpsBanners } from '@/components/client-ops-banners'
 import { NotificationBell } from '@/components/notification-bell'
 import { RealtimeProvider } from '@/lib/realtime'
-import { BrandLogo } from '@/components/brand-logo'
+import { ShellBrand } from '@/components/brand-logo'
 import { BrandTheme } from '@/components/brand-theme'
 import { brandAssetUrl } from '@/lib/brand'
 
@@ -47,7 +47,7 @@ export default function DashboardLayout({
   const { actor } = useAuth()
   const { signOut } = useClerk()
   const { isAdmin, isAgency, loading: adminLoading } = useIsAdmin()
-  const brand = useAgencyBrand(!adminLoading && !isAdmin && !isAgency)
+  const { brand, loading: brandLoading } = useAgencyBrand(!adminLoading && !isAdmin && !isAgency)
 
   const fullBleedPage =
     pathname === '/conversations' || pathname.startsWith('/conversations/')
@@ -60,7 +60,7 @@ export default function DashboardLayout({
       router.replace('/admin')
     }
     if (!adminLoading && isAgency && !impersonating) {
-      router.replace('/admin/clients')
+      router.replace('/admin')
     }
   }, [adminLoading, isAdmin, isAgency, impersonating, router])
 
@@ -94,12 +94,10 @@ export default function DashboardLayout({
             <SidebarSection>
               <SidebarItem href="/">
                 <span className="flex min-w-0 items-center">
-                  <BrandLogo
-                    height={31}
-                    priority
-                    className="max-w-44.5"
-                    src={brandAssetUrl(brand?.logo_url)}
-                    alt={brand?.company_name || 'Logo'}
+                  <ShellBrand
+                    loading={brandLoading || adminLoading}
+                    logoUrl={brandAssetUrl(brand?.logo_url)}
+                    name={brand?.company_name}
                   />
                 </span>
               </SidebarItem>

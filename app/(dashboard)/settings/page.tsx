@@ -1,8 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Subheading } from '@/components/heading'
-import { PageHeader, PageShell, settingsTabClass } from '@/components/dashboard-ui'
+import { PageHeader, PageShell, dashCardClass, settingsTabClass } from '@/components/dashboard-ui'
 import { Button } from '@/components/button'
 import { Divider } from '@/components/divider'
 import { Text } from '@/components/text'
@@ -17,6 +16,9 @@ import { notifyError, notifySuccess } from '@/lib/notify'
 import type { Credential, Tenant, TimezoneChoice } from '@/lib/types'
 import { ReadOnlyBanner, useReadOnlyAccount } from '@/components/account-status-gate'
 import { CostPolicyPicker } from '@/components/cost-policy-picker'
+import { AgencyBrandForm } from '@/components/admin/agency-brand-form'
+import { ProfilePhotoForm } from '@/components/profile-photo-form'
+import { Subheading } from '@/components/heading'
 
 /**
  * Disables every form control inside (native fieldset semantics) and blocks
@@ -844,6 +846,16 @@ export default function SettingsPage() {
       />
 
       <ReadOnlyBanner />
+
+      <ProfilePhotoForm />
+
+      <section className={`${dashCardClass} p-5`}>
+        <Subheading>Colors</Subheading>
+        <p className="mt-1 mb-5 text-sm text-zinc-500">
+          These colors are only for your dashboard. The logo stays with your agency.
+        </p>
+        <AgencyBrandForm showLogo={false} />
+      </section>
 
       <div className="rounded-2xl border border-zinc-200/80 bg-white px-4 shadow-sm dark:border-zinc-700/80 dark:bg-zinc-900/80 sm:px-6">
         <nav className="-mb-px flex gap-6 border-b border-zinc-200/80 pt-2 dark:border-zinc-700/80" aria-label="Settings tabs">

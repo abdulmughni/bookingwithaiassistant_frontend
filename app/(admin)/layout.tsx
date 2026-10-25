@@ -7,6 +7,7 @@ import {
   BuildingOffice2Icon,
   ChartBarSquareIcon,
   CreditCardIcon,
+  HomeIcon,
   InboxArrowDownIcon,
   ShieldCheckIcon,
   SwatchIcon,
@@ -25,7 +26,7 @@ import {
   SidebarSpacer,
 } from '@/components/sidebar'
 import { SidebarLayout } from '@/components/sidebar-layout'
-import { BrandLogo } from '@/components/brand-logo'
+import { BrandLogo, ShellBrand } from '@/components/brand-logo'
 import { BrandTheme } from '@/components/brand-theme'
 import { brandAssetUrl, brandGradientClass } from '@/lib/brand'
 import { useAgencyBrand, useIsAdmin } from '@/lib/hooks'
@@ -39,6 +40,7 @@ const superAdminNav = [
 ]
 
 const agencyNav = [
+  { label: 'Home', href: '/admin', icon: HomeIcon, exact: true },
   { label: 'Clients', href: '/admin/clients', icon: UsersIcon, exact: false },
   { label: 'Brand', href: '/admin/brand', icon: SwatchIcon, exact: false },
 ]
@@ -47,14 +49,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const { isLoaded, userId } = useAuth()
   const { user } = useUser()
   const { isAdmin, isAgency, loading } = useIsAdmin()
-  const brand = useAgencyBrand(isAgency)
+  const { brand, loading: brandLoading } = useAgencyBrand(isAgency)
   const router = useRouter()
   const pathname = usePathname()
   const allowed = isAdmin || isAgency
   const agencyBlocked =
     isAgency &&
-    (pathname === '/admin' ||
-      pathname.startsWith('/admin/plans') ||
+    (pathname.startsWith('/admin/plans') ||
       pathname.startsWith('/admin/requests') ||
       pathname.startsWith('/admin/agencies'))
   const nav = isAgency ? agencyNav : superAdminNav
@@ -73,7 +74,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       router.replace('/')
     }
     if (isLoaded && userId && !loading && agencyBlocked) {
-      router.replace('/admin/clients')
+      router.replace('/admin')
     }
   }, [isLoaded, userId, loading, allowed, agencyBlocked, router])
 
@@ -99,17 +100,21 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       sidebar={
         <Sidebar>
           <SidebarHeader>
-            <div className="flex flex-col gap-0 px-2 py-0.5">
-              <BrandLogo
-                height={31}
-                priority
-                className="max-w-44.5"
-                src={isAgency ? brandAssetUrl(brand?.logo_url) : null}
-                alt={brand?.company_name || 'Logo'}
-              />
-              <p className="truncate pl-[25px] text-[10px] font-medium leading-tight text-zinc-500 dark:text-zinc-400">
-                {isAgency ? 'Agency' : 'Admin Console'}
-              </p>
+            <div className="flex min-w-0 flex-col gap-0 px-2 py-0.5">
+              {isAgency ? (
+                <ShellBrand
+                  loading={brandLoading}
+                  logoUrl={brandAssetUrl(brand?.logo_url)}
+                  name={brand?.company_name}
+                />
+              ) : (
+                <>
+                  <BrandLogo height={31} priority className="max-w-44.5" />
+                  <p className="truncate pl-[25px] text-[10px] font-medium leading-tight text-zinc-500 dark:text-zinc-400">
+                    Admin Console
+                  </p>
+                </>
+              )}
             </div>
           </SidebarHeader>
 

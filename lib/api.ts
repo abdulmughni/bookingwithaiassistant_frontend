@@ -939,6 +939,12 @@ export const api = {
 
   brand: {
     me: (token: string) => request<import('./types').SessionBrand>('/api/brand/me', { token }),
+    saveTheme: (token: string, theme: import('./brand-presets').BrandThemeColors) =>
+      request<import('./types').SessionBrand>('/api/brand/theme', {
+        token,
+        method: 'PUT',
+        body: JSON.stringify({ theme }),
+      }),
   },
 
   credentials: {
