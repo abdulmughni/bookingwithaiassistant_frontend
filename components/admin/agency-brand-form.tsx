@@ -4,16 +4,89 @@ import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/button'
-import { Field, Label } from '@/components/fieldset'
 import { Input } from '@/components/input'
 import { ApiError, api } from '@/lib/api'
 import { brandAssetUrl } from '@/lib/brand'
+import {
+  BRAND_PRESETS,
+  CURRENT_THEME,
+  THEME_ROWS,
+  isHexColor,
+  themesMatch,
+  type BrandThemeColors,
+} from '@/lib/brand-presets'
 import { useApiToken } from '@/lib/hooks'
+
+function BrandPreview({
+  colors,
+  logoUrl,
+}: {
+  colors: BrandThemeColors
+  logoUrl: string | null
+}) {
+  return (
+    <div
+      className="overflow-hidden rounded-2xl border shadow-sm"
+      style={{ background: colors.page_background, borderColor: colors.border, color: colors.main_text }}
+    >
+      <div className="border-b px-4 py-3" style={{ borderColor: colors.border }}>
+        <p className="text-xs font-medium" style={{ color: colors.subtext }}>
+          Live preview
+        </p>
+      </div>
+      <div className="flex gap-3 p-3">
+        <div
+          className="flex w-20 shrink-0 flex-col gap-3 rounded-xl p-2"
+          style={{ background: colors.soft_background }}
+        >
+          {logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={logoUrl} alt="" className="h-6 w-auto object-contain object-left" />
+          ) : (
+            <div className="h-6 w-10 rounded" style={{ background: colors.primary }} />
+          )}
+          <div className="space-y-1.5">
+            <div className="h-1.5 rounded-full" style={{ background: colors.primary }} />
+            <div className="h-1.5 w-4/5 rounded-full" style={{ background: colors.border }} />
+            <div className="h-1.5 w-3/5 rounded-full" style={{ background: colors.border }} />
+          </div>
+        </div>
+        <div className="min-w-0 flex-1 space-y-2">
+          <div
+            className="rounded-xl border p-3"
+            style={{ background: colors.card_background, borderColor: colors.border }}
+          >
+            <p className="text-sm font-semibold">Today&apos;s jobs</p>
+            <p className="mt-1 text-xs" style={{ color: colors.subtext }}>
+              Cards, text, and buttons use the colors on the left.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <span
+                className="rounded-lg px-2.5 py-1 text-xs font-semibold"
+                style={{ background: colors.primary, color: colors.button_text }}
+              >
+                Primary
+              </span>
+              <span
+                className="rounded-lg px-2.5 py-1 text-xs font-semibold"
+                style={{ background: colors.accent, color: colors.button_text }}
+              >
+                Accent
+              </span>
+            </div>
+          </div>
+          <div className="rounded-xl px-3 py-2 text-xs" style={{ background: colors.soft_background, color: colors.subtext }}>
+            Soft panel
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export function AgencyBrandForm({ agencyId }: { agencyId: string }) {
   const getToken = useApiToken()
-  const [primary, setPrimary] = useState('#3b59ff')
-  const [primaryDark, setPrimaryDark] = useState('#2438e6')
+  const [colors, setColors] = useState<BrandThemeColors>(CURRENT_THEME)
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
   const [savingColors, setSavingColors] = useState(false)
   const [savingLogo, setSavingLogo] = useState(false)
@@ -25,8 +98,7 @@ export function AgencyBrandForm({ agencyId }: { agencyId: string }) {
         const token = await getToken()
         const agency = await api.admin.getAgency(token, agencyId)
         if (cancelled) return
-        if (agency.primary_color) setPrimary(agency.primary_color)
-        if (agency.primary_dark_color) setPrimaryDark(agency.primary_dark_color)
+        if (agency.theme) setColors(agency.theme)
         setLogoUrl(agency.logo_url)
       } catch {
         /* The page that hosts this form reports load errors. */
@@ -37,16 +109,24 @@ export function AgencyBrandForm({ agencyId }: { agencyId: string }) {
     }
   }, [agencyId, getToken])
 
+  function setColor(key: keyof BrandThemeColors, value: string) {
+    setColors((current) => ({ ...current, [key]: value }))
+  }
+
   async function saveColors() {
+    const invalid = THEME_ROWS.find((row) => !isHexColor(colors[row.key]))
+    if (invalid) {
+      toast.error(`${invalid.label} must be a color like #1D4ED8.`)
+      return
+    }
+    const theme = Object.fromEntries(
+      THEME_ROWS.map((row) => [row.key, colors[row.key].trim().toLowerCase()]),
+    ) as BrandThemeColors
     setSavingColors(true)
     try {
       const token = await getToken()
-      const saved = await api.admin.saveBrandColors(token, agencyId, {
-        primary_color: primary,
-        primary_dark_color: primaryDark,
-      })
-      setPrimary(saved.primary_color || primary)
-      setPrimaryDark(saved.primary_dark_color || primaryDark)
+      const saved = await api.admin.saveBrandColors(token, agencyId, theme)
+      if (saved.theme) setColors(saved.theme)
       window.dispatchEvent(new Event('agency-brand-changed'))
       toast.success('Colors saved')
     } catch (err) {
@@ -75,55 +155,90 @@ export function AgencyBrandForm({ agencyId }: { agencyId: string }) {
   const preview = brandAssetUrl(logoUrl)
 
   return (
-    <div className="grid gap-6 sm:grid-cols-2">
-      <div className="space-y-4">
-        <Field>
-          <Label>Main color</Label>
-          <div className="flex items-center gap-3">
-            <input
-              type="color"
-              aria-label="Main color"
-              value={primary}
-              onChange={(e) => setPrimary(e.target.value)}
-              className="size-10 cursor-pointer rounded border border-zinc-200 bg-white"
-            />
-            <Input value={primary} onChange={(e) => setPrimary(e.target.value)} />
-          </div>
-        </Field>
-        <Field>
-          <Label>Dark color</Label>
-          <div className="flex items-center gap-3">
-            <input
-              type="color"
-              aria-label="Dark color"
-              value={primaryDark}
-              onChange={(e) => setPrimaryDark(e.target.value)}
-              className="size-10 cursor-pointer rounded border border-zinc-200 bg-white"
-            />
-            <Input value={primaryDark} onChange={(e) => setPrimaryDark(e.target.value)} />
-          </div>
-        </Field>
-        <Button color="brand" disabled={savingColors} onClick={() => void saveColors()}>
-          {savingColors ? 'Saving…' : 'Save colors'}
-        </Button>
-      </div>
-      <div className="space-y-3">
-        <Field>
-          <Label>Logo</Label>
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center gap-4">
+        <div className="flex size-16 items-center justify-center overflow-hidden rounded-xl border border-zinc-200 bg-white">
+          {preview ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={preview} alt="Agency logo" className="max-h-12 max-w-14 object-contain" />
+          ) : (
+            <span className="text-[10px] font-medium text-zinc-400">Logo</span>
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-zinc-950 dark:text-white">Logo</p>
+          <p className="mt-0.5 text-xs text-zinc-500">PNG, JPG, or WebP. Under 2 MB.</p>
           <Input
+            className="mt-2 max-w-sm"
             type="file"
             accept="image/png,image/jpeg,image/webp"
             disabled={savingLogo}
             onChange={(e) => void onLogo(e.target.files?.[0])}
           />
-        </Field>
-        {preview ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={preview} alt="Agency logo" className="h-12 w-auto object-contain" />
-        ) : (
-          <p className="text-sm text-zinc-500">PNG, JPG, or WebP. Under 2 MB.</p>
-        )}
-        {savingLogo ? <p className="text-sm text-zinc-500">Uploading…</p> : null}
+          {savingLogo ? <p className="mt-1 text-xs text-zinc-500">Uploading…</p> : null}
+        </div>
+      </div>
+
+      <div>
+        <p className="text-sm font-medium text-zinc-950 dark:text-white">Presets</p>
+        <p className="mt-0.5 text-xs text-zinc-500">
+          Current is the app as it looks today. A preset fills the colors below. Nothing is saved until you save.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {BRAND_PRESETS.map((preset) => {
+            const selected = themesMatch(colors, preset.colors)
+            return (
+              <button
+                key={preset.id}
+                type="button"
+                onClick={() => setColors(preset.colors)}
+                className={
+                  selected
+                    ? 'inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-sm font-medium text-zinc-950 ring-2 ring-brand-600'
+                    : 'inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-sm text-zinc-700 ring-1 ring-zinc-200 hover:bg-zinc-50'
+                }
+              >
+                <span className="flex gap-0.5">
+                  <span className="size-3 rounded-full" style={{ background: preset.colors.primary }} />
+                  <span className="size-3 rounded-full" style={{ background: preset.colors.accent }} />
+                  <span className="size-3 rounded-full ring-1 ring-zinc-200" style={{ background: preset.colors.soft_background }} />
+                </span>
+                {preset.name}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_300px]">
+        <div className="space-y-3">
+          {THEME_ROWS.map((row) => {
+            const value = colors[row.key]
+            const picker = isHexColor(value) ? value : '#000000'
+            return (
+              <label key={row.key} className="flex flex-wrap items-center gap-3">
+                <input
+                  type="color"
+                  aria-label={row.label}
+                  value={picker}
+                  onChange={(e) => setColor(row.key, e.target.value)}
+                  className="size-9 cursor-pointer rounded-md border border-zinc-200 bg-white"
+                />
+                <span className="w-36 text-sm text-zinc-700 dark:text-zinc-300">{row.label}</span>
+                <Input
+                  value={value}
+                  spellCheck={false}
+                  onChange={(e) => setColor(row.key, e.target.value)}
+                  className="min-w-36 flex-1 font-mono"
+                />
+              </label>
+            )
+          })}
+          <Button color="brand" disabled={savingColors} onClick={() => void saveColors()}>
+            {savingColors ? 'Saving…' : 'Save colors'}
+          </Button>
+        </div>
+        <BrandPreview colors={colors} logoUrl={preview} />
       </div>
     </div>
   )

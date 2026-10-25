@@ -11,7 +11,7 @@ export default function AgencyBrandPage() {
     <PageShell>
       <PageHeader
         title="Brand"
-        description="Your logo and two colors appear on your screens and on your clients' dashboards."
+        description="Your logo and colors appear on your screens and on your clients' dashboards."
       />
       <section className={`${dashCardClass} p-5 sm:p-6`}>
         {loading ? (

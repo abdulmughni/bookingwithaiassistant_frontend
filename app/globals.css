@@ -700,3 +700,22 @@ body {
     font-size: 0.72rem;
   }
 }
+
+/* Agency palette. These classes do nothing until BrandTheme sets data-agency-theme. */
+html[data-agency-theme] .agency-canvas {
+  background-color: var(--brand-page) !important;
+  color: var(--brand-text);
+}
+html[data-agency-theme] .agency-soft {
+  background-color: var(--brand-soft) !important;
+}
+html[data-agency-theme] .agency-surface {
+  background-color: var(--brand-card) !important;
+  border-color: var(--brand-border) !important;
+}
+html[data-agency-theme] .agency-text {
+  color: var(--brand-text) !important;
+}
+html[data-agency-theme] .agency-muted {
+  color: var(--brand-subtext) !important;
+}

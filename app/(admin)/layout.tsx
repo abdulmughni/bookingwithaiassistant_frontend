@@ -153,10 +153,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </Sidebar>
       }
     >
-      {isAgency ? (
-        <BrandTheme primary={brand?.primary_color} primaryDark={brand?.primary_dark_color} />
-      ) : null}
-      <div className="min-h-full bg-zinc-50/90 px-4 py-6 sm:px-6 lg:px-8 lg:py-8 dark:bg-zinc-950">
+      {isAgency ? <BrandTheme theme={brand?.theme} /> : null}
+      <div className="agency-canvas min-h-full bg-zinc-50/90 px-4 py-6 sm:px-6 lg:px-8 lg:py-8 dark:bg-zinc-950">
         {children}
       </div>
     </SidebarLayout>

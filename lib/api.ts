@@ -569,11 +569,11 @@ export const api = {
     saveBrandColors: (
       token: string,
       agencyId: string,
-      colors: { primary_color: string; primary_dark_color: string },
+      theme: import('./brand-presets').BrandThemeColors,
     ) =>
       request<import('./types').AgencyBrandColors>(
         `/api/admin/agencies/${encodeURIComponent(agencyId)}/brand`,
-        { token, method: 'PUT', body: JSON.stringify(colors) },
+        { token, method: 'PUT', body: JSON.stringify({ theme }) },
       ),
     uploadBrandLogo: (token: string, agencyId: string, file: File) => {
       const form = new FormData()

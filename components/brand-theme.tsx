@@ -2,32 +2,36 @@
 
 import { useEffect } from 'react'
 
-/** Apply an agency's two colors to the shared brand tokens for this screen. */
-export function BrandTheme({
-  primary,
-  primaryDark,
-}: {
-  primary?: string | null
-  primaryDark?: string | null
-}) {
+import type { BrandThemeColors } from '@/lib/brand-presets'
+
+/** Apply a saved agency palette to the shell. Draft colors stay in the editor preview. */
+export function BrandTheme({ theme }: { theme?: BrandThemeColors | null }) {
   useEffect(() => {
-    if (!primary) return
-    const dark = primaryDark || primary
+    if (!theme?.primary) return
     const root = document.documentElement
     const values: Record<string, string> = {
-      '--color-brand-400': primary,
-      '--color-brand-500': primary,
-      '--color-brand-600': primary,
-      '--color-brand-700': dark,
-      '--bc-brand': primary,
+      '--brand-page': theme.page_background,
+      '--brand-card': theme.card_background,
+      '--brand-soft': theme.soft_background,
+      '--brand-text': theme.main_text,
+      '--brand-subtext': theme.subtext,
+      '--brand-button-text': theme.button_text,
+      '--brand-border': theme.border,
+      '--color-brand-400': theme.primary,
+      '--color-brand-500': theme.primary,
+      '--color-brand-600': theme.primary,
+      '--color-brand-700': theme.accent,
+      '--bc-brand': theme.primary,
     }
+    root.dataset.agencyTheme = 'on'
     for (const [key, value] of Object.entries(values)) {
       root.style.setProperty(key, value)
     }
     return () => {
+      delete root.dataset.agencyTheme
       for (const key of Object.keys(values)) root.style.removeProperty(key)
     }
-  }, [primary, primaryDark])
+  }, [theme])
 
   return null
 }

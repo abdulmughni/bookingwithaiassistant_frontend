@@ -4,7 +4,7 @@ import { Heading } from '@/components/heading'
 
 /** Standard dashboard card surface (Donezo-style). */
 export const dashCardClass =
-  'rounded-2xl border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-700/80 dark:bg-zinc-900/80'
+  'agency-surface rounded-2xl border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-700/80 dark:bg-zinc-900/80'
 
 export function PageShell({
   children,
@@ -32,7 +32,7 @@ export function PageHeader({
       <header className="text-center">
         <Heading>{title}</Heading>
         {description ? (
-          <p className="mx-auto mt-2 max-w-2xl text-sm text-zinc-500 dark:text-zinc-400">
+          <p className="agency-muted mx-auto mt-2 max-w-2xl text-sm text-zinc-500 dark:text-zinc-400">
             {description}
           </p>
         ) : null}
@@ -46,7 +46,7 @@ export function PageHeader({
       <div className="max-w-2xl">
         <Heading>{title}</Heading>
         {description ? (
-          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{description}</p>
+          <p className="agency-muted mt-1 text-sm text-zinc-500 dark:text-zinc-400">{description}</p>
         ) : null}
       </div>
       {children ? <div className="flex flex-wrap items-center gap-2">{children}</div> : null}

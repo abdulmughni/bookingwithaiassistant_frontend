@@ -112,7 +112,7 @@ export default function AdminAgencyDetailPage() {
       <section className={`${dashCardClass} space-y-4 p-5 sm:p-6`}>
         <h2 className="text-base font-semibold text-zinc-950 dark:text-white">Brand</h2>
         <p className="text-sm text-zinc-500">
-          This logo and these two colors show on the agency screens and on this agency&apos;s client dashboards.
+          This logo and these colors show on the agency screens and on this agency&apos;s client dashboards.
         </p>
         <AgencyBrandForm agencyId={agencyId} />
       </section>
