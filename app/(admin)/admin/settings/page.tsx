@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useUser } from '@clerk/nextjs'
 import { toast } from 'sonner'
 
+import { AgencyBrandForm } from '@/components/admin/agency-brand-form'
 import { AgencyOnly } from '@/components/admin/agency-only'
 import { Button } from '@/components/button'
 import { Input } from '@/components/input'
@@ -52,7 +53,10 @@ function SettingsBody() {
 
   return (
     <PageShell>
-      <PageHeader title="Settings" description="Your agency name and the email on this login." />
+      <PageHeader
+        title="Settings"
+        description="Your agency name, logo, and colors. Clients see this logo and these colors."
+      />
       {agency.loading ? <SkeletonBlock className="h-32" /> : null}
       {agency.error ? <p className="text-sm text-red-600">{agency.error}</p> : null}
       <section className={`${dashCardClass} max-w-xl space-y-4 p-5`}>
@@ -68,6 +72,17 @@ function SettingsBody() {
             {busy ? 'Saving…' : 'Save name'}
           </Button>
         )}
+      </section>
+      <section className={`${dashCardClass} p-5 sm:p-6`}>
+        <h2 className="text-sm font-semibold text-zinc-950 dark:text-white">Branding</h2>
+        <p className="mt-1 mb-4 text-sm text-zinc-500">
+          Logo and colors appear on your screens and on your clients&apos; dashboards.
+        </p>
+        {isAgencyStaff ? (
+          <p className="text-sm text-zinc-500">Only the agency owner can change the logo and colors.</p>
+        ) : tenantId ? (
+          <AgencyBrandForm agencyId={tenantId} />
+        ) : null}
       </section>
     </PageShell>
   )

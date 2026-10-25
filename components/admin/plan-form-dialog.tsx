@@ -62,12 +62,15 @@ export function PlanFormDialog({
   open,
   onClose,
   plan,
+  seed,
   onSubmit,
 }: {
   open: boolean
   onClose: () => void
   /** When provided, the dialog edits this plan; otherwise it creates one. */
   plan?: AdminPlan | null
+  /** Prefills a new plan, for example from the agency cost calculator. */
+  seed?: PlanWriteBody | null
   onSubmit: (body: PlanWriteBody) => Promise<void>
 }) {
   const isEdit = Boolean(plan)
@@ -79,12 +82,12 @@ export function PlanFormDialog({
 
   useEffect(() => {
     if (!open) return
-    const body = plan ? planToBody(plan) : EMPTY
+    const body = plan ? planToBody(plan) : { ...EMPTY, ...(seed ?? {}) }
     setForm(body)
     setPriceDollars(String((body.monthly_price_cents / 100) || 0))
     setExtraDollars(String((body.extra_minute_cents / 100) || 0))
     setFeaturesText(body.features.join('\n'))
-  }, [open, plan])
+  }, [open, plan, seed])
 
   const set = <K extends keyof PlanWriteBody>(key: K, value: PlanWriteBody[K]) =>
     setForm((f) => ({ ...f, [key]: value }))

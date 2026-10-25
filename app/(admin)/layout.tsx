@@ -12,10 +12,11 @@ import {
   HomeIcon,
   InboxArrowDownIcon,
   ShieldCheckIcon,
-  SwatchIcon,
   UserGroupIcon,
   UsersIcon,
 } from '@heroicons/react/20/solid'
+
+import { AgencyNotificationBell } from '@/components/admin/agency-notification-bell'
 
 import { Navbar, NavbarSpacer } from '@/components/navbar'
 import {
@@ -48,7 +49,6 @@ const agencyNav = [
   { label: 'Client Activity', href: '/admin/activity', icon: ChartBarSquareIcon, exact: false },
   { label: 'Plans & Credits', href: '/admin/credits', icon: CreditCardIcon, exact: false },
   { label: 'Billing', href: '/admin/billing', icon: BanknotesIcon, exact: false },
-  { label: 'Branding', href: '/admin/brand', icon: SwatchIcon, exact: false },
   { label: 'Team', href: '/admin/team', icon: UserGroupIcon, exact: false },
   { label: 'Settings', href: '/admin/settings', icon: Cog6ToothIcon, exact: false },
 ]
@@ -102,6 +102,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       navbar={
         <Navbar>
           <NavbarSpacer />
+          {isAgency ? <AgencyNotificationBell /> : null}
           <UserButton />
         </Navbar>
       }
