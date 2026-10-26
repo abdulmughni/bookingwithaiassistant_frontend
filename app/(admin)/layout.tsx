@@ -1,8 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { useEffect } from 'react'
+import { usePathname, useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
 import { useAuth, useUser, UserButton } from '@clerk/nextjs'
 import {
   BanknotesIcon,
@@ -85,9 +85,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const { brand, loading: brandLoading } = useAgencyBrand(isAgency)
   const router = useRouter()
   const pathname = usePathname()
-  const searchParams = useSearchParams()
-  const view = searchParams.get('view')
-  const section = searchParams.get('section')
+  const [view, setView] = useState<string | null>(null)
+  const [section, setSection] = useState<string | null>(null)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    setView(params.get('view'))
+    setSection(params.get('section'))
+  }, [pathname])
   const allowed = isAdmin || isAgency
   const agencyBlocked =
     isAgency &&
