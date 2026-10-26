@@ -1,17 +1,23 @@
 'use client'
 
-import { usePathname, useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useEffect } from 'react'
 import { useAuth, useUser, UserButton } from '@clerk/nextjs'
 import {
   BanknotesIcon,
   BuildingOffice2Icon,
+  CalendarDaysIcon,
   ChartBarSquareIcon,
+  ChatBubbleLeftRightIcon,
   Cog6ToothIcon,
   CreditCardIcon,
+  EnvelopeIcon,
   HomeIcon,
   InboxArrowDownIcon,
+  PhoneIcon,
   ShieldCheckIcon,
+  SwatchIcon,
   UserGroupIcon,
   UsersIcon,
 } from '@heroicons/react/20/solid'
@@ -32,8 +38,10 @@ import {
 import { SidebarLayout } from '@/components/sidebar-layout'
 import { BrandLogo, ShellBrand } from '@/components/brand-logo'
 import { BrandTheme } from '@/components/brand-theme'
+import { UsageBar } from '@/components/admin/shared'
 import { brandAssetUrl, brandGradientClass } from '@/lib/brand'
-import { useAgencyBrand, useIsAdmin } from '@/lib/hooks'
+import { api } from '@/lib/api'
+import { useAgencyBrand, useApiData, useIsAdmin } from '@/lib/hooks'
 
 const superAdminNav = [
   { label: 'Overview', href: '/admin', icon: ChartBarSquareIcon, exact: true },
@@ -44,14 +52,31 @@ const superAdminNav = [
 ]
 
 const agencyNav = [
-  { label: 'Overview', href: '/admin', icon: HomeIcon, exact: true },
-  { label: 'My Clients', href: '/admin/clients', icon: UsersIcon, exact: false },
-  { label: 'Client Activity', href: '/admin/activity', icon: ChartBarSquareIcon, exact: false },
-  { label: 'Plans & Credits', href: '/admin/credits', icon: CreditCardIcon, exact: false },
+  { label: 'Home', href: '/admin', icon: HomeIcon, exact: true },
+  { label: 'Clients', href: '/admin/clients', icon: UsersIcon, exact: false },
+  { label: 'Bookings', href: '/admin/activity?view=bookings', icon: CalendarDaysIcon, exact: false, view: 'bookings' },
+  { label: 'Conversations', href: '/admin/activity?view=conversations', icon: ChatBubbleLeftRightIcon, exact: false, view: 'conversations' },
+  { label: 'Calls', href: '/admin/activity?view=calls', icon: PhoneIcon, exact: false, view: 'calls' },
+  { label: 'Messages', href: '/admin/activity?view=messages', icon: EnvelopeIcon, exact: false, view: 'messages' },
+  { label: 'Team Members', href: '/admin/team', icon: UserGroupIcon, exact: false },
+  { label: 'Brand & White Label', href: '/admin/settings?section=brand', icon: SwatchIcon, exact: false, section: 'brand' },
+  { label: 'Billing & Plans', href: '/admin/credits', icon: CreditCardIcon, exact: false },
   { label: 'Billing', href: '/admin/billing', icon: BanknotesIcon, exact: false },
-  { label: 'Team', href: '/admin/team', icon: UserGroupIcon, exact: false },
-  { label: 'Settings', href: '/admin/settings', icon: Cog6ToothIcon, exact: false },
+  { label: 'Settings', href: '/admin/settings', icon: Cog6ToothIcon, exact: true },
 ]
+
+function agencyItemCurrent(
+  item: { href: string; exact?: boolean; view?: string; section?: string },
+  pathname: string,
+  view: string | null,
+  section: string | null,
+) {
+  if (item.view) return pathname.startsWith('/admin/activity') && view === item.view
+  if (item.section) return pathname === '/admin/settings' && section === item.section
+  if (item.exact && item.href === '/admin/settings') return pathname === '/admin/settings' && !section
+  if (item.exact) return pathname === item.href
+  return pathname === item.href || pathname.startsWith(`${item.href}/`)
+}
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { isLoaded, userId } = useAuth()
@@ -60,6 +85,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const { brand, loading: brandLoading } = useAgencyBrand(isAgency)
   const router = useRouter()
   const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const view = searchParams.get('view')
+  const section = searchParams.get('section')
   const allowed = isAdmin || isAgency
   const agencyBlocked =
     isAgency &&
@@ -133,7 +161,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 <SidebarItem
                   key={item.href}
                   href={item.href}
-                  current={item.exact ? pathname === item.href : pathname.startsWith(item.href)}
+                  current={
+                    isAgency
+                      ? agencyItemCurrent(item, pathname, view, section)
+                      : item.exact
+                        ? pathname === item.href
+                        : pathname.startsWith(item.href)
+                  }
                 >
                   <item.icon data-slot="icon" />
                   <SidebarLabel>{item.label}</SidebarLabel>
@@ -145,6 +179,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </SidebarBody>
 
           <SidebarFooter>
+            {isAgency ? <AgencyUsageCard /> : null}
             <SidebarSection>
               <div className="flex items-center gap-3 px-2 py-1.5">
                 <UserButton appearance={{ elements: { avatarBox: 'size-8' } }} />
@@ -172,5 +207,28 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         {children}
       </div>
     </SidebarLayout>
+  )
+}
+
+function AgencyUsageCard() {
+  const clients = useApiData((token) => api.admin.listTenants(token), [])
+  const rows = clients.data ?? []
+  const used = rows.reduce((sum, client) => sum + (client.usage?.call_minutes_used ?? 0), 0)
+  const quota = rows.reduce((sum, client) => sum + (client.usage?.call_minutes_quota ?? 0), 0)
+
+  return (
+    <div className="mb-2 rounded-xl border border-zinc-200 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-900">
+      <p className="text-xs font-semibold text-zinc-950 dark:text-white">Usage</p>
+      <p className="mt-2 text-xs text-zinc-500">{rows.length.toLocaleString()} clients</p>
+      <div className="mt-2">
+        <UsageBar used={used} quota={quota} label="Call minutes" />
+      </div>
+      <Link
+        href="/admin/credits"
+        className="mt-3 flex items-center justify-center rounded-lg border border-brand-200 px-3 py-1.5 text-xs font-semibold text-brand-700 hover:bg-brand-50 dark:border-brand-500/30 dark:text-brand-300 dark:hover:bg-brand-500/10"
+      >
+        Manage plans
+      </Link>
+    </div>
   )
 }
