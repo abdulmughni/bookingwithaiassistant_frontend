@@ -6,6 +6,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Legend,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -44,15 +45,80 @@ export function attentionReason(client: AdminTenant, now = Date.now()) {
   return null
 }
 
+function chartDate(iso: string) {
+  const date = new Date(`${iso}T00:00:00`)
+  if (Number.isNaN(date.getTime())) return iso.slice(5)
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+function DashboardTooltip({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean
+  payload?: Array<{ name?: string; value?: number; color?: string }>
+  label?: string
+}) {
+  if (!active || !payload?.length) return null
+  return (
+    <div className="rounded-lg bg-white px-3 py-2 text-xs shadow-lg ring-1 ring-zinc-200 dark:bg-zinc-900 dark:ring-zinc-700">
+      <p className="font-medium text-zinc-950 dark:text-white">{label ? chartDate(String(label)) : ''}</p>
+      {payload.map((item) => (
+        <p key={item.name} className="mt-1 text-zinc-600 dark:text-zinc-300">
+          <span className="mr-1 inline-block size-2 rounded-sm" style={{ background: item.color }} />
+          {item.name}: {item.value ?? 0}
+        </p>
+      ))}
+    </div>
+  )
+}
+
 export function AgencyRangeChart({
   series,
+  variant = 'simple',
 }: {
   series: AgencyActivity['series']
+  variant?: 'simple' | 'dashboard'
 }) {
   const data = series.map((point) => ({
     ...point,
     label: point.date.slice(5),
   }))
+  if (variant === 'dashboard') {
+    return (
+      <div className="h-80 w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data} barGap={2} barCategoryGap="28%" margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
+            <CartesianGrid stroke="#e4e4e7" vertical={false} />
+            <XAxis
+              dataKey="date"
+              tickFormatter={chartDate}
+              interval={2}
+              tick={{ fontSize: 11, fill: '#71717a' }}
+              axisLine={false}
+              tickLine={false}
+            />
+            <YAxis
+              allowDecimals={false}
+              tick={{ fontSize: 11, fill: '#71717a' }}
+              axisLine={false}
+              tickLine={false}
+            />
+            <Tooltip content={<DashboardTooltip />} cursor={{ fill: 'rgba(59, 89, 255, 0.06)' }} />
+            <Legend
+              verticalAlign="top"
+              align="center"
+              iconType="circle"
+              wrapperStyle={{ fontSize: 12, paddingBottom: 8 }}
+            />
+            <Bar dataKey="bookings" name="Bookings" fill="#93c5fd" radius={[6, 6, 0, 0]} maxBarSize={14} />
+            <Bar dataKey="calls" name="Calls" fill="#2563eb" radius={[6, 6, 0, 0]} maxBarSize={14} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    )
+  }
   return (
     <div className="h-64 w-full">
       <ResponsiveContainer width="100%" height="100%">
