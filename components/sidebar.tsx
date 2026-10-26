@@ -94,21 +94,29 @@ const sidebarItemClasses = clsx(
   'dark:data-current:*:data-[slot=icon]:fill-white'
 )
 
+const pillItemClasses = clsx(
+  sidebarItemClasses,
+  'data-current:bg-blue-50 data-current:text-blue-700 data-current:*:data-[slot=icon]:fill-blue-600',
+  'dark:data-current:bg-blue-500/10 dark:data-current:text-blue-300 dark:data-current:*:data-[slot=icon]:fill-blue-300',
+)
+
 export const SidebarItem = forwardRef(function SidebarItem(
   {
     current,
+    pill,
     className,
     children,
     ...props
-  }: { current?: boolean; className?: string; children: React.ReactNode } & (
+  }: { current?: boolean; pill?: boolean; className?: string; children: React.ReactNode } & (
     | ({ href?: never } & Omit<Headless.ButtonProps, 'as' | 'className'>)
     | ({ href: string } & Omit<Headless.ButtonProps<typeof Link>, 'as' | 'className'>)
   ),
   ref: React.ForwardedRef<HTMLAnchorElement | HTMLButtonElement>
 ) {
+  const itemClass = pill ? pillItemClasses : sidebarItemClasses
   return (
     <span className={clsx(className, 'relative')}>
-      {current && (
+      {current && !pill && (
         <motion.span
           layoutId="current-indicator"
           className="absolute inset-y-2 -left-4 w-0.5 rounded-full bg-brand-600 dark:bg-brand-500"
@@ -118,7 +126,7 @@ export const SidebarItem = forwardRef(function SidebarItem(
         <Headless.CloseButton
           as={Link}
           {...props}
-          className={sidebarItemClasses}
+          className={itemClass}
           data-current={current ? 'true' : undefined}
           ref={ref}
         >
@@ -127,7 +135,7 @@ export const SidebarItem = forwardRef(function SidebarItem(
       ) : (
         <Headless.Button
           {...props}
-          className={clsx('cursor-default', sidebarItemClasses)}
+          className={clsx('cursor-default', itemClass)}
           data-current={current ? 'true' : undefined}
           ref={ref}
         >
