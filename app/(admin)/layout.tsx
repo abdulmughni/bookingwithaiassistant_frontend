@@ -5,7 +5,6 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { useAuth, useUser, UserButton } from '@clerk/nextjs'
 import {
-  BanknotesIcon,
   BuildingOffice2Icon,
   CalendarDaysIcon,
   ChartBarSquareIcon,
@@ -17,6 +16,7 @@ import {
   InboxArrowDownIcon,
   PhoneIcon,
   ShieldCheckIcon,
+  SparklesIcon,
   SwatchIcon,
   UserGroupIcon,
   UsersIcon,
@@ -38,10 +38,10 @@ import {
 import { SidebarLayout } from '@/components/sidebar-layout'
 import { BrandLogo, ShellBrand } from '@/components/brand-logo'
 import { BrandTheme } from '@/components/brand-theme'
-import { UsageBar } from '@/components/admin/shared'
 import { brandAssetUrl, brandGradientClass } from '@/lib/brand'
-import { api } from '@/lib/api'
+import { useAgencyDemo } from '@/lib/agency-dashboard-demo'
 import { useAgencyBrand, useApiData, useIsAdmin } from '@/lib/hooks'
+import { api } from '@/lib/api'
 
 const superAdminNav = [
   { label: 'Overview', href: '/admin', icon: ChartBarSquareIcon, exact: true },
@@ -58,10 +58,10 @@ const agencyNav = [
   { label: 'Conversations', href: '/admin/activity?view=conversations', icon: ChatBubbleLeftRightIcon, exact: false, view: 'conversations' },
   { label: 'Calls', href: '/admin/activity?view=calls', icon: PhoneIcon, exact: false, view: 'calls' },
   { label: 'Messages', href: '/admin/activity?view=messages', icon: EnvelopeIcon, exact: false, view: 'messages' },
+  { label: 'AI Assistants', href: '/admin/activity?view=assistants', icon: SparklesIcon, exact: false, view: 'assistants' },
   { label: 'Team Members', href: '/admin/team', icon: UserGroupIcon, exact: false },
   { label: 'Brand & White Label', href: '/admin/settings?section=brand', icon: SwatchIcon, exact: false, section: 'brand' },
   { label: 'Billing & Plans', href: '/admin/credits', icon: CreditCardIcon, exact: false },
-  { label: 'Billing', href: '/admin/billing', icon: BanknotesIcon, exact: false },
   { label: 'Settings', href: '/admin/settings', icon: Cog6ToothIcon, exact: true },
 ]
 
@@ -143,11 +143,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <SidebarHeader>
             <div className="flex min-w-0 flex-col gap-0 px-2 py-0.5">
               {isAgency ? (
-                <ShellBrand
-                  loading={brandLoading}
-                  logoUrl={brandAssetUrl(brand?.logo_url)}
-                  name={brand?.company_name}
-                />
+                <div className="min-w-0">
+                  <ShellBrand
+                    loading={brandLoading}
+                    logoUrl={brandAssetUrl(brand?.logo_url)}
+                    name={brand?.company_name}
+                  />
+                  <p className="truncate pl-1 text-[11px] text-zinc-400">Agency dashboard</p>
+                </div>
               ) : (
                 <>
                   <BrandLogo height={31} priority className="max-w-44.5" />
@@ -165,6 +168,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 <SidebarItem
                   key={item.href}
                   href={item.href}
+                  pill={isAgency}
                   current={
                     isAgency
                       ? agencyItemCurrent(item, pathname, view, section)
@@ -183,19 +187,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </SidebarBody>
 
           <SidebarFooter>
-            {isAgency ? <AgencyUsageCard /> : null}
+            {isAgency ? <AgencyPlanCard /> : null}
             <SidebarSection>
               <div className="flex items-center gap-3 px-2 py-1.5">
                 <UserButton appearance={{ elements: { avatarBox: 'size-8' } }} />
                 <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="truncate text-sm font-medium text-zinc-950 dark:text-white">
-                      {adminName}
-                    </p>
-                    <span className="inline-flex shrink-0 items-center rounded-md bg-brand-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-700 dark:text-brand-300">
-                      {isAgency ? 'Agency' : 'Admin'}
-                    </span>
-                  </div>
+                  <p className="truncate text-sm font-medium text-zinc-950 dark:text-white">
+                    {isAgency ? brand?.company_name || adminName : adminName}
+                  </p>
                   <p className="truncate text-xs text-zinc-500">
                     {user?.primaryEmailAddress?.emailAddress ?? 'Platform owner'}
                   </p>
@@ -214,25 +213,60 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   )
 }
 
-function AgencyUsageCard() {
+function AgencyPlanCard() {
+  const { enabled } = useAgencyDemo()
   const clients = useApiData((token) => api.admin.listTenants(token), [])
   const rows = clients.data ?? []
   const used = rows.reduce((sum, client) => sum + (client.usage?.call_minutes_used ?? 0), 0)
   const quota = rows.reduce((sum, client) => sum + (client.usage?.call_minutes_quota ?? 0), 0)
+  const minutePct = quota > 0 ? Math.min(100, Math.round((used / quota) * 100)) : 0
+  const plan = enabled
+    ? {
+        name: 'Professional',
+        clientsLabel: '3 / 10 clients',
+        clientsPct: 30,
+        minutesLabel: '12,450 / 50,000 mins',
+        minutesPct: 25,
+      }
+    : {
+        name: 'Your clients',
+        clientsLabel: `${rows.length.toLocaleString()} clients`,
+        clientsPct: rows.length > 0 ? 100 : 0,
+        minutesLabel: `${used.toLocaleString()} / ${quota > 0 ? quota.toLocaleString() : '—'} mins`,
+        minutesPct: minutePct,
+      }
 
   return (
-    <div className="mb-2 rounded-xl border border-zinc-200 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-900">
-      <p className="text-xs font-semibold text-zinc-950 dark:text-white">Usage</p>
-      <p className="mt-2 text-xs text-zinc-500">{rows.length.toLocaleString()} clients</p>
-      <div className="mt-2">
-        <UsageBar used={used} quota={quota} label="Call minutes" />
+    <div className="mb-3 rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
+      <div className="flex items-center gap-2">
+        <span className="flex size-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+          <SparklesIcon className="size-4" />
+        </span>
+        <div>
+          <p className="text-[11px] text-zinc-500">Agency Plan</p>
+          <p className="text-sm font-semibold text-zinc-950 dark:text-white">{plan.name}</p>
+        </div>
       </div>
+      <PlanMeter label={plan.clientsLabel} pct={plan.clientsPct} />
+      <PlanMeter label={plan.minutesLabel} pct={plan.minutesPct} />
       <Link
         href="/admin/credits"
-        className="mt-3 flex items-center justify-center rounded-lg border border-brand-200 px-3 py-1.5 text-xs font-semibold text-brand-700 hover:bg-brand-50 dark:border-brand-500/30 dark:text-brand-300 dark:hover:bg-brand-500/10"
+        className="mt-3 flex items-center justify-center gap-1 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700"
       >
-        Manage plans
+        Upgrade Plan
+        <span aria-hidden>→</span>
       </Link>
+    </div>
+  )
+}
+
+function PlanMeter({ label, pct }: { label: string; pct: number }) {
+  return (
+    <div className="mt-3">
+      <p className="text-[11px] text-zinc-500">{label}</p>
+      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-zinc-100">
+        <div className="h-full rounded-full bg-blue-500" style={{ width: `${pct}%` }} />
+      </div>
     </div>
   )
 }

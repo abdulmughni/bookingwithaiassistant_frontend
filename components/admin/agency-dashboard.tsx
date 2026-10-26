@@ -77,43 +77,55 @@ function DashboardTooltip({
 export function AgencyRangeChart({
   series,
   variant = 'simple',
+  lightName = 'Bookings',
+  darkName = 'Calls',
+  yMax,
 }: {
   series: AgencyActivity['series']
   variant?: 'simple' | 'dashboard'
+  lightName?: string
+  darkName?: string
+  yMax?: number
 }) {
   const data = series.map((point) => ({
     ...point,
     label: point.date.slice(5),
+    light: point.bookings,
+    dark: point.calls,
   }))
   if (variant === 'dashboard') {
     return (
-      <div className="h-80 w-full">
+      <div className="h-72 w-full">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} barGap={2} barCategoryGap="28%" margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
-            <CartesianGrid stroke="#e4e4e7" vertical={false} />
+          <BarChart data={data} barCategoryGap="38%" margin={{ top: 28, right: 8, left: -8, bottom: 0 }}>
+            <CartesianGrid stroke="#ececef" vertical={false} />
             <XAxis
               dataKey="date"
               tickFormatter={chartDate}
               interval={2}
-              tick={{ fontSize: 11, fill: '#71717a' }}
+              tick={{ fontSize: 11, fill: '#a1a1aa' }}
               axisLine={false}
               tickLine={false}
             />
             <YAxis
               allowDecimals={false}
-              tick={{ fontSize: 11, fill: '#71717a' }}
+              domain={yMax ? [0, yMax] : [0, 'auto']}
+              ticks={yMax ? [0, 10, 20, 30, 40] : undefined}
+              tick={{ fontSize: 11, fill: '#a1a1aa' }}
               axisLine={false}
               tickLine={false}
+              width={32}
             />
-            <Tooltip content={<DashboardTooltip />} cursor={{ fill: 'rgba(59, 89, 255, 0.06)' }} />
+            <Tooltip content={<DashboardTooltip />} cursor={{ fill: 'rgba(37, 99, 235, 0.05)' }} />
             <Legend
               verticalAlign="top"
               align="center"
               iconType="circle"
-              wrapperStyle={{ fontSize: 12, paddingBottom: 8 }}
+              iconSize={8}
+              wrapperStyle={{ fontSize: 12, color: '#71717a', top: 0 }}
             />
-            <Bar dataKey="bookings" name="Bookings" fill="#93c5fd" radius={[6, 6, 0, 0]} maxBarSize={14} />
-            <Bar dataKey="calls" name="Calls" fill="#2563eb" radius={[6, 6, 0, 0]} maxBarSize={14} />
+            <Bar dataKey="light" name={lightName} stackId="day" fill="#93c5fd" maxBarSize={16} />
+            <Bar dataKey="dark" name={darkName} stackId="day" fill="#2563eb" radius={[5, 5, 0, 0]} maxBarSize={16} />
           </BarChart>
         </ResponsiveContainer>
       </div>
