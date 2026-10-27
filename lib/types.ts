@@ -781,6 +781,7 @@ export interface AgencyActivityPoint {
   bookings: number
   calls: number
   messages: number
+  call_minutes?: number
 }
 
 export interface AgencyActivityClient {
