@@ -521,8 +521,13 @@ export const api = {
     me: (token: string) => request<import('./types').AdminMe>('/api/admin/me', { token }),
     overview: (token: string) =>
       request<import('./types').AdminOverview>('/api/admin/overview', { token }),
-    agencyActivity: (token: string, days: 7 | 30) =>
-      request<import('./types').AgencyActivity>(`/api/admin/agency/activity?days=${days}`, { token }),
+    agencyActivity: (token: string, range: 7 | 30 | { start: string; end: string }) => {
+      const qs =
+        typeof range === 'number'
+          ? `days=${range}`
+          : `start=${encodeURIComponent(range.start)}&end=${encodeURIComponent(range.end)}`
+      return request<import('./types').AgencyActivity>(`/api/admin/agency/activity?${qs}`, { token })
+    },
     agencyAlerts: (token: string) =>
       request<import('./types').AdminAlert[]>('/api/admin/agency/alerts', { token }),
     agencyNotifications: (token: string) =>

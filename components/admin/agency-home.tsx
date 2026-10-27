@@ -2,7 +2,6 @@
 
 import { useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import { useUser, UserButton } from '@clerk/nextjs'
 import { toast } from 'sonner'
 import {
   ArrowUpIcon,
@@ -44,23 +43,44 @@ function timeAgo(iso: string): string {
   return formatDate(iso)
 }
 
-function rangeLabel(days: number) {
+function localIso(date: Date) {
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${date.getFullYear()}-${month}-${day}`
+}
+
+function defaultRange() {
   const end = new Date()
   const start = new Date()
-  start.setDate(end.getDate() - (days - 1))
-  const fmt = (date: Date) => date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  start.setDate(end.getDate() - 29)
+  return { start: localIso(start), end: localIso(end) }
+}
+
+function prettyRange(start: string, end: string) {
+  const fmt = (value: string) =>
+    new Date(`${value}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
   return `${fmt(start)} – ${fmt(end)}`
 }
 
+function inRange(iso: string | null | undefined, start: string, end: string) {
+  if (!iso) return false
+  const day = iso.slice(0, 10)
+  return day >= start && day <= end
+}
+
 export function AgencyHome() {
-  const [days, setDays] = useState<7 | 30>(30)
+  const [range, setRange] = useState(defaultRange)
+  const [draft, setDraft] = useState(defaultRange)
+  const [rangeOpen, setRangeOpen] = useState(false)
   const [inviteOpen, setInviteOpen] = useState(false)
   const { enabled: demo, setDemo } = useAgencyDemo()
   const { tenantId, isAgencyStaff } = useIsAdmin()
-  const { user } = useUser()
   const { brand } = useAgencyBrand(true)
   const clientsQuery = useApiData((token) => api.admin.listTenants(token), [])
-  const activityQuery = useApiData((token) => api.admin.agencyActivity(token, days), [days])
+  const activityQuery = useApiData(
+    (token) => api.admin.agencyActivity(token, { start: range.start, end: range.end }),
+    [range.start, range.end],
+  )
   const alertsQuery = useApiData((token) => api.admin.agencyAlerts(token), [])
   const clients = clientsQuery.data ?? []
   const counts = useMemo(() => {
@@ -69,10 +89,7 @@ export function AgencyHome() {
     return map
   }, [activityQuery.data])
   const agencyName = brand?.company_name || 'Your agency'
-  const owner =
-    (user ? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() : '') ||
-    user?.primaryEmailAddress?.emailAddress ||
-    'Agency owner'
+  const series = activityQuery.data?.series ?? []
 
   if (!demo && clientsQuery.loading) {
     return (
@@ -83,13 +100,14 @@ export function AgencyHome() {
     )
   }
 
-  const bookings = clients.reduce((sum, client) => sum + (client.bookings_count ?? 0), 0)
-  const minutes = clients.reduce((sum, client) => sum + (client.usage?.call_minutes_used ?? 0), 0)
-  const messages = clients.reduce((sum, client) => sum + (client.usage?.messages_used ?? 0), 0)
+  const bookings = series.reduce((sum, point) => sum + point.bookings, 0)
+  const minutes = series.reduce((sum, point) => sum + (point.call_minutes ?? 0), 0)
+  const messages = series.reduce((sum, point) => sum + point.messages, 0)
+  const clientsInRange = clients.filter((client) => inRange(client.created_at, range.start, range.end)).length
   const kpis = demo
     ? agencyDemo.kpis
     : [
-        { label: 'Total clients', value: clients.length.toLocaleString(), trend: '' },
+        { label: 'Total clients', value: clientsInRange.toLocaleString(), trend: '' },
         { label: 'Total bookings', value: bookings.toLocaleString(), trend: '' },
         { label: 'Call minutes', value: minutes.toLocaleString(), trend: '' },
         { label: 'Messages', value: messages.toLocaleString(), trend: '' },
@@ -97,26 +115,16 @@ export function AgencyHome() {
       ]
   const icons = [UsersIcon, CalendarDaysIcon, PhoneIcon, EnvelopeIcon, BanknotesIcon]
   const topClients = [...clients].sort((a, b) => (counts.get(b.id)?.bookings ?? 0) - (counts.get(a.id)?.bookings ?? 0)).slice(0, 5)
-  const signups = [...clients].sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')).slice(0, 5)
+  const signups = clients
+    .filter((client) => inRange(client.created_at, range.start, range.end))
+    .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+    .slice(0, 5)
   const attention = clients
     .map((client) => ({ client, reason: attentionReason(client) }))
     .filter((item): item is { client: AdminTenant; reason: string } => item.reason !== null)
 
   return (
     <PageShell>
-      <div className="flex justify-end">
-        <button
-          type="button"
-          onClick={() => setDemo(!demo)}
-          className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-medium text-zinc-600 shadow-sm ring-1 ring-zinc-200"
-        >
-          <span className={demo ? 'text-blue-600' : 'text-zinc-400'}>{demo ? 'Demo data on' : 'Demo data off'}</span>
-          <span className={`relative h-5 w-9 rounded-full ${demo ? 'bg-blue-600' : 'bg-zinc-300'}`}>
-            <span className={`absolute top-0.5 size-4 rounded-full bg-white transition ${demo ? 'left-4' : 'left-0.5'}`} />
-          </span>
-        </button>
-      </div>
-
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-sm text-zinc-500">Welcome back,</p>
@@ -128,23 +136,63 @@ export function AgencyHome() {
         <div className="flex flex-wrap items-center gap-3">
           <button
             type="button"
-            onClick={() => {
-              if (!demo) setDays(days === 30 ? 7 : 30)
-            }}
-            className="inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-sm text-zinc-600 shadow-sm ring-1 ring-zinc-200"
+            onClick={() => setDemo(!demo)}
+            className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-2 text-xs font-medium text-zinc-600 shadow-sm ring-1 ring-zinc-200"
           >
-            <CalendarDaysIcon className="size-4 text-zinc-400" />
-            {demo ? agencyDemo.rangeLabel : rangeLabel(days)}
-            <ChevronDownIcon className="size-4 text-zinc-400" />
-          </button>
-          <AgencyNotificationBell />
-          <span className="flex items-center gap-2">
-            <UserButton appearance={{ elements: { avatarBox: 'size-9' } }} />
-            <span className="hidden sm:block">
-              <span className="block text-sm font-semibold leading-tight text-zinc-950">{agencyName}</span>
-              <span className="block text-xs text-zinc-500">{owner}</span>
+            <span className={demo ? 'text-blue-600' : 'text-zinc-400'}>{demo ? 'Demo data on' : 'Demo data off'}</span>
+            <span className={`relative h-5 w-9 rounded-full ${demo ? 'bg-blue-600' : 'bg-zinc-300'}`}>
+              <span className={`absolute top-0.5 size-4 rounded-full bg-white transition ${demo ? 'left-4' : 'left-0.5'}`} />
             </span>
-          </span>
+          </button>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                setDraft(range)
+                setRangeOpen((open) => !open)
+              }}
+              className="inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-sm text-zinc-600 shadow-sm ring-1 ring-zinc-200"
+            >
+              <CalendarDaysIcon className="size-4 text-zinc-400" />
+              {prettyRange(range.start, range.end)}
+              <ChevronDownIcon className="size-4 text-zinc-400" />
+            </button>
+            {rangeOpen ? (
+              <div className="absolute right-0 z-20 mt-2 w-64 rounded-xl bg-white p-3 shadow-lg ring-1 ring-zinc-200">
+                <label className="block text-xs font-medium text-zinc-500">
+                  From
+                  <input
+                    type="date"
+                    value={draft.start}
+                    onChange={(event) => setDraft((current) => ({ ...current, start: event.target.value }))}
+                    className="mt-1 w-full rounded-lg border border-zinc-200 px-2 py-1.5 text-sm text-zinc-800"
+                  />
+                </label>
+                <label className="mt-2 block text-xs font-medium text-zinc-500">
+                  To
+                  <input
+                    type="date"
+                    value={draft.end}
+                    onChange={(event) => setDraft((current) => ({ ...current, end: event.target.value }))}
+                    className="mt-1 w-full rounded-lg border border-zinc-200 px-2 py-1.5 text-sm text-zinc-800"
+                  />
+                </label>
+                <Button
+                  color="brand"
+                  className="mt-3 w-full"
+                  onClick={() => {
+                    if (!draft.start || !draft.end) return
+                    const next = draft.start <= draft.end ? draft : { start: draft.end, end: draft.start }
+                    setRange(next)
+                    setRangeOpen(false)
+                  }}
+                >
+                  Apply
+                </Button>
+              </div>
+            ) : null}
+          </div>
+          <AgencyNotificationBell />
           {isAgencyStaff || !tenantId ? null : (
             <Button color="brand" onClick={() => setInviteOpen(true)}>
               <PlusIcon data-slot="icon" />
@@ -186,8 +234,7 @@ export function AgencyHome() {
               <p className="mt-0.5 text-sm text-zinc-500">New bookings across all your clients.</p>
             </div>
             <span className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-zinc-500 ring-1 ring-zinc-200">
-              Last {demo ? 30 : days} days
-              <ChevronDownIcon className="size-3.5" />
+              {prettyRange(range.start, range.end)}
             </span>
           </div>
           {demo ? (

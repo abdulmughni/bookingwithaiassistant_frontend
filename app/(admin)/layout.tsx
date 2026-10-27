@@ -2,9 +2,10 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useAuth, useUser, UserButton } from '@clerk/nextjs'
 import {
+  ArrowPathIcon,
   BuildingOffice2Icon,
   CalendarDaysIcon,
   ChartBarSquareIcon,
@@ -17,7 +18,6 @@ import {
   PhoneIcon,
   ShieldCheckIcon,
   SparklesIcon,
-  SwatchIcon,
   UserGroupIcon,
   UsersIcon,
 } from '@heroicons/react/20/solid'
@@ -60,7 +60,6 @@ const agencyNav = [
   { label: 'Messages', href: '/admin/activity?view=messages', icon: EnvelopeIcon, exact: false, view: 'messages' },
   { label: 'AI Assistants', href: '/admin/activity?view=assistants', icon: SparklesIcon, exact: false, view: 'assistants' },
   { label: 'Team Members', href: '/admin/team', icon: UserGroupIcon, exact: false },
-  { label: 'Brand & White Label', href: '/admin/settings?section=brand', icon: SwatchIcon, exact: false, section: 'brand' },
   { label: 'Billing & Plans', href: '/admin/credits', icon: CreditCardIcon, exact: false },
   { label: 'Settings', href: '/admin/settings', icon: Cog6ToothIcon, exact: true },
 ]
@@ -73,7 +72,7 @@ function agencyItemCurrent(
 ) {
   if (item.view) return pathname.startsWith('/admin/activity') && view === item.view
   if (item.section) return pathname === '/admin/settings' && section === item.section
-  if (item.exact && item.href === '/admin/settings') return pathname === '/admin/settings' && !section
+  if (item.exact && item.href === '/admin/settings') return pathname === '/admin/settings'
   if (item.exact) return pathname === item.href
   return pathname === item.href || pathname.startsWith(`${item.href}/`)
 }
@@ -216,57 +215,121 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 function AgencyPlanCard() {
   const { enabled } = useAgencyDemo()
   const clients = useApiData((token) => api.admin.listTenants(token), [])
+  const [refreshing, setRefreshing] = useState(false)
   const rows = clients.data ?? []
-  const used = rows.reduce((sum, client) => sum + (client.usage?.call_minutes_used ?? 0), 0)
-  const quota = rows.reduce((sum, client) => sum + (client.usage?.call_minutes_quota ?? 0), 0)
-  const minutePct = quota > 0 ? Math.min(100, Math.round((used / quota) * 100)) : 0
-  const plan = enabled
+  const messageUsed = rows.reduce((sum, client) => sum + (client.usage?.messages_used ?? 0), 0)
+  const messageQuota = rows.reduce(
+    (sum, client) => sum + (client.plan?.messages_unlimited ? 0 : client.usage?.messages_quota ?? 0),
+    0,
+  )
+  const minuteUsed = rows.reduce((sum, client) => sum + (client.usage?.call_minutes_used ?? 0), 0)
+  const minuteQuota = rows.reduce((sum, client) => sum + (client.usage?.call_minutes_quota ?? 0), 0)
+  const names = rows.map((client) => client.plan?.name).filter((name): name is string => Boolean(name))
+  const planName = names.sort((a, b) => names.filter((name) => name === b).length - names.filter((name) => name === a).length)[0] || 'No pack'
+  const expiries = rows
+    .map((client) => client.subscription_expires_at)
+    .filter((value): value is string => Boolean(value))
+    .sort()
+  const expiry = expiries[0]
+  const expiryLabel = expiry
+    ? new Date(expiry).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    : ''
+  const view = enabled
     ? {
-        name: 'Professional',
-        clientsLabel: '3 / 10 clients',
-        clientsPct: 30,
-        minutesLabel: '12,450 / 50,000 mins',
-        minutesPct: 25,
+        name: 'Standard',
+        featured: true,
+        until: 'Apr 14, 2027',
+        messages: { used: 12, quota: 6000 },
+        minutes: { used: 53, quota: 600 },
       }
     : {
-        name: 'Your clients',
-        clientsLabel: `${rows.length.toLocaleString()} clients`,
-        clientsPct: rows.length > 0 ? 100 : 0,
-        minutesLabel: `${used.toLocaleString()} / ${quota > 0 ? quota.toLocaleString() : '—'} mins`,
-        minutesPct: minutePct,
+        name: planName,
+        featured: false,
+        until: expiryLabel,
+        messages: { used: messageUsed, quota: messageQuota },
+        minutes: { used: minuteUsed, quota: minuteQuota },
       }
 
   return (
     <div className="mb-3 rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
-      <div className="flex items-center gap-2">
-        <span className="flex size-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
-          <SparklesIcon className="size-4" />
-        </span>
-        <div>
-          <p className="text-[11px] text-zinc-500">Agency Plan</p>
-          <p className="text-sm font-semibold text-zinc-950 dark:text-white">{plan.name}</p>
+      <p className="text-[10px] font-semibold tracking-wide text-zinc-400">YOUR PLAN</p>
+      <div className="mt-1 flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="flex items-center gap-1 truncate text-sm font-semibold text-zinc-950 dark:text-white">
+            {view.name}
+            {view.featured ? <span className="text-[10px] text-amber-500">★</span> : null}
+          </p>
+          <p className="mt-0.5 text-[11px] text-zinc-500">
+            {view.until ? (
+              <>
+                Credits valid until <span className="font-medium text-zinc-700 dark:text-zinc-300">{view.until}</span>
+              </>
+            ) : (
+              'Prepaid credit pack'
+            )}
+          </p>
         </div>
+        <button
+          type="button"
+          aria-label="Refresh usage numbers"
+          title="Refresh usage"
+          disabled={refreshing}
+          onClick={() => {
+            setRefreshing(true)
+            void clients.refetch().finally(() => setRefreshing(false))
+          }}
+          className="shrink-0 rounded-lg border border-zinc-200 bg-zinc-50 p-1.5 text-zinc-500 hover:bg-zinc-100 disabled:opacity-50"
+        >
+          <ArrowPathIcon className={`size-4 ${refreshing ? 'animate-spin' : ''}`} />
+        </button>
       </div>
-      <PlanMeter label={plan.clientsLabel} pct={plan.clientsPct} />
-      <PlanMeter label={plan.minutesLabel} pct={plan.minutesPct} />
-      <Link
-        href="/admin/credits"
-        className="mt-3 flex items-center justify-center gap-1 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700"
-      >
-        Upgrade Plan
-        <span aria-hidden>→</span>
+      <div className="mt-3 space-y-3 rounded-xl bg-zinc-50 p-2.5 ring-1 ring-zinc-950/5 dark:bg-zinc-800/40">
+        <UsageMeter icon={<ChatBubbleLeftRightIcon className="size-3.5" />} label="Messages" used={view.messages.used} quota={view.messages.quota} />
+        <UsageMeter icon={<PhoneIcon className="size-3.5" />} label="Voice minutes" used={view.minutes.used} quota={view.minutes.quota} />
+      </div>
+      <Link href="/admin/credits" className="mt-2.5 inline-flex items-center gap-1 text-xs font-medium text-brand-600 hover:text-brand-700">
+        Manage plan
+        <span aria-hidden>↗</span>
       </Link>
     </div>
   )
 }
 
-function PlanMeter({ label, pct }: { label: string; pct: number }) {
+function UsageMeter({
+  icon,
+  label,
+  used,
+  quota,
+}: {
+  icon: ReactNode
+  label: string
+  used: number
+  quota: number
+}) {
+  const pct = quota > 0 ? Math.min(100, Math.round((used / quota) * 100)) : 0
+  const remaining = Math.max(0, quota - used)
+  const warning = pct >= 80
   return (
-    <div className="mt-3">
-      <p className="text-[11px] text-zinc-500">{label}</p>
-      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-zinc-100">
-        <div className="h-full rounded-full bg-blue-500" style={{ width: `${pct}%` }} />
+    <div>
+      <div className="flex items-center justify-between gap-2">
+        <span className="flex items-center gap-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300">
+          <span className="text-brand-600">{icon}</span>
+          {label}
+        </span>
+        <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${warning ? 'bg-amber-100 text-amber-800' : 'bg-brand-100 text-brand-700'}`}>
+          {quota > 0 && used >= quota ? 'Used up' : warning ? 'Almost gone' : 'On track'}
+        </span>
       </div>
+      <div className="mt-1.5 flex items-baseline justify-between tabular-nums">
+        <span className="text-sm font-semibold text-zinc-950 dark:text-white">{pct}%</span>
+        <span className="text-[10px] text-zinc-500">
+          {used.toLocaleString()} / {quota > 0 ? quota.toLocaleString() : '—'}
+        </span>
+      </div>
+      <div className="mt-1 h-2 overflow-hidden rounded-full bg-brand-100">
+        <div className={`h-full rounded-full ${warning ? 'bg-amber-500' : 'bg-brand-500'}`} style={{ width: `${pct}%` }} />
+      </div>
+      <p className="mt-1 text-[10px] text-zinc-500">{quota > 0 ? `${remaining.toLocaleString()} remaining` : 'No pack assigned'}</p>
     </div>
   )
 }
