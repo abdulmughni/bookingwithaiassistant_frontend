@@ -1,7 +1,7 @@
 'use client'
 
 import { Suspense, useEffect, useMemo, useState } from 'react'
-import { useAuth, useUser } from '@clerk/nextjs'
+import { useAuth, useOrganization, useUser } from '@clerk/nextjs'
 import { useRouter, useSearchParams } from 'next/navigation'
 import clsx from 'clsx'
 import {
@@ -10,12 +10,20 @@ import {
   CheckCircleIcon,
   ClockIcon,
   ChatBubbleLeftRightIcon,
-} from '@heroicons/react/24/outline'
+} from '@heroicons/react/20/solid'
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts'
 import { Button } from '@/components/button'
-import { PageHeader, PageShell } from '@/components/dashboard-ui'
+import { PageShell, dashCardClass } from '@/components/dashboard-ui'
 import { Input } from '@/components/input'
 import { Badge } from '@/components/badge'
-import { Card, CardBody } from '@/components/card'
 import { SourceBadge } from '@/components/channel-icon'
 import { useApiData, useTenantTimezone } from '@/lib/hooks'
 import { api } from '@/lib/api'
@@ -78,62 +86,21 @@ function KpiCard({
   value,
   hint,
   icon,
-  highlight = false,
 }: {
   label: string
   value: number | string
   hint?: string
   icon: React.ReactNode
-  highlight?: boolean
 }) {
   return (
-    <div
-      className={clsx(
-        'relative overflow-hidden rounded-2xl border p-5 transition',
-        highlight
-          ? 'border-transparent bg-linear-to-br from-brand-500 to-brand-700 text-white shadow-lg shadow-brand-500/20'
-          : 'border-zinc-200/80 bg-white shadow-sm hover:border-zinc-300 hover:shadow-md dark:border-zinc-700/80 dark:bg-zinc-900/80',
-      )}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <p
-          className={clsx(
-            'text-sm font-medium',
-            highlight ? 'text-brand-50' : 'text-zinc-500 dark:text-zinc-400',
-          )}
-        >
-          {label}
-        </p>
-        <span
-          className={clsx(
-            'flex size-8 shrink-0 items-center justify-center rounded-full',
-            highlight
-              ? 'bg-white/20 text-white'
-              : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400',
-          )}
-        >
-          {icon}
-        </span>
-      </div>
-      <p
-        className={clsx(
-          'mt-3 text-3xl font-semibold tracking-tight',
-          highlight ? 'text-white' : 'text-zinc-950 dark:text-white',
-        )}
-      >
-        {value}
-      </p>
-      {hint && (
-        <p
-          className={clsx(
-            'mt-1 text-xs font-medium',
-            highlight ? 'text-brand-50/90' : 'text-zinc-400 dark:text-zinc-500',
-          )}
-        >
-          {hint}
-        </p>
-      )}
-    </div>
+    <article className={`${dashCardClass} p-4`}>
+      <span className="flex size-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-300">
+        {icon}
+      </span>
+      <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400">{label}</p>
+      <p className="mt-1 text-2xl font-semibold tracking-tight text-zinc-950 dark:text-white">{value}</p>
+      {hint ? <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">{hint}</p> : null}
+    </article>
   )
 }
 
@@ -198,67 +165,58 @@ function WeeklyBarChart({
   const max = series ? Math.max(1, ...series.map((d) => d.count)) : weekly.max
   const total = series ? series.reduce((sum, day) => sum + day.count, 0) : weekly.total
 
-  return (
-    <Card className="h-full border-zinc-200/80 dark:border-zinc-700/80">
-      <CardBody className="flex h-full flex-col">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-base font-semibold text-zinc-950 dark:text-white">
-              Booking activity
-            </h3>
-            <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">
-              {subtitle ?? 'New bookings · last 7 days'}
-            </p>
-          </div>
-          <Badge color="blue" className="text-xs">
-            {total} total
-          </Badge>
-        </div>
+  const chart = days.map((day) => ({ label: day.label, bookings: day.count }))
+  const tickEvery = chart.length > 16 ? Math.ceil(chart.length / 8) - 1 : 0
 
-        {loading ? (
-          <div className="mt-8 h-44 animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-800" />
-        ) : (
-          <div className="mt-8 flex flex-1 items-end justify-between gap-2 sm:gap-4">
-            {days.map((d, i) => {
-              const pct = Math.round((d.count / max) * 100)
-              return (
-                <div key={i} className="flex flex-1 flex-col items-center gap-2">
-                  <div className="relative flex h-40 w-full items-end justify-center">
-                    <div className="absolute inset-x-2 inset-y-0 rounded-lg bg-zinc-100 dark:bg-zinc-800/60" />
-                    <div
-                      className={clsx(
-                        'relative w-full max-w-11 rounded-lg transition-all duration-500',
-                        d.isToday
-                          ? 'bg-linear-to-t from-brand-600 to-brand-400'
-                          : 'bg-brand-500/80 dark:bg-brand-500/60',
-                      )}
-                      style={{ height: `${Math.max(pct, d.count > 0 ? 8 : 3)}%` }}
-                      title={`${d.count} booking${d.count === 1 ? '' : 's'}`}
-                    >
-                      {d.count > 0 && (
-                        <span className="absolute -top-6 left-1/2 -translate-x-1/2 text-xs font-semibold text-zinc-700 dark:text-zinc-200">
-                          {d.count}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <span
-                    className={clsx(
-                      'text-xs font-medium',
-                      d.isToday
-                        ? 'text-brand-600 dark:text-brand-400'
-                        : 'text-zinc-400 dark:text-zinc-500',
-                    )}
-                  >
-                    {d.label}
-                  </span>
-                </div>
-              )
-            })}
-          </div>
-        )}
-      </CardBody>
-    </Card>
+  return (
+    <section className={`${dashCardClass} flex h-full flex-col p-5`}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-base font-semibold text-zinc-950 dark:text-white">Booking activity</h2>
+          <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">
+            {subtitle ?? 'New bookings · last 7 days'}
+          </p>
+        </div>
+        <span className="inline-flex items-center rounded-lg px-2 py-1 text-xs font-medium text-zinc-500 ring-1 ring-zinc-200 dark:ring-zinc-700">
+          {total} total
+        </span>
+      </div>
+      {loading ? (
+        <div className="mt-4 h-72 animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-800" />
+      ) : (
+        <div className="mt-2 h-72 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={chart} barCategoryGap="38%" margin={{ top: 16, right: 8, left: -8, bottom: 0 }}>
+              <CartesianGrid stroke="#ececef" vertical={false} />
+              <XAxis
+                dataKey="label"
+                interval={tickEvery}
+                tick={{ fontSize: 11, fill: '#a1a1aa' }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis
+                allowDecimals={false}
+                domain={[0, Math.max(max, 1)]}
+                tick={{ fontSize: 11, fill: '#a1a1aa' }}
+                axisLine={false}
+                tickLine={false}
+                width={32}
+              />
+              <Tooltip
+                cursor={{ fill: 'rgba(37, 99, 235, 0.05)' }}
+                contentStyle={{
+                  borderRadius: 8,
+                  border: '1px solid #e4e4e7',
+                  fontSize: 12,
+                }}
+              />
+              <Bar dataKey="bookings" name="Bookings" fill="#2563eb" radius={[5, 5, 0, 0]} maxBarSize={18} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+    </section>
   )
 }
 
@@ -283,11 +241,8 @@ function CompletionGauge({
   const dash = (pct / 100) * circumference
 
   return (
-    <Card className="h-full border-zinc-200/80 dark:border-zinc-700/80">
-      <CardBody className="flex h-full flex-col">
-        <h3 className="text-base font-semibold text-zinc-950 dark:text-white">
-          Completion rate
-        </h3>
+    <section className={`${dashCardClass} flex h-full flex-col p-5`}>
+        <h2 className="text-base font-semibold text-zinc-950 dark:text-white">Completion rate</h2>
 
         {loading ? (
           <div className="mt-6 h-40 animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-800" />
@@ -341,8 +296,7 @@ function CompletionGauge({
             </div>
           </>
         )}
-      </CardBody>
-    </Card>
+    </section>
   )
 }
 
@@ -408,8 +362,7 @@ function NextAppointmentCard({
   loading: boolean
 }) {
   return (
-    <Card className="h-full overflow-hidden border-transparent bg-linear-to-br from-zinc-900 to-zinc-800 text-white shadow-lg dark:from-zinc-800 dark:to-zinc-900">
-      <CardBody className="flex h-full flex-col">
+    <section className="flex h-full flex-col overflow-hidden rounded-2xl bg-linear-to-br from-zinc-900 to-zinc-800 p-5 text-white shadow-sm dark:from-zinc-800 dark:to-zinc-900">
         <div className="flex items-center gap-2 text-sm font-medium text-zinc-300">
           <ClockIcon className="size-4" />
           Next appointment
@@ -446,8 +399,7 @@ function NextAppointmentCard({
             </div>
           </div>
         )}
-      </CardBody>
-    </Card>
+    </section>
   )
 }
 
@@ -463,12 +415,9 @@ function UpcomingList({
   const items = (bookings ?? []).slice(0, 6)
 
   return (
-    <Card className="h-full border-zinc-200/80 dark:border-zinc-700/80">
-      <CardBody className="flex h-full flex-col">
+    <section className={`${dashCardClass} flex h-full flex-col p-5`}>
         <div className="flex items-center justify-between">
-          <h3 className="text-base font-semibold text-zinc-950 dark:text-white">
-            Upcoming appointments
-          </h3>
+          <h2 className="text-base font-semibold text-zinc-950 dark:text-white">Upcoming appointments</h2>
           <Button href="/bookings" plain className="text-xs">
             View all
             <ArrowUpRightIcon data-slot="icon" />
@@ -517,8 +466,7 @@ function UpcomingList({
             No upcoming appointments
           </div>
         )}
-      </CardBody>
-    </Card>
+    </section>
   )
 }
 
@@ -528,6 +476,7 @@ function UpcomingList({
 
 function DashboardPageInner() {
   const { user } = useUser()
+  const { organization } = useOrganization()
   const { orgId } = useAuth()
   const router = useRouter()
   const search = useSearchParams()
@@ -592,21 +541,27 @@ function DashboardPageInner() {
     })
   }, [upcoming])
 
+  const businessName = organization?.name || 'Dashboard'
+
   return (
     <PageShell>
-      <PageHeader
-        title="Dashboard"
-        description={`Welcome back${user?.firstName ? `, ${user.firstName}` : ''} — here is your booking activity at a glance.`}
-      >
-        <Button href="/conversations" outline>
-          Conversations
-        </Button>
-        <Button href="/bookings" color="brand">
-          View bookings
-        </Button>
-      </PageHeader>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-sm text-zinc-500">Welcome back{user?.firstName ? `, ${user.firstName}` : ''}</p>
+          <h1 className="mt-0.5 text-3xl font-semibold tracking-tight text-zinc-950 dark:text-white">{businessName}</h1>
+          <p className="mt-1 text-sm text-zinc-500">Here is your booking activity at a glance.</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button href="/conversations" outline>
+            Conversations
+          </Button>
+          <Button href="/bookings" color="brand">
+            View bookings
+          </Button>
+        </div>
+      </div>
 
-      <div className="flex flex-col gap-3 rounded-2xl border border-zinc-200/80 bg-white p-4 dark:border-zinc-700/80 dark:bg-zinc-900/80 sm:flex-row sm:flex-wrap sm:items-end">
+      <div className={`${dashCardClass} flex flex-col gap-3 p-4 sm:flex-row sm:flex-wrap sm:items-end`}>
         <div className="flex flex-wrap gap-2">
           {(
             [
@@ -689,20 +644,19 @@ function DashboardPageInner() {
               label="Total bookings"
               value={statsView?.total_bookings ?? 0}
               hint={`${statsView?.confirmed_bookings ?? 0} confirmed`}
-              icon={<CalendarDaysIcon className="size-4" />}
-              highlight
+              icon={<CalendarDaysIcon className="size-5" />}
             />
             <KpiCard
               label="Completed"
               value={statsView?.completed_bookings ?? 0}
               hint={`${statsView?.cancelled_bookings ?? 0} cancelled`}
-              icon={<CheckCircleIcon className="size-4" />}
+              icon={<CheckCircleIcon className="size-5" />}
             />
             <KpiCard
               label="Upcoming"
               value={statsView?.upcoming_bookings ?? 0}
               hint="Scheduled ahead"
-              icon={<ClockIcon className="size-4" />}
+              icon={<ClockIcon className="size-5" />}
             />
             <KpiCard
               label={range ? 'Conversations' : 'Active conversations'}
@@ -712,7 +666,7 @@ function DashboardPageInner() {
                   ? 'Started in this range'
                   : `${statsView?.total_channel_accounts ?? 0} channels`
               }
-              icon={<ChatBubbleLeftRightIcon className="size-4" />}
+              icon={<ChatBubbleLeftRightIcon className="size-5" />}
             />
           </>
         )}

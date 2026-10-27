@@ -155,11 +155,13 @@ export function SidebarNavGroup({
   label,
   icon: Icon,
   active,
+  pill = false,
   children,
 }: {
   label: string
   icon: React.ComponentType<React.SVGProps<SVGSVGElement>>
   active: boolean
+  pill?: boolean
   children: React.ReactNode
 }) {
   const [open, setOpen] = useState(active)
@@ -173,7 +175,7 @@ export function SidebarNavGroup({
       <Headless.Button
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className={clsx('cursor-pointer', sidebarItemClasses)}
+        className={clsx('cursor-pointer', pill ? pillItemClasses : sidebarItemClasses)}
         data-current={active ? 'true' : undefined}
         aria-expanded={open}
       >

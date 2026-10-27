@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
-import { useAuth, useUser, useClerk, UserButton } from '@clerk/nextjs'
+import { useAuth, useUser, useClerk, useOrganization, UserButton } from '@clerk/nextjs'
 import { SidebarLayout } from '@/components/sidebar-layout'
 import {
   Sidebar,
@@ -44,6 +44,7 @@ export default function DashboardLayout({
   const pathname = usePathname()
   const router = useRouter()
   const { user } = useUser()
+  const { organization } = useOrganization()
   const { actor } = useAuth()
   const { signOut } = useClerk()
   const { isAdmin, isAgency, loading: adminLoading } = useIsAdmin()
@@ -91,17 +92,14 @@ export default function DashboardLayout({
       sidebar={
         <Sidebar>
           <SidebarHeader>
-            <SidebarSection>
-              <SidebarItem href="/">
-                <span className="flex min-w-0 items-center">
-                  <ShellBrand
-                    loading={brandLoading || adminLoading}
-                    logoUrl={brandAssetUrl(brand?.logo_url)}
-                    name={brand?.company_name}
-                  />
-                </span>
-              </SidebarItem>
-            </SidebarSection>
+            <div className="flex min-w-0 flex-col gap-0 px-2 py-0.5">
+              <ShellBrand
+                loading={brandLoading || adminLoading}
+                logoUrl={brandAssetUrl(brand?.logo_url)}
+                name={brand?.company_name || organization?.name}
+              />
+              <p className="truncate pl-1 text-[11px] text-zinc-400">Client dashboard</p>
+            </div>
           </SidebarHeader>
 
           <SidebarBody>
@@ -115,11 +113,13 @@ export default function DashboardLayout({
                       label={item.label}
                       icon={item.icon}
                       active={groupActive}
+                      pill
                     >
                       {item.children.map((child) => (
                         <SidebarItem
                           key={child.href}
                           href={child.href}
+                          pill
                           current={isNavHrefCurrent(child.href, pathname)}
                         >
                           {child.icon ? <child.icon data-slot="icon" /> : null}
@@ -134,6 +134,7 @@ export default function DashboardLayout({
                   <SidebarItem
                     key={item.href}
                     href={item.href}
+                    pill
                     current={isNavHrefCurrent(item.href, pathname)}
                   >
                     <item.icon data-slot="icon" />
