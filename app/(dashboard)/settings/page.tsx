@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { PageHeader, PageShell, dashCardClass, settingsTabClass } from '@/components/dashboard-ui'
 import { Button } from '@/components/button'
 import { Divider } from '@/components/divider'
@@ -44,7 +44,11 @@ function LockWhenReadOnly({
 // ---------------------------------------------------------------------------
 // Tab type
 // ---------------------------------------------------------------------------
-type SettingsTab = 'tenant' | 'documents'
+type SettingsTab = 'appearance' | 'calendar' | 'tenant'
+
+function googleCalendarReturnOpen() {
+  return new URLSearchParams(window.location.search).has('google_calendar')
+}
 
 const CUSTOMER_EDITABLE_KEYS = [
   'name',
@@ -828,7 +832,17 @@ export default function SettingsPage() {
   )
 
   const { readOnly } = useReadOnlyAccount()
+  const openedFromGoogle = useSyncExternalStore(
+    () => () => {},
+    googleCalendarReturnOpen,
+    () => false,
+  )
   const [activeTab, setActiveTab] = useState<SettingsTab>('tenant')
+  const [openedCalendar, setOpenedCalendar] = useState(false)
+  if (openedFromGoogle && !openedCalendar) {
+    setOpenedCalendar(true)
+    setActiveTab('calendar')
+  }
 
   if (loading || credsLoading) {
     return (
@@ -848,20 +862,22 @@ export default function SettingsPage() {
 
       <ReadOnlyBanner />
 
-      <ProfilePhotoForm />
-
-      <section className={`${dashCardClass} p-5`}>
-        <Subheading>Colors</Subheading>
-        <p className="mt-1 mb-5 text-sm text-zinc-500">
-          These colors are only for your dashboard. The logo stays with your agency.
-        </p>
-        <AgencyBrandForm showLogo={false} />
-      </section>
-
-      <GoogleCalendarCard />
-
       <div className="rounded-2xl border border-zinc-200/80 bg-white px-4 shadow-sm dark:border-zinc-700/80 dark:bg-zinc-900/80 sm:px-6">
-        <nav className="-mb-px flex gap-6 border-b border-zinc-200/80 pt-2 dark:border-zinc-700/80" aria-label="Settings tabs">
+        <nav className="-mb-px flex gap-6 overflow-x-auto border-b border-zinc-200/80 pt-2 dark:border-zinc-700/80" aria-label="Settings tabs">
+          <button
+            type="button"
+            onClick={() => setActiveTab('appearance')}
+            className={settingsTabClass(activeTab === 'appearance')}
+          >
+            Profile and colors
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('calendar')}
+            className={settingsTabClass(activeTab === 'calendar')}
+          >
+            Google Calendar
+          </button>
           <button
             type="button"
             onClick={() => setActiveTab('tenant')}
@@ -872,12 +888,28 @@ export default function SettingsPage() {
         </nav>
       </div>
 
-      {/* Tab content — locked (read-only) until the account is active */}
-      <LockWhenReadOnly readOnly={readOnly}>
-        {activeTab === 'tenant' && tenant && credentials && (
-          <TenantConfigTab mode="customer" tenant={tenant} credentials={credentials} onSaved={refetch} />
-        )}
-      </LockWhenReadOnly>
+      {activeTab === 'appearance' && (
+        <>
+          <ProfilePhotoForm />
+          <section className={`${dashCardClass} p-5`}>
+            <Subheading>Colors</Subheading>
+            <p className="mt-1 mb-5 text-sm text-zinc-500">
+              These colors are only for your dashboard. The logo stays with your agency.
+            </p>
+            <AgencyBrandForm showLogo={false} />
+          </section>
+        </>
+      )}
+
+      {activeTab === 'calendar' && <GoogleCalendarCard />}
+
+      {activeTab === 'tenant' && (
+        <LockWhenReadOnly readOnly={readOnly}>
+          {tenant && credentials && (
+            <TenantConfigTab mode="customer" tenant={tenant} credentials={credentials} onSaved={refetch} />
+          )}
+        </LockWhenReadOnly>
+      )}
     </PageShell>
   )
 }
