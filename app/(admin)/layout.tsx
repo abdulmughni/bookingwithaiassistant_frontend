@@ -167,7 +167,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 <SidebarItem
                   key={item.href}
                   href={item.href}
-                  pill={isAgency}
+                  pill
                   current={
                     isAgency
                       ? agencyItemCurrent(item, pathname, view, section)
@@ -195,7 +195,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     {isAgency ? brand?.company_name || adminName : adminName}
                   </p>
                   <p className="truncate text-xs text-zinc-500">
-                    {user?.primaryEmailAddress?.emailAddress ?? 'Platform owner'}
+                    {isAgency
+                      ? (user?.primaryEmailAddress?.emailAddress ?? 'Platform owner')
+                      : 'Super Admin'}
                   </p>
                 </div>
               </div>

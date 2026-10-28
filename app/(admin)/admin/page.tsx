@@ -2,300 +2,211 @@
 
 import { useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
+import { useUser } from '@clerk/nextjs'
 import {
+  ArrowDownIcon,
   ArrowPathIcon,
+  ArrowUpIcon,
   BanknotesIcon,
+  BellIcon,
   BuildingOffice2Icon,
   CalendarDaysIcon,
   ChatBubbleLeftRightIcon,
   CheckCircleIcon,
   ClockIcon,
   DocumentTextIcon,
+  EllipsisHorizontalIcon,
   EnvelopeIcon,
   PauseIcon,
   PhoneIcon,
   UsersIcon,
 } from '@heroicons/react/20/solid'
+import { ChevronDownIcon } from '@heroicons/react/16/solid'
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Legend,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts'
 
 import { Button } from '@/components/button'
 import { PageShell, SkeletonBlock, dashCardClass } from '@/components/dashboard-ui'
-import { AdminAlertPanel, HealthDot } from '@/components/admin/ops'
+import { Dropdown, DropdownButton, DropdownItem, DropdownMenu } from '@/components/dropdown'
+import { HealthDot } from '@/components/admin/ops'
 import { StatusBadge, formatDate } from '@/components/admin/shared'
 import { AgencyHome } from '@/components/admin/agency-home'
 import { api } from '@/lib/api'
 import { useApiData, useIsAdmin } from '@/lib/hooks'
-import type { AdminAlert, AdminFunnel } from '@/lib/types'
+import type { AdminAlert, AdminDashboard, AdminFunnel, DashboardMetric } from '@/lib/types'
 
-/** Session-only dashboard dismiss keys (not persisted). */
-function alertKey(a: Pick<AdminAlert, 'tenant_id' | 'rule_key'>) {
-  return `${a.tenant_id}:${a.rule_key}`
+function alertKey(alert: Pick<AdminAlert, 'tenant_id' | 'rule_key'>) {
+  return `${alert.tenant_id}:${alert.rule_key}`
 }
 
-function SuperAdminOverview() {
-  const { data, loading, error, refetch } = useApiData((token) => api.admin.overview(token), [])
-  const [sessionDismissed, setSessionDismissed] = useState<Set<string>>(() => new Set())
+function iso(date: Date) {
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${date.getFullYear()}-${month}-${day}`
+}
 
-  const visibleAlerts = useMemo(() => {
-    const all = data?.alerts ?? []
-    return all.filter((a) => !sessionDismissed.has(alertKey(a)))
-  }, [data?.alerts, sessionDismissed])
+function daysBack(count: number) {
+  const end = new Date()
+  const start = new Date()
+  start.setDate(end.getDate() - (count - 1))
+  return { start: iso(start), end: iso(end) }
+}
 
-  const handleDismiss = (alert: AdminAlert) => {
-    setSessionDismissed((prev) => {
-      const next = new Set(prev)
-      next.add(alertKey(alert))
-      return next
-    })
-  }
+function thisMonth() {
+  const end = new Date()
+  return { start: iso(new Date(end.getFullYear(), end.getMonth(), 1)), end: iso(end) }
+}
 
+function pretty(value: string) {
+  return new Date(`${value}T00:00:00`).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+}
+
+function periodLabel(range: { start: string; end: string }) {
+  const options = [
+    { label: 'Last 7 days', range: daysBack(7) },
+    { label: 'Last 30 days', range: daysBack(30) },
+    { label: 'This month', range: thisMonth() },
+  ]
+  return options.find((option) => option.range.start === range.start && option.range.end === range.end)?.label ?? 'Custom'
+}
+
+function Sparkline({ values, color }: { values: number[]; color: string }) {
+  if (values.length < 2) return null
+  const width = 88
+  const height = 32
+  const max = Math.max(...values, 1)
+  const min = Math.min(...values, 0)
+  const span = max - min || 1
+  const step = width / (values.length - 1)
+  const points = values
+    .map((value, index) => `${index * step},${height - 3 - ((value - min) / span) * (height - 8)}`)
+    .join(' ')
   return (
-    <PageShell>
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-sm text-zinc-500">Welcome back,</p>
-          <h1 className="mt-0.5 text-3xl font-semibold tracking-tight text-zinc-950 dark:text-white">
-            Admin Console
-          </h1>
-          <p className="mt-1 text-sm text-zinc-500">Here&apos;s what&apos;s happening across your platform today.</p>
-        </div>
-        <Button color="brand" onClick={() => void refetch()}>
-          <ArrowPathIcon data-slot="icon" />
-          Refresh data
-        </Button>
-      </div>
+    <svg viewBox={`0 0 ${width} ${height}`} className="h-8 w-20" aria-hidden>
+      <polyline fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" points={points} />
+    </svg>
+  )
+}
 
-      {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-800/60 dark:bg-red-900/20 dark:text-red-200">
-          {error}
-        </div>
-      )}
-
-      {loading || !data ? (
-        <div className="space-y-6">
-          <SkeletonBlock className="h-24" />
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {[0, 1, 2, 3].map((i) => (
-              <SkeletonBlock key={i} className="h-28" />
-            ))}
-          </div>
-          <SkeletonBlock className="h-64" />
-        </div>
-      ) : (
-        <>
-          <AdminAlertPanel alerts={visibleAlerts} onDismiss={handleDismiss} />
-
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <MetricCard
-              label="Total clients"
-              value={data.tenants_total}
-              href="/admin/clients"
-              icon={<UsersIcon className="size-5" />}
-              tone="bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-300"
-            />
-            <MetricCard
-              label="Active"
-              value={data.tenants_active}
-              href="/admin/clients?status=active"
-              icon={<CheckCircleIcon className="size-5" />}
-              tone="bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300"
-            />
-            <MetricCard
-              label="Pending activation"
-              value={data.tenants_pending}
-              href="/admin/clients?status=pending"
-              icon={<ClockIcon className="size-5" />}
-              tone="bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-300"
-            />
-            <MetricCard
-              label="Suspended"
-              value={data.tenants_suspended}
-              href="/admin/clients?status=suspended"
-              icon={<PauseIcon className="size-5" />}
-              tone="bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-300"
-            />
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-            <MetricCard
-              label="Bookings (all time)"
-              value={data.bookings_total}
-              icon={<CalendarDaysIcon className="size-5" />}
-              tone="bg-sky-50 text-sky-600 dark:bg-sky-500/10 dark:text-sky-300"
-            />
-            <MetricCard
-              label="Conversations"
-              value={data.conversations_total}
-              icon={<ChatBubbleLeftRightIcon className="size-5" />}
-              tone="bg-violet-50 text-violet-600 dark:bg-violet-500/10 dark:text-violet-300"
-            />
-            <MetricCard
-              label="Calls"
-              value={data.calls_total}
-              icon={<PhoneIcon className="size-5" />}
-              tone="bg-cyan-50 text-cyan-600 dark:bg-cyan-500/10 dark:text-cyan-300"
-            />
-            <MetricCard
-              label="Messages (30 days)"
-              value={data.messages_30d}
-              icon={<EnvelopeIcon className="size-5" />}
-              tone="bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-300"
-            />
-            <MetricCard
-              label="$ recovered this month"
-              value={data.recovered_value_this_month ?? 0}
-              money
-              icon={<BanknotesIcon className="size-5" />}
-              tone="bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300"
-            />
-          </div>
-
-          <OverviewFunnel funnel={data.funnel} />
-
-          <div className="grid items-stretch gap-4 lg:grid-cols-2">
-            <section className={`${dashCardClass} flex flex-col`}>
-              <div className="flex items-center justify-between px-5 py-4">
-                <h3 className="text-base font-semibold text-zinc-950 dark:text-white">Recent sign-ups</h3>
-                <Link href="/admin/clients" className="text-sm font-medium text-blue-600 hover:text-blue-700">
-                  View all
-                </Link>
-              </div>
-              <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto] gap-3 px-5 pb-2 text-[11px] font-medium tracking-wide text-zinc-400 uppercase">
-                <span>Client</span>
-                <span>Plan</span>
-                <span>Status</span>
-              </div>
-              <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
-                {data.recent_tenants.length === 0 && (
-                  <li className="px-5 py-10 text-center text-sm text-zinc-500">No clients yet.</li>
-                )}
-                {data.recent_tenants.map((t) => (
-                  <li key={t.id}>
-                    <Link
-                      href={`/admin/clients/${encodeURIComponent(t.id)}`}
-                      className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto] items-center gap-3 px-5 py-3 transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
-                    >
-                      <span className="flex min-w-0 items-center gap-2.5">
-                        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600 dark:bg-blue-500/10">
-                          <BuildingOffice2Icon className="size-4" />
-                        </span>
-                        <span className="min-w-0">
-                          <span className="flex min-w-0 items-center gap-1.5 text-sm font-medium text-zinc-950 dark:text-white">
-                            <HealthDot health={t.health ?? 'green'} />
-                            <span className="truncate">{t.name}</span>
-                          </span>
-                          <span className="block truncate text-xs text-zinc-400">Joined {formatDate(t.created_at)}</span>
-                        </span>
-                      </span>
-                      <span className="truncate text-sm text-zinc-500">{t.plan?.name ?? 'No plan'}</span>
-                      <StatusBadge status={t.account_status} />
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </section>
-
-            <section className={`${dashCardClass} flex min-h-72 flex-col`}>
-              <div className="flex items-center justify-between px-5 py-4">
-                <h3 className="text-base font-semibold text-zinc-950 dark:text-white">
-                  Open plan requests
-                  {data.open_plan_requests > 0 && (
-                    <span className="ml-2 inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-500/15 dark:text-amber-400">
-                      {data.open_plan_requests}
-                    </span>
-                  )}
-                </h3>
-                <Link href="/admin/requests" className="text-sm font-medium text-blue-600 hover:text-blue-700">
-                  Manage
-                </Link>
-              </div>
-              {data.recent_requests.length === 0 ? (
-                <div className="flex flex-1 flex-col items-center justify-center px-6 py-10 text-center">
-                  <span className="flex size-14 items-center justify-center rounded-full bg-blue-50 text-blue-500 dark:bg-blue-500/10">
-                    <DocumentTextIcon className="size-7" />
-                  </span>
-                  <p className="mt-4 text-sm text-zinc-500">No open requests. All caught up.</p>
-                </div>
-              ) : (
-                <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
-                  {data.recent_requests.map((r) => (
-                    <li key={r.id} className="px-5 py-3.5">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-medium text-zinc-950 dark:text-white">
-                            {r.tenant_name ?? r.tenant_id}
-                          </p>
-                          <p className="truncate text-xs text-zinc-500">
-                            Wants{' '}
-                            <span className="font-medium text-zinc-700 dark:text-zinc-300">
-                              {r.requested_plan_id ?? 'a plan change'}
-                            </span>
-                            {r.message ? ` — “${r.message}”` : ''}
-                          </p>
-                        </div>
-                        <span className="shrink-0 text-xs text-zinc-400">{formatDate(r.created_at)}</span>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
-          </div>
-        </>
-      )}
-    </PageShell>
+function TrendLine({ metric }: { metric: DashboardMetric }) {
+  if (metric.delta_pct == null && metric.value === metric.previous) {
+    return <p className="mt-1 text-xs text-zinc-400">— no change</p>
+  }
+  if (metric.delta_pct == null) {
+    return (
+      <p className="mt-1 flex items-center gap-1 text-xs font-medium text-emerald-600">
+        <ArrowUpIcon className="size-3" />
+        new
+      </p>
+    )
+  }
+  const up = metric.delta_pct >= 0
+  return (
+    <p className={`mt-1 flex items-center gap-1 text-xs font-medium ${up ? 'text-emerald-600' : 'text-rose-600'}`}>
+      {up ? <ArrowUpIcon className="size-3" /> : <ArrowDownIcon className="size-3" />}
+      {Math.abs(metric.delta_pct)}% from last month
+    </p>
   )
 }
 
 function MetricCard({
   label,
-  value,
+  metric,
   icon,
   tone,
+  stroke,
   href,
   money,
 }: {
   label: string
-  value: number
+  metric: DashboardMetric
   icon: ReactNode
   tone: string
+  stroke: string
   href?: string
   money?: boolean
 }) {
+  const shown = money
+    ? `$${Math.round(metric.value).toLocaleString()}`
+    : Math.round(metric.value).toLocaleString()
   const body = (
     <>
-      <span className={`flex size-10 items-center justify-center rounded-full ${tone}`}>{icon}</span>
-      <p className="mt-4 text-sm text-zinc-500 dark:text-zinc-400">{label}</p>
-      <p className="mt-1 text-3xl font-semibold tracking-tight tabular-nums text-zinc-950 dark:text-white">
-        {money ? `$${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : value.toLocaleString()}
-      </p>
+      <div className="flex items-start justify-between gap-3">
+        <span className={`flex size-10 items-center justify-center rounded-full ${tone}`}>{icon}</span>
+        <Sparkline values={metric.series} color={stroke} />
+      </div>
+      <p className="mt-4 text-sm text-zinc-500">{label}</p>
+      <p className="mt-1 text-3xl font-semibold tracking-tight tabular-nums text-zinc-950">{shown}</p>
+      <TrendLine metric={metric} />
     </>
   )
-  const className = `${dashCardClass} block min-h-[148px] p-5 transition hover:shadow-md`
-  if (href) {
-    return (
-      <Link href={href} className={className}>
-        {body}
-      </Link>
-    )
-  }
-  return <div className={className}>{body}</div>
+  const className = `${dashCardClass} block min-h-[168px] p-5 transition hover:shadow-md`
+  if (!href) return <article className={className}>{body}</article>
+  return (
+    <Link href={href} className={className}>
+      {body}
+    </Link>
+  )
 }
 
-function OverviewFunnel({ funnel }: { funnel: AdminFunnel | null | undefined }) {
-  if (!funnel) return null
-  const clientConv = funnel.booking_conversion_pct
-  const companyAvg = funnel.company_avg_conversion_pct
-  const belowAvg = clientConv != null && companyAvg != null && companyAvg - clientConv > 10
+function PeriodMenu({
+  value,
+  onChange,
+}: {
+  value: { start: string; end: string }
+  onChange: (range: { start: string; end: string }) => void
+}) {
+  const options = [
+    { label: 'Last 7 days', range: daysBack(7) },
+    { label: 'Last 30 days', range: daysBack(30) },
+    { label: 'This month', range: thisMonth() },
+  ]
+  return (
+    <Dropdown>
+      <DropdownButton
+        as="button"
+        className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-zinc-500 ring-1 ring-zinc-200"
+      >
+        {periodLabel(value)}
+        <ChevronDownIcon className="size-3.5" />
+      </DropdownButton>
+      <DropdownMenu anchor="bottom end">
+        {options.map((option) => (
+          <DropdownItem key={option.label} onClick={() => onChange(option.range)}>
+            {option.label}
+          </DropdownItem>
+        ))}
+      </DropdownMenu>
+    </Dropdown>
+  )
+}
+
+function FunnelPanel({ funnel, range, onChange }: { funnel: AdminFunnel; range: { start: string; end: string }; onChange: (range: { start: string; end: string }) => void }) {
   const steps = [
-    { label: 'Conversations', value: funnel.conversations, pct: null, tint: 'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300' },
-    { label: 'Booking-intent', value: funnel.booking_intent, pct: funnel.conv_to_intent_pct, tint: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300' },
-    { label: 'Booked', value: funnel.booked, pct: funnel.intent_to_booked_pct, tint: 'bg-teal-50 text-teal-700 dark:bg-teal-500/10 dark:text-teal-300' },
-    { label: 'Completed', value: funnel.completed, pct: funnel.booked_to_completed_pct, tint: 'bg-amber-50 text-amber-800 dark:bg-amber-500/10 dark:text-amber-300' },
+    { label: 'Conversations', value: funnel.conversations, pct: null as number | null, tint: 'bg-blue-50 text-blue-700' },
+    { label: 'Booking-intent', value: funnel.booking_intent, pct: funnel.conv_to_intent_pct, tint: 'bg-emerald-50 text-emerald-700' },
+    { label: 'Booked', value: funnel.booked, pct: funnel.intent_to_booked_pct, tint: 'bg-teal-50 text-teal-700' },
+    { label: 'Completed', value: funnel.completed, pct: funnel.booked_to_completed_pct, tint: 'bg-amber-50 text-amber-800' },
   ]
   return (
     <section className={`${dashCardClass} p-5`}>
-      <h3 className="text-base font-semibold text-zinc-950 dark:text-white">Company funnel (this month)</h3>
-      <div className="mt-4 grid items-center gap-6 lg:grid-cols-[1.4fr_0.8fr]">
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-base font-semibold text-zinc-950">Company funnel (this month)</h3>
+        <PeriodMenu value={range} onChange={onChange} />
+      </div>
+      <div className="mt-4 grid items-center gap-6 xl:grid-cols-[1.15fr_0.85fr]">
         <div className="space-y-2.5">
           {steps.map((step) => (
             <div key={step.label} className={`flex items-center justify-between gap-3 rounded-xl px-4 py-3 ${step.tint}`}>
@@ -307,18 +218,18 @@ function OverviewFunnel({ funnel }: { funnel: AdminFunnel | null | undefined }) 
             </div>
           ))}
         </div>
-        <div className="flex items-center justify-between gap-4 rounded-2xl bg-zinc-50 px-5 py-5 dark:bg-zinc-800/40">
+        <div className="flex items-center justify-between gap-4 px-2">
           <div>
-            <p className="text-xs font-medium text-zinc-500">Booking conversion</p>
-            <p className={`mt-1 text-3xl font-semibold tabular-nums ${belowAvg ? 'text-red-600' : 'text-zinc-950 dark:text-white'}`}>
-              {clientConv == null ? '—' : `${clientConv}%`}
+            <p className="text-xs text-zinc-500">Booking conversion</p>
+            <p className="mt-1 text-3xl font-semibold tabular-nums text-zinc-950">
+              {funnel.booking_conversion_pct == null ? '—' : `${funnel.booking_conversion_pct}%`}
             </p>
-            <p className="mt-4 text-xs font-medium text-zinc-500">Company average</p>
-            <p className="mt-1 text-xl font-semibold tabular-nums text-zinc-950 dark:text-white">
-              {companyAvg == null ? '—' : `${companyAvg}%`}
+            <p className="mt-4 text-xs text-zinc-500">Company average</p>
+            <p className="mt-1 text-xl font-semibold tabular-nums text-zinc-950">
+              {funnel.company_avg_conversion_pct == null ? '—' : `${funnel.company_avg_conversion_pct}%`}
             </p>
           </div>
-          <ConversionRing pct={clientConv} />
+          <ConversionRing pct={funnel.booking_conversion_pct} />
         </div>
       </div>
     </section>
@@ -327,16 +238,16 @@ function OverviewFunnel({ funnel }: { funnel: AdminFunnel | null | undefined }) 
 
 function ConversionRing({ pct }: { pct: number | null }) {
   const shown = pct == null ? 0 : Math.max(0, Math.min(100, pct))
-  const radius = 34
+  const radius = 36
   const circumference = 2 * Math.PI * radius
   const dash = (shown / 100) * circumference
   return (
-    <div className="relative size-24 shrink-0">
-      <svg viewBox="0 0 88 88" className="size-24 -rotate-90">
-        <circle cx="44" cy="44" r={radius} fill="none" className="stroke-zinc-200 dark:stroke-zinc-700" strokeWidth="8" />
+    <div className="relative size-28 shrink-0">
+      <svg viewBox="0 0 96 96" className="size-28 -rotate-90">
+        <circle cx="48" cy="48" r={radius} fill="none" stroke="#dbeafe" strokeWidth="8" />
         <circle
-          cx="44"
-          cy="44"
+          cx="48"
+          cy="48"
           r={radius}
           fill="none"
           stroke="#2563eb"
@@ -345,10 +256,339 @@ function ConversionRing({ pct }: { pct: number | null }) {
           strokeDasharray={`${dash} ${circumference}`}
         />
       </svg>
-      <span className="absolute inset-0 flex items-center justify-center px-2 text-center text-[11px] font-semibold leading-tight text-blue-600">
+      <span className="absolute inset-0 flex items-center justify-center px-3 text-center text-xs font-semibold text-blue-600">
         {pct == null ? '—' : `${pct}%`}
       </span>
     </div>
+  )
+}
+
+function ActivityChart({
+  points,
+  range,
+  onChange,
+}: {
+  points: AdminDashboard['activity']
+  range: { start: string; end: string }
+  onChange: (range: { start: string; end: string }) => void
+}) {
+  const data = points.map((point) => ({
+    ...point,
+    label: new Date(`${point.date}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+  }))
+  return (
+    <section className={`${dashCardClass} p-5`}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-base font-semibold text-zinc-950">Platform activity</h3>
+          <p className="mt-0.5 text-sm text-zinc-500">Bookings, calls and messages across all agencies and clients.</p>
+        </div>
+        <PeriodMenu value={range} onChange={onChange} />
+      </div>
+      <div className="mt-2 h-72 w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data} barCategoryGap="42%" margin={{ top: 28, right: 8, left: -12, bottom: 0 }}>
+            <CartesianGrid stroke="#ececef" vertical={false} />
+            <XAxis dataKey="label" interval={data.length > 16 ? 2 : 0} tick={{ fontSize: 11, fill: '#a1a1aa' }} axisLine={false} tickLine={false} />
+            <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#a1a1aa' }} axisLine={false} tickLine={false} width={32} />
+            <Tooltip cursor={{ fill: 'rgba(37, 99, 235, 0.05)' }} contentStyle={{ borderRadius: 8, border: '1px solid #e4e4e7', fontSize: 12 }} />
+            <Legend verticalAlign="top" align="right" iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12, top: 0 }} />
+            <Bar dataKey="bookings" name="Bookings" stackId="day" fill="#1d4ed8" maxBarSize={16} />
+            <Bar dataKey="calls" name="Calls" stackId="day" fill="#60a5fa" maxBarSize={16} />
+            <Bar dataKey="messages" name="Messages" stackId="day" fill="#93c5fd" radius={[4, 4, 0, 0]} maxBarSize={16} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </section>
+  )
+}
+
+function SuperAdminOverview() {
+  const { user } = useUser()
+  const [cardRange, setCardRange] = useState(daysBack(30))
+  const [draft, setDraft] = useState(daysBack(30))
+  const [rangeOpen, setRangeOpen] = useState(false)
+  const [funnelRange, setFunnelRange] = useState(daysBack(30))
+  const [chartRange, setChartRange] = useState(daysBack(30))
+  const [bellOpen, setBellOpen] = useState(false)
+  const [dismissed, setDismissed] = useState<Set<string>>(() => new Set())
+  const overview = useApiData((token) => api.admin.overview(token), [])
+  const dashboard = useApiData(
+    (token) =>
+      api.admin.overviewDashboard(token, {
+        start: cardRange.start,
+        end: cardRange.end,
+        funnelStart: funnelRange.start,
+        funnelEnd: funnelRange.end,
+        chartStart: chartRange.start,
+        chartEnd: chartRange.end,
+      }),
+    [cardRange.start, cardRange.end, funnelRange.start, funnelRange.end, chartRange.start, chartRange.end],
+  )
+  const alerts = useMemo(
+    () => (overview.data?.alerts ?? []).filter((alert) => !dismissed.has(alertKey(alert))),
+    [overview.data?.alerts, dismissed],
+  )
+  const name =
+    (user ? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() : '') ||
+    user?.primaryEmailAddress?.emailAddress ||
+    'Admin'
+  const initials = name
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? '')
+    .join('')
+
+  function refresh() {
+    void overview.refetch()
+    void dashboard.refetch()
+  }
+
+  const stats = dashboard.data
+
+  return (
+    <PageShell>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-sm text-zinc-500">Welcome back,</p>
+          <h1 className="mt-0.5 text-3xl font-semibold tracking-tight text-zinc-950">Admin Console</h1>
+          <p className="mt-1 text-sm text-zinc-500">Here&apos;s what&apos;s happening across your platform today.</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                setDraft(cardRange)
+                setRangeOpen((open) => !open)
+              }}
+              className="inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-sm text-zinc-600 shadow-sm ring-1 ring-zinc-200"
+            >
+              <CalendarDaysIcon className="size-4 text-zinc-400" />
+              {pretty(cardRange.start)} – {pretty(cardRange.end)}
+              <ChevronDownIcon className="size-4 text-zinc-400" />
+            </button>
+            {rangeOpen ? (
+              <div className="absolute right-0 z-20 mt-2 w-64 rounded-xl bg-white p-3 shadow-lg ring-1 ring-zinc-200">
+                <label className="block text-xs font-medium text-zinc-500">
+                  From
+                  <input
+                    type="date"
+                    value={draft.start}
+                    onChange={(event) => setDraft((current) => ({ ...current, start: event.target.value }))}
+                    className="mt-1 w-full rounded-lg border border-zinc-200 px-2 py-1.5 text-sm"
+                  />
+                </label>
+                <label className="mt-2 block text-xs font-medium text-zinc-500">
+                  To
+                  <input
+                    type="date"
+                    value={draft.end}
+                    onChange={(event) => setDraft((current) => ({ ...current, end: event.target.value }))}
+                    className="mt-1 w-full rounded-lg border border-zinc-200 px-2 py-1.5 text-sm"
+                  />
+                </label>
+                <Button
+                  color="brand"
+                  className="mt-3 w-full"
+                  onClick={() => {
+                    if (!draft.start || !draft.end) return
+                    setCardRange(draft.start <= draft.end ? draft : { start: draft.end, end: draft.start })
+                    setRangeOpen(false)
+                  }}
+                >
+                  Apply
+                </Button>
+              </div>
+            ) : null}
+          </div>
+          <div className="relative">
+            <button
+              type="button"
+              aria-label="Alerts"
+              onClick={() => setBellOpen((open) => !open)}
+              className="relative rounded-full p-2 text-zinc-500 hover:bg-white"
+            >
+              <BellIcon className="size-5" />
+              {alerts.length > 0 ? (
+                <span className="absolute top-1 right-1 size-2 rounded-full bg-red-500" />
+              ) : null}
+            </button>
+            {bellOpen ? (
+              <div className="absolute right-0 z-20 mt-2 w-80 rounded-xl bg-white p-2 shadow-lg ring-1 ring-zinc-200">
+                <p className="px-2 py-1.5 text-sm font-semibold text-zinc-950">Needs action today</p>
+                {alerts.length === 0 ? (
+                  <p className="px-2 py-3 text-sm text-zinc-500">All clients healthy</p>
+                ) : (
+                  <ul className="max-h-80 overflow-y-auto">
+                    {alerts.map((alert) => (
+                      <li key={alertKey(alert)} className="rounded-lg px-2 py-2 hover:bg-zinc-50">
+                        <div className="flex items-start gap-2">
+                          <HealthDot health={alert.severity} size="md" className="mt-1" />
+                          <div className="min-w-0 flex-1">
+                            <Link href={`/admin/clients/${encodeURIComponent(alert.tenant_id)}`} className="text-sm font-medium text-zinc-950">
+                              {alert.tenant_name}
+                            </Link>
+                            <p className="text-xs text-zinc-500">{alert.reason}</p>
+                          </div>
+                          <button
+                            type="button"
+                            className="text-xs font-medium text-zinc-400 hover:text-zinc-700"
+                            onClick={() =>
+                              setDismissed((current) => {
+                                const next = new Set(current)
+                                next.add(alertKey(alert))
+                                return next
+                              })
+                            }
+                          >
+                            Dismiss
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            ) : null}
+          </div>
+          <span className="flex items-center gap-2">
+            <span className="flex size-9 items-center justify-center rounded-full bg-blue-600 text-xs font-semibold text-white">
+              {initials || 'A'}
+            </span>
+            <span className="hidden sm:block">
+              <span className="block text-sm font-semibold leading-tight text-zinc-950">{name}</span>
+              <span className="block text-xs text-zinc-500">Super Admin</span>
+            </span>
+          </span>
+          <Button color="brand" onClick={refresh}>
+            <ArrowPathIcon data-slot="icon" />
+            Refresh Data
+          </Button>
+        </div>
+      </div>
+
+      {overview.error ? <p className="text-sm text-red-600">{overview.error}</p> : null}
+      {dashboard.error ? <p className="text-sm text-red-600">{dashboard.error}</p> : null}
+
+      {!stats || dashboard.loading ? (
+        <div className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {[0, 1, 2, 3].map((item) => (
+              <SkeletonBlock key={item} className="h-40" />
+            ))}
+          </div>
+          <SkeletonBlock className="h-72" />
+        </div>
+      ) : (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <MetricCard label="Total Clients" metric={stats.clients} href="/admin/clients" icon={<UsersIcon className="size-5" />} tone="bg-blue-50 text-blue-600" stroke="#2563eb" />
+            <MetricCard label="Active" metric={stats.active} href="/admin/clients?status=active" icon={<CheckCircleIcon className="size-5" />} tone="bg-emerald-50 text-emerald-600" stroke="#10b981" />
+            <MetricCard label="Pending activation" metric={stats.pending} href="/admin/clients?status=pending" icon={<ClockIcon className="size-5" />} tone="bg-amber-50 text-amber-600" stroke="#f59e0b" />
+            <MetricCard label="Suspended" metric={stats.suspended} href="/admin/clients?status=suspended" icon={<PauseIcon className="size-5" />} tone="bg-rose-50 text-rose-600" stroke="#f43f5e" />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+            <MetricCard label="Total Bookings" metric={stats.bookings} icon={<CalendarDaysIcon className="size-5" />} tone="bg-sky-50 text-sky-600" stroke="#0284c7" />
+            <MetricCard label="Conversations" metric={stats.conversations} icon={<ChatBubbleLeftRightIcon className="size-5" />} tone="bg-violet-50 text-violet-600" stroke="#7c3aed" />
+            <MetricCard label="Calls" metric={stats.calls} icon={<PhoneIcon className="size-5" />} tone="bg-cyan-50 text-cyan-600" stroke="#0891b2" />
+            <MetricCard label="Messages" metric={stats.messages} icon={<EnvelopeIcon className="size-5" />} tone="bg-indigo-50 text-indigo-600" stroke="#4f46e5" />
+            <MetricCard label="$ recovered this month" metric={stats.recovered} money icon={<BanknotesIcon className="size-5" />} tone="bg-emerald-50 text-emerald-600" stroke="#059669" />
+          </div>
+          <div className="grid items-start gap-4 xl:grid-cols-2">
+            <FunnelPanel funnel={stats.funnel} range={funnelRange} onChange={setFunnelRange} />
+            <ActivityChart points={stats.activity} range={chartRange} onChange={setChartRange} />
+          </div>
+        </>
+      )}
+
+      <div className="grid items-stretch gap-4 lg:grid-cols-2">
+        <section className={`${dashCardClass} flex flex-col`}>
+          <div className="flex items-center justify-between px-5 py-4">
+            <h3 className="text-base font-semibold text-zinc-950">Recent sign-ups</h3>
+            <Link href="/admin/clients" className="text-sm font-medium text-blue-600 hover:text-blue-700">
+              View all
+            </Link>
+          </div>
+          <div className="grid grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_auto_auto_auto] gap-3 px-5 pb-2 text-[11px] font-medium tracking-wide text-zinc-400 uppercase">
+            <span>Client</span>
+            <span>Agency</span>
+            <span>Joined</span>
+            <span>Status</span>
+            <span className="sr-only">Actions</span>
+          </div>
+          <ul className="divide-y divide-zinc-100">
+            {(overview.data?.recent_tenants.length ?? 0) === 0 && !overview.loading ? (
+              <li className="px-5 py-10 text-center text-sm text-zinc-500">No clients yet.</li>
+            ) : null}
+            {(overview.data?.recent_tenants ?? []).map((tenant) => (
+              <li key={tenant.id} className="grid grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_auto_auto_auto] items-center gap-3 px-5 py-3">
+                <Link href={`/admin/clients/${encodeURIComponent(tenant.id)}`} className="flex min-w-0 items-center gap-2.5">
+                  <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600">
+                    <BuildingOffice2Icon className="size-4" />
+                  </span>
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    <HealthDot health={tenant.health ?? 'green'} />
+                    <span className="truncate text-sm font-medium text-zinc-950">{tenant.name}</span>
+                  </span>
+                </Link>
+                <span className="truncate text-sm text-zinc-500">{tenant.parent_name || '—'}</span>
+                <span className="text-sm text-zinc-500">{formatDate(tenant.created_at)}</span>
+                <StatusBadge status={tenant.account_status} />
+                <Dropdown>
+                  <DropdownButton as="button" aria-label={`Actions for ${tenant.name}`} className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700">
+                    <EllipsisHorizontalIcon className="size-5" />
+                  </DropdownButton>
+                  <DropdownMenu anchor="bottom end">
+                    <DropdownItem href={`/admin/clients/${encodeURIComponent(tenant.id)}`}>Open client</DropdownItem>
+                  </DropdownMenu>
+                </Dropdown>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section className={`${dashCardClass} flex min-h-72 flex-col`}>
+          <div className="flex items-center justify-between px-5 py-4">
+            <h3 className="text-base font-semibold text-zinc-950">
+              Open plan requests
+              {(overview.data?.open_plan_requests ?? 0) > 0 ? (
+                <span className="ml-2 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                  {overview.data?.open_plan_requests}
+                </span>
+              ) : null}
+            </h3>
+            <Link href="/admin/requests" className="text-sm font-medium text-blue-600 hover:text-blue-700">
+              Manage
+            </Link>
+          </div>
+          {(overview.data?.recent_requests.length ?? 0) === 0 ? (
+            <div className="flex flex-1 flex-col items-center justify-center px-6 py-10 text-center">
+              <span className="flex size-16 items-center justify-center rounded-full bg-blue-50 text-blue-500">
+                <DocumentTextIcon className="size-7" />
+              </span>
+              <p className="mt-4 text-sm text-zinc-500">No open requests. All caught up.</p>
+            </div>
+          ) : (
+            <ul className="divide-y divide-zinc-100">
+              {(overview.data?.recent_requests ?? []).map((request) => (
+                <li key={request.id} className="flex items-center justify-between gap-3 px-5 py-3.5">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-zinc-950">{request.tenant_name ?? request.tenant_id}</p>
+                    <p className="truncate text-xs text-zinc-500">
+                      Wants <span className="font-medium text-zinc-700">{request.requested_plan_id ?? 'a plan change'}</span>
+                      {request.message ? ` — “${request.message}”` : ''}
+                    </p>
+                  </div>
+                  <span className="shrink-0 text-xs text-zinc-400">{formatDate(request.created_at)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </div>
+    </PageShell>
   )
 }
 
