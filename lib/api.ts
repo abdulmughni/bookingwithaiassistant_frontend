@@ -343,10 +343,12 @@ export const api = {
         body: JSON.stringify({}),
       }),
     googleCalendarStatus: (token: string) =>
-      request<{ connected: boolean; email: string; needs_reconnect: boolean }>(
-        '/api/oauth/google-calendar/status',
-        { token },
-      ),
+      request<{
+        connected: boolean
+        email: string
+        needs_reconnect: boolean
+        connected_at?: string | null
+      }>('/api/oauth/google-calendar/status', { token }),
     googleCalendarDisconnect: (token: string) =>
       request<null>('/api/oauth/google-calendar/disconnect', {
         token,
