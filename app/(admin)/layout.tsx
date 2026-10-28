@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState, type ReactNode } from 'react'
-import { useAuth, useUser, UserButton } from '@clerk/nextjs'
+import { useAuth } from '@clerk/nextjs'
 import {
   ArrowPathIcon,
   BuildingOffice2Icon,
@@ -22,6 +22,7 @@ import {
   UsersIcon,
 } from '@heroicons/react/20/solid'
 
+import { AccountMenu } from '@/components/account-menu'
 import { AgencyNotificationBell } from '@/components/admin/agency-notification-bell'
 
 import { Navbar, NavbarSpacer } from '@/components/navbar'
@@ -79,7 +80,6 @@ function agencyItemCurrent(
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { isLoaded, userId } = useAuth()
-  const { user } = useUser()
   const { isAdmin, isAgency, loading } = useIsAdmin()
   const { brand, loading: brandLoading } = useAgencyBrand(isAgency)
   const router = useRouter()
@@ -98,11 +98,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       pathname.startsWith('/admin/requests') ||
       pathname.startsWith('/admin/agencies'))
   const nav = isAgency ? agencyNav : superAdminNav
-
-  const adminName =
-    (user ? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() : '') ||
-    user?.primaryEmailAddress?.emailAddress ||
-    'Administrator'
+  const portalName = isAgency ? brand?.company_name || 'Agency' : 'Admin Console'
 
   useEffect(() => {
     if (isLoaded && !userId) {
@@ -134,7 +130,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <Navbar>
           <NavbarSpacer />
           {isAgency ? <AgencyNotificationBell /> : null}
-          <UserButton />
+          <AccountMenu portalName={portalName} compact />
         </Navbar>
       }
       sidebar={
@@ -187,21 +183,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
           <SidebarFooter>
             {isAgency ? <AgencyPlanCard /> : null}
-            <SidebarSection>
-              <div className="flex items-center gap-3 px-2 py-1.5">
-                <UserButton appearance={{ elements: { avatarBox: 'size-8' } }} />
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-zinc-950 dark:text-white">
-                    {isAgency ? brand?.company_name || adminName : adminName}
-                  </p>
-                  <p className="truncate text-xs text-zinc-500">
-                    {isAgency
-                      ? (user?.primaryEmailAddress?.emailAddress ?? 'Platform owner')
-                      : 'Super Admin'}
-                  </p>
-                </div>
-              </div>
-            </SidebarSection>
+            <AccountMenu portalName={portalName} />
           </SidebarFooter>
         </Sidebar>
       }
