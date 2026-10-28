@@ -2,7 +2,6 @@
 
 import { useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import { useUser } from '@clerk/nextjs'
 import {
   ArrowDownIcon,
   ArrowPathIcon,
@@ -142,17 +141,17 @@ function MetricCard({
     ? `$${Math.round(metric.value).toLocaleString()}`
     : Math.round(metric.value).toLocaleString()
   const body = (
-    <>
-      <div className="flex items-start justify-between gap-3">
-        <span className={`flex size-10 items-center justify-center rounded-full ${tone}`}>{icon}</span>
-        <Sparkline values={metric.series} color={stroke} />
+    <div className="flex items-center gap-3">
+      <span className={`flex size-11 shrink-0 items-center justify-center rounded-full ${tone}`}>{icon}</span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm text-zinc-500">{label}</p>
+        <p className="mt-0.5 text-2xl font-semibold tracking-tight tabular-nums text-zinc-950">{shown}</p>
+        <TrendLine metric={metric} />
       </div>
-      <p className="mt-4 text-sm text-zinc-500">{label}</p>
-      <p className="mt-1 text-3xl font-semibold tracking-tight tabular-nums text-zinc-950">{shown}</p>
-      <TrendLine metric={metric} />
-    </>
+      <Sparkline values={metric.series} color={stroke} />
+    </div>
   )
-  const className = `${dashCardClass} block min-h-[168px] p-5 transition hover:shadow-md`
+  const className = `${dashCardClass} block p-4 transition hover:shadow-md`
   if (!href) return <article className={className}>{body}</article>
   return (
     <Link href={href} className={className}>
@@ -304,7 +303,6 @@ function ActivityChart({
 }
 
 function SuperAdminOverview() {
-  const { user } = useUser()
   const [cardRange, setCardRange] = useState(daysBack(30))
   const [draft, setDraft] = useState(daysBack(30))
   const [rangeOpen, setRangeOpen] = useState(false)
@@ -329,17 +327,6 @@ function SuperAdminOverview() {
     () => (overview.data?.alerts ?? []).filter((alert) => !dismissed.has(alertKey(alert))),
     [overview.data?.alerts, dismissed],
   )
-  const name =
-    (user ? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() : '') ||
-    user?.primaryEmailAddress?.emailAddress ||
-    'Admin'
-  const initials = name
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? '')
-    .join('')
-
   function refresh() {
     void overview.refetch()
     void dashboard.refetch()
@@ -453,15 +440,6 @@ function SuperAdminOverview() {
               </div>
             ) : null}
           </div>
-          <span className="flex items-center gap-2">
-            <span className="flex size-9 items-center justify-center rounded-full bg-blue-600 text-xs font-semibold text-white">
-              {initials || 'A'}
-            </span>
-            <span className="hidden sm:block">
-              <span className="block text-sm font-semibold leading-tight text-zinc-950">{name}</span>
-              <span className="block text-xs text-zinc-500">Super Admin</span>
-            </span>
-          </span>
           <Button color="brand" onClick={refresh}>
             <ArrowPathIcon data-slot="icon" />
             Refresh Data
