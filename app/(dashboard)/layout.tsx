@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
-import { useAuth, useUser, useClerk, useOrganization, UserButton } from '@clerk/nextjs'
+import { useAuth, useOrganization } from '@clerk/nextjs'
 import { SidebarLayout } from '@/components/sidebar-layout'
 import {
   Sidebar,
@@ -17,8 +17,8 @@ import {
 } from '@/components/sidebar'
 import { Navbar, NavbarSpacer } from '@/components/navbar'
 import { isNavGroupCurrent, isNavHrefCurrent, mainNavItems } from '@/lib/navigation'
+import { AccountMenu } from '@/components/account-menu'
 import { useAgencyBrand, useIsAdmin } from '@/lib/hooks'
-import { ArrowRightStartOnRectangleIcon } from '@heroicons/react/20/solid'
 import {
   NavbarOrganizationSwitcher,
   OrganizationGate,
@@ -43,10 +43,8 @@ export default function DashboardLayout({
 }) {
   const pathname = usePathname()
   const router = useRouter()
-  const { user } = useUser()
   const { organization } = useOrganization()
   const { actor } = useAuth()
-  const { signOut } = useClerk()
   const { isAdmin, isAgency, loading: adminLoading } = useIsAdmin()
   const { brand, loading: brandLoading } = useAgencyBrand(!adminLoading && !isAdmin && !isAgency)
 
@@ -86,7 +84,7 @@ export default function DashboardLayout({
           <NavbarSpacer />
           <NotificationBell />
           <NavbarOrganizationSwitcher />
-          <UserButton />
+          <AccountMenu portalName={organization?.name || 'Client'} compact />
         </Navbar>
       }
       sidebar={
@@ -151,31 +149,7 @@ export default function DashboardLayout({
 
           <SidebarFooter>
             <SidebarUsageCard />
-            <SidebarSection>
-              <SidebarItem
-                onClick={() => signOut()}
-              >
-                <ArrowRightStartOnRectangleIcon data-slot="icon" />
-                <SidebarLabel>Sign out</SidebarLabel>
-              </SidebarItem>
-              {user && (
-                <div className="flex items-center gap-3 px-2 py-1.5">
-                  <UserButton
-                    appearance={{
-                      elements: { avatarBox: 'size-8' },
-                    }}
-                  />
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-zinc-950 dark:text-white">
-                      {user.firstName} {user.lastName}
-                    </p>
-                    <p className="truncate text-xs text-zinc-500">
-                      {user.primaryEmailAddress?.emailAddress}
-                    </p>
-                  </div>
-                </div>
-              )}
-            </SidebarSection>
+            <AccountMenu portalName={organization?.name || brand?.company_name || 'Client'} />
           </SidebarFooter>
         </Sidebar>
       }
