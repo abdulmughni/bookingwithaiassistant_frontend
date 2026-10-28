@@ -250,7 +250,6 @@ export function AgencyHome() {
             'bg-emerald-50 text-emerald-600',
           ]
           const strokes = ['#2563eb', '#0284c7', '#0891b2', '#4f46e5', '#059669']
-          const cardSeries = demo ? agencyDemoSeries() : series
           const spark =
             index === 1
               ? cardSeries.map((point) => point.bookings)
