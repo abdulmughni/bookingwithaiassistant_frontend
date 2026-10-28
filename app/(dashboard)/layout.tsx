@@ -80,7 +80,7 @@ export default function DashboardLayout({
       <BrandTheme theme={brand?.theme} />
       <SidebarLayout
       contentViewportLocked={fullBleedPage}
-      desktopHeader={<NotificationBell />}
+      desktopHeader={pathname === '/' ? null : <NotificationBell />}
       navbar={
         <Navbar>
           <NavbarSpacer />
