@@ -49,21 +49,29 @@ export function AdminAlertPanel({
 }) {
   if (!alerts.length) {
     return (
-      <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-800/50 dark:bg-emerald-950/30 dark:text-emerald-200">
+      <div className="flex items-center gap-3 rounded-2xl border border-emerald-200/80 bg-white px-5 py-4 text-sm text-emerald-800 shadow-sm dark:border-emerald-900/50 dark:bg-zinc-900 dark:text-emerald-200">
+        <span className="flex size-8 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10">
+          <span className="size-2 rounded-full bg-emerald-500" />
+        </span>
         All clients healthy
       </div>
     )
   }
 
   return (
-    <section className="rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-      <header className="border-b border-zinc-100 px-4 py-3 dark:border-zinc-800">
-        <h2 className="text-sm font-semibold text-zinc-900 dark:text-white">
-          Needs action today ({alerts.length})
-        </h2>
-        <p className="mt-0.5 text-xs text-zinc-500">
-          Dismiss hides here for this session only — still visible on the client page.
-        </p>
+    <section className="overflow-hidden rounded-2xl border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-700/80 dark:bg-zinc-900">
+      <header className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-100 px-5 py-4 dark:border-zinc-800">
+        <div>
+          <h2 className="flex items-center gap-2 text-base font-semibold text-zinc-950 dark:text-white">
+            Needs action today
+            <span className="inline-flex min-w-6 items-center justify-center rounded-full bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-600 dark:bg-red-500/10 dark:text-red-300">
+              {alerts.length}
+            </span>
+          </h2>
+          <p className="mt-0.5 text-xs text-zinc-500">
+            Dismiss hides here for this session only — still visible on the client page.
+          </p>
+        </div>
       </header>
       <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
         {alerts.map((a) => {
@@ -71,26 +79,22 @@ export function AdminAlertPanel({
           return (
             <li
               key={key}
-              className="flex flex-wrap items-center gap-3 px-4 py-3 text-sm"
+              className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3.5 text-sm transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
             >
-              <HealthDot health={a.severity} />
+              <HealthDot health={a.severity} size="md" />
               <Link
                 href={`/admin/clients/${encodeURIComponent(a.tenant_id)}`}
-                className="font-medium text-sky-700 hover:underline dark:text-sky-300"
+                className="min-w-32 font-semibold text-zinc-950 hover:text-blue-700 dark:text-white dark:hover:text-blue-300"
               >
                 {a.tenant_name}
               </Link>
-              <span className="min-w-0 flex-1 text-zinc-600 dark:text-zinc-300">
-                {a.reason}
-              </span>
-              <span className="shrink-0 text-xs text-zinc-400">
-                since {formatSince(a.since)}
-              </span>
+              <span className="min-w-0 flex-1 text-zinc-500 dark:text-zinc-400">{a.reason}</span>
+              <span className="shrink-0 text-xs tabular-nums text-zinc-400">since {formatSince(a.since)}</span>
               {onDismiss ? (
                 <button
                   type="button"
                   onClick={() => onDismiss(a)}
-                  className="shrink-0 rounded-md px-2 py-1 text-xs font-medium text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                  className="shrink-0 rounded-lg px-2.5 py-1 text-xs font-semibold text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
                 >
                   Dismiss
                 </button>
