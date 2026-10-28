@@ -7,7 +7,6 @@ import {
   ArrowPathIcon,
   ArrowUpIcon,
   BanknotesIcon,
-  BellIcon,
   BuildingOffice2Icon,
   CalendarDaysIcon,
   ChatBubbleLeftRightIcon,
@@ -21,17 +20,9 @@ import {
   UsersIcon,
 } from '@heroicons/react/20/solid'
 import { ChevronDownIcon } from '@heroicons/react/16/solid'
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Legend,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts'
+import { BellIcon } from '@heroicons/react/24/outline'
 
+import { ActivityBars } from '@/components/activity-bars'
 import { Button } from '@/components/button'
 import { PageShell, SkeletonBlock, dashCardClass } from '@/components/dashboard-ui'
 import { Dropdown, DropdownButton, DropdownItem, DropdownMenu } from '@/components/dropdown'
@@ -151,7 +142,7 @@ function MetricCard({
       <Sparkline values={metric.series} color={stroke} />
     </div>
   )
-  const className = `${dashCardClass} block p-4 transition hover:shadow-md`
+  const className = `${dashCardClass} block h-full p-4 transition hover:shadow-md`
   if (!href) return <article className={className}>{body}</article>
   return (
     <Link href={href} className={className}>
@@ -194,13 +185,13 @@ function PeriodMenu({
 
 function FunnelPanel({ funnel, range, onChange }: { funnel: AdminFunnel; range: { start: string; end: string }; onChange: (range: { start: string; end: string }) => void }) {
   const steps = [
-    { label: 'Conversations', value: funnel.conversations, pct: null as number | null, tint: 'bg-blue-50 text-blue-700' },
-    { label: 'Booking-intent', value: funnel.booking_intent, pct: funnel.conv_to_intent_pct, tint: 'bg-emerald-50 text-emerald-700' },
-    { label: 'Booked', value: funnel.booked, pct: funnel.intent_to_booked_pct, tint: 'bg-teal-50 text-teal-700' },
-    { label: 'Completed', value: funnel.completed, pct: funnel.booked_to_completed_pct, tint: 'bg-amber-50 text-amber-800' },
+    { label: 'Total bookings', value: funnel.total_bookings ?? funnel.conversations, pct: null as number | null, tint: 'bg-blue-50 text-blue-700' },
+    { label: 'From messages', value: funnel.message_bookings ?? funnel.booking_intent, pct: funnel.conv_to_intent_pct, tint: 'bg-emerald-50 text-emerald-700' },
+    { label: 'From calls', value: funnel.call_bookings ?? funnel.booked, pct: funnel.intent_to_booked_pct, tint: 'bg-teal-50 text-teal-700' },
+    { label: 'Completed', value: funnel.completed_bookings ?? funnel.completed, pct: funnel.booked_to_completed_pct, tint: 'bg-amber-50 text-amber-800' },
   ]
   return (
-    <section className={`${dashCardClass} p-5`}>
+    <section className={`${dashCardClass} flex h-full flex-col p-5`}>
       <div className="flex items-center justify-between gap-3">
         <h3 className="text-base font-semibold text-zinc-950">Company funnel (this month)</h3>
         <PeriodMenu value={range} onChange={onChange} />
@@ -211,7 +202,7 @@ function FunnelPanel({ funnel, range, onChange }: { funnel: AdminFunnel; range: 
             <div key={step.label} className={`flex items-center justify-between gap-3 rounded-xl px-4 py-3 ${step.tint}`}>
               <div>
                 <p className="text-sm font-medium">{step.label}</p>
-                {step.pct != null ? <p className="text-xs opacity-80">{step.pct}% from prior</p> : null}
+                {step.pct != null ? <p className="text-xs opacity-80">{step.pct}% of bookings</p> : null}
               </div>
               <p className="text-lg font-semibold tabular-nums">{step.value.toLocaleString()}</p>
             </div>
@@ -271,34 +262,13 @@ function ActivityChart({
   range: { start: string; end: string }
   onChange: (range: { start: string; end: string }) => void
 }) {
-  const data = points.map((point) => ({
-    ...point,
-    label: new Date(`${point.date}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-  }))
   return (
-    <section className={`${dashCardClass} p-5`}>
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h3 className="text-base font-semibold text-zinc-950">Platform activity</h3>
-          <p className="mt-0.5 text-sm text-zinc-500">Bookings, calls and messages across all agencies and clients.</p>
-        </div>
-        <PeriodMenu value={range} onChange={onChange} />
-      </div>
-      <div className="mt-2 h-72 w-full">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} barCategoryGap="42%" margin={{ top: 28, right: 8, left: -12, bottom: 0 }}>
-            <CartesianGrid stroke="#ececef" vertical={false} />
-            <XAxis dataKey="label" interval={data.length > 16 ? 2 : 0} tick={{ fontSize: 11, fill: '#a1a1aa' }} axisLine={false} tickLine={false} />
-            <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#a1a1aa' }} axisLine={false} tickLine={false} width={32} />
-            <Tooltip cursor={{ fill: 'rgba(37, 99, 235, 0.05)' }} contentStyle={{ borderRadius: 8, border: '1px solid #e4e4e7', fontSize: 12 }} />
-            <Legend verticalAlign="top" align="right" iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12, top: 0 }} />
-            <Bar dataKey="bookings" name="Bookings" stackId="day" fill="#1d4ed8" maxBarSize={16} />
-            <Bar dataKey="calls" name="Calls" stackId="day" fill="#60a5fa" maxBarSize={16} />
-            <Bar dataKey="messages" name="Messages" stackId="day" fill="#93c5fd" radius={[4, 4, 0, 0]} maxBarSize={16} />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-    </section>
+    <ActivityBars
+      title="Platform activity"
+      subtitle="Bookings, calls and messages across all agencies and clients."
+      points={points}
+      menu={<PeriodMenu value={range} onChange={onChange} />}
+    />
   )
 }
 
@@ -390,16 +360,20 @@ function SuperAdminOverview() {
               </div>
             ) : null}
           </div>
+          <Button color="brand" onClick={refresh}>
+            <ArrowPathIcon data-slot="icon" />
+            Refresh Data
+          </Button>
           <div className="relative">
             <button
               type="button"
               aria-label="Alerts"
               onClick={() => setBellOpen((open) => !open)}
-              className="relative rounded-full p-2 text-zinc-500 hover:bg-white"
+              className="relative flex size-10 items-center justify-center rounded-xl bg-zinc-50 text-zinc-600 shadow-sm ring-1 ring-zinc-200 hover:bg-white"
             >
               <BellIcon className="size-5" />
               {alerts.length > 0 ? (
-                <span className="absolute top-1 right-1 size-2 rounded-full bg-red-500" />
+                <span className="absolute top-1.5 right-1.5 size-2 rounded-full bg-red-500" />
               ) : null}
             </button>
             {bellOpen ? (
@@ -440,10 +414,6 @@ function SuperAdminOverview() {
               </div>
             ) : null}
           </div>
-          <Button color="brand" onClick={refresh}>
-            <ArrowPathIcon data-slot="icon" />
-            Refresh Data
-          </Button>
         </div>
       </div>
 
@@ -474,7 +444,7 @@ function SuperAdminOverview() {
             <MetricCard label="Messages" metric={stats.messages} icon={<EnvelopeIcon className="size-5" />} tone="bg-indigo-50 text-indigo-600" stroke="#4f46e5" />
             <MetricCard label="$ recovered this month" metric={stats.recovered} money icon={<BanknotesIcon className="size-5" />} tone="bg-emerald-50 text-emerald-600" stroke="#059669" />
           </div>
-          <div className="grid items-start gap-4 xl:grid-cols-2">
+          <div className="grid items-stretch gap-4 xl:grid-cols-2">
             <FunnelPanel funnel={stats.funnel} range={funnelRange} onChange={setFunnelRange} />
             <ActivityChart points={stats.activity} range={chartRange} onChange={setChartRange} />
           </div>

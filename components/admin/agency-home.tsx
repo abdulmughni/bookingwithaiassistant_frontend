@@ -19,7 +19,10 @@ import {
 } from '@heroicons/react/20/solid'
 import { ChevronDownIcon } from '@heroicons/react/16/solid'
 
-import { AgencyRangeChart, attentionReason } from '@/components/admin/agency-dashboard'
+import { Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/react'
+
+import { ActivityBars } from '@/components/activity-bars'
+import { attentionReason } from '@/components/admin/agency-dashboard'
 import { AgencyNotificationBell } from '@/components/admin/agency-notification-bell'
 import { InviteCompanyDialog } from '@/components/admin/invite-company-dialog'
 import { StatusBadge, formatDate } from '@/components/admin/shared'
@@ -53,6 +56,37 @@ function defaultRange() {
   const end = new Date()
   const start = new Date()
   start.setDate(end.getDate() - 29)
+  return { start: localIso(start), end: localIso(end) }
+}
+
+function Sparkline({ values, color }: { values: number[]; color: string }) {
+  const width = 88
+  const height = 36
+  if (values.length < 2) {
+    return <span className="h-9 w-20 shrink-0" />
+  }
+  const max = Math.max(...values, 1)
+  const min = Math.min(...values, 0)
+  const span = max - min || 1
+  const step = width / (values.length - 1)
+  const points = values
+    .map((value, index) => `${index * step},${height - 4 - ((value - min) / span) * (height - 10)}`)
+    .join(' ')
+  return (
+    <svg viewBox={`0 0 ${width} ${height}`} className="h-9 w-20 shrink-0" aria-hidden>
+      <polyline fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" points={points} />
+    </svg>
+  )
+}
+
+function chartPreset(kind: 'week' | 'month' | 'year') {
+  const end = new Date()
+  const start = new Date()
+  if (kind === 'week') start.setDate(end.getDate() - 6)
+  else if (kind === 'month') start.setDate(end.getDate() - 29)
+  else {
+    start.setMonth(0, 1)
+  }
   return { start: localIso(start), end: localIso(end) }
 }
 
@@ -192,69 +226,117 @@ export function AgencyHome() {
               </div>
             ) : null}
           </div>
-          <AgencyNotificationBell />
           {isAgencyStaff || !tenantId ? null : (
             <Button color="brand" onClick={() => setInviteOpen(true)}>
               <PlusIcon data-slot="icon" />
               Add New Client
             </Button>
           )}
+          <AgencyNotificationBell />
         </div>
       </div>
 
       {clientsQuery.error && !demo ? <p className="text-sm text-red-600">{clientsQuery.error}</p> : null}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid items-stretch gap-4 sm:grid-cols-2 xl:grid-cols-5">
         {kpis.map((kpi, index) => {
           const Icon = icons[index] ?? UsersIcon
-          const tint = index === 4 ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'
+          const cardSeries = demo ? agencyDemoSeries() : series
+          const tones = [
+            'bg-blue-50 text-blue-600',
+            'bg-sky-50 text-sky-600',
+            'bg-cyan-50 text-cyan-600',
+            'bg-indigo-50 text-indigo-600',
+            'bg-emerald-50 text-emerald-600',
+          ]
+          const strokes = ['#2563eb', '#0284c7', '#0891b2', '#4f46e5', '#059669']
+          const cardSeries = demo ? agencyDemoSeries() : series
+          const spark =
+            index === 1
+              ? cardSeries.map((point) => point.bookings)
+              : index === 2
+                ? cardSeries.map((point) => (demo ? point.calls : point.call_minutes ?? 0))
+                : index === 3
+                  ? cardSeries.map((point) => point.messages)
+                  : []
           return (
-            <article key={kpi.label} className={`${dashCardClass} p-4`}>
-              <span className={`flex size-10 items-center justify-center rounded-xl ${tint}`}>
+            <article key={kpi.label} className={`${dashCardClass} flex h-full items-center gap-3 p-4`}>
+              <span className={`flex size-11 shrink-0 items-center justify-center rounded-full ${tones[index] ?? tones[0]}`}>
                 <Icon className="size-5" />
               </span>
-              <p className="mt-3 text-sm text-zinc-500">{kpi.label}</p>
-              <p className="mt-1 text-2xl font-semibold tracking-tight text-zinc-950">{kpi.value}</p>
-              {kpi.trend ? (
-                <p className="mt-1 flex items-center gap-1 text-xs font-medium text-emerald-600">
-                  <ArrowUpIcon className="size-3" />
-                  {kpi.trend}
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm text-zinc-500">{kpi.label}</p>
+                <p className="mt-0.5 text-2xl font-semibold tracking-tight text-zinc-950">{kpi.value}</p>
+                <p className="mt-1 flex min-h-4 items-center gap-1 text-xs font-medium text-emerald-600">
+                  {kpi.trend ? (
+                    <>
+                      <ArrowUpIcon className="size-3" />
+                      {kpi.trend}
+                    </>
+                  ) : null}
                 </p>
-              ) : null}
+              </div>
+              <Sparkline values={spark} color={strokes[index] ?? strokes[0]} />
             </article>
           )
         })}
       </div>
 
-      <div className="grid items-start gap-4 xl:grid-cols-5">
-        <section className={`${dashCardClass} p-5 xl:col-span-3`}>
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h2 className="text-base font-semibold text-zinc-950">Booking activity</h2>
-              <p className="mt-0.5 text-sm text-zinc-500">New bookings across all your clients.</p>
-            </div>
-            <span className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-zinc-500 ring-1 ring-zinc-200">
-              {prettyRange(range.start, range.end)}
-            </span>
-          </div>
-          {demo ? (
-            <AgencyRangeChart
-              series={agencyDemoSeries()}
-              variant="dashboard"
-              lightName="Website/Widget"
-              darkName="Calls/AI"
-              yMax={40}
-            />
-          ) : activityQuery.loading ? (
-            <SkeletonBlock className="mt-4 h-72" />
-          ) : activityQuery.error ? (
-            <p className="mt-3 text-sm text-red-600">{activityQuery.error}</p>
-          ) : (
-            <AgencyRangeChart series={activityQuery.data?.series ?? []} variant="dashboard" />
-          )}
-        </section>
+      <div className="grid items-stretch gap-4 xl:grid-cols-5">
+        <div className="h-full xl:col-span-3">
+          <ActivityBars
+            title="Booking activity"
+            subtitle="New bookings across all your clients."
+            loading={!demo && activityQuery.loading}
+            points={(demo ? agencyDemoSeries() : activityQuery.data?.series ?? []).map((point) => ({
+              date: point.date,
+              bookings: point.bookings,
+              calls: point.calls,
+              messages: point.messages,
+            }))}
+            menu={
+              <Menu as="div" className="relative shrink-0">
+                <MenuButton className="inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-600 ring-1 ring-zinc-200 hover:bg-zinc-50">
+                  {(() => {
+                    const week = chartPreset('week')
+                    const month = chartPreset('month')
+                    const year = chartPreset('year')
+                    if (range.start === week.start && range.end === week.end) return 'Last 7 days'
+                    if (range.start === month.start && range.end === month.end) return 'Last 30 days'
+                    if (range.start === year.start && range.end === year.end) return 'This year'
+                    return prettyRange(range.start, range.end)
+                  })()}
+                  <ChevronDownIcon className="size-3.5 text-zinc-400" />
+                </MenuButton>
+                <MenuItems
+                  anchor="bottom end"
+                  className="z-20 w-40 rounded-xl bg-white p-1 shadow-lg ring-1 ring-zinc-200 [--anchor-gap:6px] focus:outline-none"
+                >
+                  {(
+                    [
+                      ['week', 'Last 7 days'],
+                      ['month', 'Last 30 days'],
+                      ['year', 'This year'],
+                    ] as const
+                  ).map(([kind, label]) => (
+                    <MenuItem key={kind}>
+                      <button
+                        type="button"
+                        onClick={() => setRange(chartPreset(kind))}
+                        className="block w-full rounded-lg px-3 py-2 text-left text-sm text-zinc-700 data-focus:bg-zinc-100"
+                      >
+                        {label}
+                      </button>
+                    </MenuItem>
+                  ))}
+                </MenuItems>
+              </Menu>
+            }
+          />
+          {!demo && activityQuery.error ? <p className="mt-2 text-sm text-red-600">{activityQuery.error}</p> : null}
+        </div>
 
-        <section className={`${dashCardClass} p-5 xl:col-span-2`}>
+        <section className={`${dashCardClass} flex h-full flex-col p-5 xl:col-span-2`}>
           <PanelHead title="Top performing clients" href="/admin/clients" />
           <table className="mt-2 w-full text-left text-sm">
             <thead className="text-xs text-zinc-400">
@@ -309,8 +391,8 @@ export function AgencyHome() {
         </section>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-3">
-        <section className={`${dashCardClass} p-5`}>
+      <div className="grid items-stretch gap-4 xl:grid-cols-3">
+        <section className={`${dashCardClass} flex h-full flex-col p-5`}>
           <PanelHead title="Recent client sign-ups" href="/admin/clients" />
           <ul className="divide-y divide-zinc-100">
             {demo
@@ -339,7 +421,7 @@ export function AgencyHome() {
           </ul>
         </section>
 
-        <section className={`${dashCardClass} p-5`}>
+        <section className={`${dashCardClass} flex h-full flex-col p-5`}>
           <PanelHead title="Needs attention" href="/admin/clients" count={demo ? agencyDemo.attentionCount : attention.length + (alertsQuery.data?.length ?? 0)} />
           <ul className="divide-y divide-zinc-100">
             {demo
@@ -386,7 +468,7 @@ export function AgencyHome() {
           ) : null}
         </section>
 
-        <section className={`${dashCardClass} p-5`}>
+        <section className={`${dashCardClass} flex h-full flex-col p-5`}>
           <PanelHead title="Recent activity" href="/admin/activity" />
           <ul>
             {demo

@@ -60,12 +60,13 @@ const demoHeights = [6, 10, 12, 16, 14, 20, 18, 22, 16, 24, 20, 26, 22, 28, 24, 
 export function agencyDemoSeries(): AgencyActivity['series'] {
   return demoHeights.map((total, index) => {
     const day = index + 1
-    const light = Math.round(total * 0.42)
+    const bookings = Math.round(total * 0.34)
+    const calls = Math.round(total * 0.4)
     return {
       date: `2026-10-${String(day).padStart(2, '0')}`,
-      bookings: light,
-      calls: total - light,
-      messages: 0,
+      bookings,
+      calls,
+      messages: Math.max(0, total - bookings - calls),
     }
   })
 }
