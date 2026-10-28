@@ -18,6 +18,7 @@ import { ReadOnlyBanner, useReadOnlyAccount } from '@/components/account-status-
 import { CostPolicyPicker } from '@/components/cost-policy-picker'
 import { AgencyBrandForm } from '@/components/admin/agency-brand-form'
 import { ProfilePhotoForm } from '@/components/profile-photo-form'
+import { GoogleCalendarCard } from '@/components/google-calendar-card'
 import { Subheading } from '@/components/heading'
 
 /**
@@ -856,6 +857,8 @@ export default function SettingsPage() {
         </p>
         <AgencyBrandForm showLogo={false} />
       </section>
+
+      <GoogleCalendarCard />
 
       <div className="rounded-2xl border border-zinc-200/80 bg-white px-4 shadow-sm dark:border-zinc-700/80 dark:bg-zinc-900/80 sm:px-6">
         <nav className="-mb-px flex gap-6 border-b border-zinc-200/80 pt-2 dark:border-zinc-700/80" aria-label="Settings tabs">

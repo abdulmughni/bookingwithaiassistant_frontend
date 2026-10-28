@@ -336,6 +336,28 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({}),
       }),
+    googleCalendarStart: (token: string) =>
+      request<{ authorization_url: string }>('/api/oauth/google-calendar/start', {
+        token,
+        method: 'POST',
+        body: JSON.stringify({}),
+      }),
+    googleCalendarStatus: (token: string) =>
+      request<{ connected: boolean; email: string; needs_reconnect: boolean }>(
+        '/api/oauth/google-calendar/status',
+        { token },
+      ),
+    googleCalendarDisconnect: (token: string) =>
+      request<null>('/api/oauth/google-calendar/disconnect', {
+        token,
+        method: 'POST',
+        body: JSON.stringify({}),
+      }),
+    googleCalendarSync: (token: string) =>
+      request<{ synced: number; skipped: number; failed: number }>(
+        '/api/oauth/google-calendar/sync',
+        { token, method: 'POST', body: JSON.stringify({}) },
+      ),
   },
 
   knowledge: {
