@@ -3,14 +3,18 @@
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useAuth, useOrganization, useUser } from '@clerk/nextjs'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/react'
 import clsx from 'clsx'
 import {
+  ArrowDownIcon,
+  ArrowUpIcon,
   ArrowUpRightIcon,
   CalendarDaysIcon,
   CheckCircleIcon,
   ClockIcon,
   ChatBubbleLeftRightIcon,
 } from '@heroicons/react/20/solid'
+import { ChevronDownIcon } from '@heroicons/react/16/solid'
 import {
   Bar,
   BarChart,
@@ -25,6 +29,7 @@ import { PageShell, dashCardClass } from '@/components/dashboard-ui'
 import { Input } from '@/components/input'
 import { Badge } from '@/components/badge'
 import { SourceBadge } from '@/components/channel-icon'
+import { NotificationBell } from '@/components/notification-bell'
 import { useApiData, useTenantTimezone } from '@/lib/hooks'
 import { api } from '@/lib/api'
 import { formatDateTime, statusColor } from '@/lib/utils'
@@ -81,25 +86,69 @@ function useWeeklySeries(bookings: Booking[] | null, tz: string) {
 // KPI cards
 // ---------------------------------------------------------------------------
 
+function Sparkline({ values, color }: { values: number[]; color: string }) {
+  if (values.length < 2) return null
+  const width = 88
+  const height = 36
+  const max = Math.max(...values, 1)
+  const min = Math.min(...values, 0)
+  const span = max - min || 1
+  const step = width / (values.length - 1)
+  const points = values
+    .map((value, index) => `${index * step},${height - 4 - ((value - min) / span) * (height - 10)}`)
+    .join(' ')
+  return (
+    <svg viewBox={`0 0 ${width} ${height}`} className="h-9 w-20 shrink-0" aria-hidden>
+      <polyline fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" points={points} />
+    </svg>
+  )
+}
+
+function percentChange(current: number, previous: number | null | undefined) {
+  if (previous == null) return null
+  if (previous === 0) return current === 0 ? 0 : null
+  return Math.round(((current - previous) / previous) * 1000) / 10
+}
+
 function KpiCard({
   label,
   value,
   hint,
   icon,
+  tone,
+  stroke,
+  series,
+  delta,
 }: {
   label: string
   value: number | string
   hint?: string
   icon: React.ReactNode
+  tone: string
+  stroke: string
+  series?: number[]
+  delta?: number | null
 }) {
   return (
     <article className={`${dashCardClass} p-4`}>
-      <span className="flex size-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-300">
-        {icon}
-      </span>
-      <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400">{label}</p>
-      <p className="mt-1 text-2xl font-semibold tracking-tight text-zinc-950 dark:text-white">{value}</p>
-      {hint ? <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">{hint}</p> : null}
+      <div className="flex items-center gap-3">
+        <span className={`flex size-11 shrink-0 items-center justify-center rounded-full ${tone}`}>{icon}</span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm text-zinc-500 dark:text-zinc-400">{label}</p>
+          <p className="mt-0.5 text-2xl font-semibold tracking-tight tabular-nums text-zinc-950 dark:text-white">{value}</p>
+          {delta == null ? (
+            hint ? <p className="mt-1 text-xs text-zinc-400">{hint}</p> : null
+          ) : delta === 0 ? (
+            <p className="mt-1 text-xs text-zinc-400">No change</p>
+          ) : (
+            <p className={`mt-1 flex items-center gap-1 text-xs font-medium ${delta > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+              {delta > 0 ? <ArrowUpIcon className="size-3" /> : <ArrowDownIcon className="size-3" />}
+              {Math.abs(delta)}% from last month
+            </p>
+          )}
+        </div>
+        <Sparkline values={series ?? []} color={stroke} />
+      </div>
     </article>
   )
 }
@@ -134,17 +183,30 @@ function seriesFromDaily(
   }
   return daily.map((row) => ({
     key: row.date,
-    label:
-      daily.length > 14
-        ? row.date.slice(8)
-        : new Date(`${row.date}T12:00:00Z`).toLocaleDateString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            timeZone: 'UTC',
-          }),
+    label: new Date(`${row.date}T12:00:00Z`).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      timeZone: 'UTC',
+    }),
     isToday: row.date === today,
     count: row.count,
   }))
+}
+
+type ChartWindow = 'week' | 'month' | 'year' | 'custom' | 'all'
+
+function chartCaption(kind: ChartWindow) {
+  if (kind === 'month') return 'last 30 days'
+  if (kind === 'year') return 'this year'
+  if (kind === 'custom') return 'selected range'
+  return 'last 7 days'
+}
+
+function chartChipLabel(kind: ChartWindow, custom?: string) {
+  if (kind === 'month') return 'Last 30 days'
+  if (kind === 'year') return 'This year'
+  if (kind === 'custom') return custom || 'Custom range'
+  return 'Last 7 days'
 }
 
 function WeeklyBarChart({
@@ -152,18 +214,21 @@ function WeeklyBarChart({
   tz,
   loading,
   series,
-  subtitle,
+  windowKind,
+  customLabel,
+  onPickWindow,
 }: {
   bookings: Booking[] | null
   tz: string
   loading: boolean
   series?: { key: string; label: string; isToday: boolean; count: number }[] | null
-  subtitle?: string
+  windowKind: ChartWindow
+  customLabel?: string
+  onPickWindow: (kind: 'week' | 'month' | 'year' | 'all') => void
 }) {
   const weekly = useWeeklySeries(bookings, tz)
   const days = series ?? weekly.days
   const max = series ? Math.max(1, ...series.map((d) => d.count)) : weekly.max
-  const total = series ? series.reduce((sum, day) => sum + day.count, 0) : weekly.total
 
   const chart = days.map((day) => ({ label: day.label, bookings: day.count }))
   const tickEvery = chart.length > 16 ? Math.ceil(chart.length / 8) - 1 : 0
@@ -174,12 +239,38 @@ function WeeklyBarChart({
         <div>
           <h2 className="text-base font-semibold text-zinc-950 dark:text-white">Booking activity</h2>
           <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">
-            {subtitle ?? 'New bookings · last 7 days'}
+            New bookings · {chartCaption(windowKind)}
           </p>
         </div>
-        <span className="inline-flex items-center rounded-lg px-2 py-1 text-xs font-medium text-zinc-500 ring-1 ring-zinc-200 dark:ring-zinc-700">
-          {total} total
-        </span>
+        <Menu as="div" className="relative shrink-0">
+          <MenuButton className="inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-600 ring-1 ring-zinc-200 hover:bg-zinc-50 dark:bg-zinc-900 dark:text-zinc-300 dark:ring-zinc-700">
+            {chartChipLabel(windowKind, customLabel)}
+            <ChevronDownIcon className="size-3.5 text-zinc-400" />
+          </MenuButton>
+          <MenuItems
+            anchor="bottom end"
+            className="z-20 mt-1 w-40 rounded-xl bg-white p-1 shadow-lg ring-1 ring-zinc-200 [--anchor-gap:6px] focus:outline-none dark:bg-zinc-900 dark:ring-zinc-700"
+          >
+            {(
+              [
+                ['week', 'Last 7 days'],
+                ['month', 'Last 30 days'],
+                ['year', 'This year'],
+                ['all', 'All time'],
+              ] as const
+            ).map(([kind, label]) => (
+              <MenuItem key={kind}>
+                <button
+                  type="button"
+                  onClick={() => onPickWindow(kind)}
+                  className="block w-full rounded-lg px-3 py-2 text-left text-sm text-zinc-700 data-focus:bg-zinc-100 dark:text-zinc-200 dark:data-focus:bg-zinc-800"
+                >
+                  {label}
+                </button>
+              </MenuItem>
+            ))}
+          </MenuItems>
+        </Menu>
       </div>
       {loading ? (
         <div className="mt-4 h-72 animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-800" />
@@ -268,8 +359,8 @@ function CompletionGauge({
                 />
                 <defs>
                   <linearGradient id="gaugeGradient" x1="0" y1="0" x2="1" y2="0">
-                    <stop offset="0%" stopColor="#5c7aff" />
-                    <stop offset="100%" stopColor="#2b44ff" />
+                    <stop offset="0%" stopColor="#34d399" />
+                    <stop offset="100%" stopColor="#059669" />
                   </linearGradient>
                 </defs>
               </svg>
@@ -282,9 +373,9 @@ function CompletionGauge({
             </div>
 
             <div className="mt-auto space-y-2 pt-4">
-              <GaugeLegend color="bg-brand-500" label="Completed" value={completed} />
+              <GaugeLegend color="bg-emerald-500" label="Completed" value={completed} />
               <GaugeLegend
-                color="bg-sky-400"
+                color="bg-blue-500"
                 label="Upcoming"
                 value={stats?.upcoming_bookings ?? 0}
               />
@@ -362,7 +453,7 @@ function NextAppointmentCard({
   loading: boolean
 }) {
   return (
-    <section className="flex h-full flex-col overflow-hidden rounded-2xl bg-linear-to-br from-zinc-900 to-zinc-800 p-5 text-white shadow-sm dark:from-zinc-800 dark:to-zinc-900">
+    <section className="flex h-full flex-col overflow-hidden rounded-2xl bg-linear-to-br from-emerald-950 to-emerald-800 p-5 text-white shadow-sm">
         <div className="flex items-center gap-2 text-sm font-medium text-zinc-300">
           <ClockIcon className="size-4" />
           Next appointment
@@ -382,22 +473,28 @@ function NextAppointmentCard({
               {booking.selected_slot ? formatDateTime(booking.selected_slot, tz) : '—'}
             </p>
             <div className="mt-auto pt-6">
-              <Button href="/bookings" color="white" className="w-full">
-                View bookings
+              <Button href="/bookings" color="white">
+                View all bookings
               </Button>
             </div>
           </>
         ) : (
-          <div className="mt-4 flex flex-1 flex-col">
-            <p className="text-sm text-zinc-300">
-              No upcoming appointments scheduled.
-            </p>
+          <>
+            <div className="mt-5 flex items-start justify-between gap-4">
+              <div>
+                <p className="text-base font-medium text-white">No upcoming appointments scheduled.</p>
+                <p className="mt-1 text-sm text-emerald-100/80">When a client books with you, it will appear here.</p>
+              </div>
+              <span className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-emerald-100">
+                <CalendarDaysIcon className="size-7" />
+              </span>
+            </div>
             <div className="mt-auto pt-6">
-              <Button href="/conversations" color="white" className="w-full">
-                Open conversations
+              <Button href="/bookings" color="white">
+                View all bookings
               </Button>
             </div>
-          </div>
+          </>
         )}
     </section>
   )
@@ -462,8 +559,15 @@ function UpcomingList({
             ))}
           </ul>
         ) : (
-          <div className="mt-4 flex flex-1 items-center justify-center rounded-xl border border-dashed border-zinc-200 py-10 text-center text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
-            No upcoming appointments
+          <div className="mt-4 flex flex-1 flex-col items-center justify-center px-4 py-8 text-center">
+            <span className="flex size-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
+              <CalendarDaysIcon className="size-7" />
+            </span>
+            <p className="mt-4 text-sm font-medium text-zinc-950 dark:text-white">No upcoming appointments</p>
+            <p className="mt-1 text-sm text-zinc-500">You don&apos;t have any scheduled appointments.</p>
+            <Button href="/bookings" color="brand" className="mt-4">
+              View all bookings
+            </Button>
           </div>
         )}
     </section>
@@ -513,6 +617,7 @@ function DashboardPageInner() {
 
   const [draftStart, setDraftStart] = useState(range?.start ?? '')
   const [draftEnd, setDraftEnd] = useState(range?.end ?? '')
+  const [rangeOpen, setRangeOpen] = useState(false)
   useEffect(() => {
     setDraftStart(range?.start ?? '')
     setDraftEnd(range?.end ?? '')
@@ -543,90 +648,128 @@ function DashboardPageInner() {
 
   const businessName = organization?.name || 'Dashboard'
 
+  const windowKind: ChartWindow = !range
+    ? 'all'
+    : range.start === presets.week.start && range.end === presets.week.end
+      ? 'week'
+      : range.start === presets.month.start && range.end === presets.month.end
+        ? 'month'
+        : range.start === presets.year.start && range.end === presets.year.end
+          ? 'year'
+          : 'custom'
+
+  function formatRangeWithYear(start: string, end: string) {
+    const fmt = (iso: string) =>
+      new Date(`${iso}T12:00:00Z`).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        timeZone: 'UTC',
+      })
+    return `${fmt(start)} – ${fmt(end)}`
+  }
+
   return (
     <PageShell>
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
           <p className="text-sm text-zinc-500">Welcome back{user?.firstName ? `, ${user.firstName}` : ''}</p>
-          <h1 className="mt-0.5 text-3xl font-semibold tracking-tight text-zinc-950 dark:text-white">{businessName}</h1>
+          <h1 className="mt-0.5 truncate text-3xl font-semibold tracking-tight text-zinc-950 dark:text-white">{businessName}</h1>
           <p className="mt-1 text-sm text-zinc-500">Here is your booking activity at a glance.</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex shrink-0 flex-nowrap items-center gap-2">
+          <div className="inline-flex rounded-xl bg-white p-1 shadow-sm ring-1 ring-zinc-200">
+            {(
+              [
+                ['week', 'Week'],
+                ['month', 'Month'],
+                ['year', 'Year'],
+              ] as const
+            ).map(([kind, label]) => {
+              const selected = range?.start === presets[kind].start && range?.end === presets[kind].end
+              return (
+                <button
+                  key={kind}
+                  type="button"
+                  onClick={() => openRange(presets[kind].start, presets[kind].end)}
+                  className={clsx(
+                    'rounded-lg px-3 py-1.5 text-sm font-semibold',
+                    selected ? 'bg-emerald-800 text-white' : 'text-zinc-600 hover:bg-zinc-100',
+                  )}
+                >
+                  {label}
+                </button>
+              )
+            })}
+          </div>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                setDraftStart(range?.start ?? '')
+                setDraftEnd(range?.end ?? '')
+                setRangeOpen((open) => !open)
+              }}
+              className="inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-sm text-zinc-600 shadow-sm ring-1 ring-zinc-200"
+            >
+              <CalendarDaysIcon className="size-4 shrink-0 text-zinc-400" />
+              <span className="whitespace-nowrap">{range ? formatRangeWithYear(range.start, range.end) : 'All time'}</span>
+              <ChevronDownIcon className="size-4 shrink-0 text-zinc-400" />
+            </button>
+            {rangeOpen ? (
+              <div className="absolute right-0 z-20 mt-2 w-64 rounded-xl bg-white p-3 shadow-lg ring-1 ring-zinc-200">
+                <label className="block text-xs font-medium text-zinc-500">
+                  Start date
+                  <Input
+                    type="date"
+                    className="mt-1"
+                    value={draftStart}
+                    onChange={(event) => setDraftStart(event.target.value)}
+                  />
+                </label>
+                <label className="mt-2 block text-xs font-medium text-zinc-500">
+                  End date
+                  <Input
+                    type="date"
+                    className="mt-1"
+                    value={draftEnd}
+                    onChange={(event) => setDraftEnd(event.target.value)}
+                  />
+                </label>
+                <div className="mt-3 flex gap-2">
+                  <Button
+                    color="brand"
+                    className="flex-1"
+                    onClick={() => {
+                      openRange(draftStart, draftEnd)
+                      setRangeOpen(false)
+                    }}
+                  >
+                    Apply
+                  </Button>
+                  {range ? (
+                    <Button
+                      outline
+                      onClick={() => {
+                        router.replace('/')
+                        setRangeOpen(false)
+                      }}
+                    >
+                      Clear
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+          </div>
           <Button href="/conversations" outline>
             Conversations
           </Button>
           <Button href="/bookings" color="brand">
             View bookings
           </Button>
+          <NotificationBell />
         </div>
-      </div>
-
-      <div className={`${dashCardClass} flex flex-col gap-3 p-4 sm:flex-row sm:flex-wrap sm:items-end`}>
-        <div className="flex flex-wrap gap-2">
-          {(
-            [
-              ['week', 'Week'],
-              ['month', 'Month'],
-              ['year', 'Year'],
-            ] as const
-          ).map(([kind, label]) => {
-            const selected =
-              range?.start === presets[kind].start && range?.end === presets[kind].end
-            return (
-              <button
-                key={kind}
-                type="button"
-                onClick={() => openRange(presets[kind].start, presets[kind].end)}
-                className={clsx(
-                  'rounded-lg px-3 py-1.5 text-sm font-semibold',
-                  selected
-                    ? 'bg-brand-500 text-white'
-                    : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700',
-                )}
-              >
-                {label}
-              </button>
-            )
-          })}
-        </div>
-        <label className="flex flex-col gap-1 text-xs font-medium text-zinc-500">
-          Start date
-          <Input
-            type="date"
-            value={draftStart}
-            onChange={(event) => {
-              const next = event.target.value
-              setDraftStart(next)
-              openRange(next, draftEnd)
-            }}
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-xs font-medium text-zinc-500">
-          End date
-          <Input
-            type="date"
-            value={draftEnd}
-            onChange={(event) => {
-              const next = event.target.value
-              setDraftEnd(next)
-              openRange(draftStart, next)
-            }}
-          />
-        </label>
-        {range && (
-          <button
-            type="button"
-            onClick={() => router.replace('/')}
-            className="rounded-lg px-3 py-1.5 text-sm font-semibold text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
-          >
-            Clear
-          </button>
-        )}
-        {range && (
-          <p className="text-sm text-zinc-500 dark:text-zinc-400 sm:ml-auto">
-            {formatRangeLabel(range.start, range.end)}
-          </p>
-        )}
       </div>
 
       {/* KPI cards */}
@@ -645,21 +788,33 @@ function DashboardPageInner() {
               value={statsView?.total_bookings ?? 0}
               hint={`${statsView?.confirmed_bookings ?? 0} confirmed`}
               icon={<CalendarDaysIcon className="size-5" />}
+              tone="bg-blue-50 text-blue-600"
+              stroke="#2563eb"
+              series={statsView?.daily?.map((point) => point.count)}
+              delta={percentChange(statsView?.total_bookings ?? 0, statsView?.previous_total_bookings)}
             />
             <KpiCard
               label="Completed"
               value={statsView?.completed_bookings ?? 0}
               hint={`${statsView?.cancelled_bookings ?? 0} cancelled`}
               icon={<CheckCircleIcon className="size-5" />}
+              tone="bg-emerald-50 text-emerald-600"
+              stroke="#059669"
+              series={statsView?.completed_daily?.map((point) => point.count)}
+              delta={percentChange(statsView?.completed_bookings ?? 0, statsView?.previous_completed_bookings)}
             />
             <KpiCard
               label="Upcoming"
               value={statsView?.upcoming_bookings ?? 0}
               hint="Scheduled ahead"
               icon={<ClockIcon className="size-5" />}
+              tone="bg-violet-50 text-violet-600"
+              stroke="#7c3aed"
+              series={statsView?.upcoming_daily?.map((point) => point.count)}
+              delta={percentChange(statsView?.upcoming_bookings ?? 0, statsView?.previous_upcoming_bookings)}
             />
             <KpiCard
-              label={range ? 'Conversations' : 'Active conversations'}
+              label="Active conversations"
               value={statsView?.active_conversations ?? 0}
               hint={
                 range
@@ -667,6 +822,10 @@ function DashboardPageInner() {
                   : `${statsView?.total_channel_accounts ?? 0} channels`
               }
               icon={<ChatBubbleLeftRightIcon className="size-5" />}
+              tone="bg-orange-50 text-orange-600"
+              stroke="#ea580c"
+              series={statsView?.conversation_daily?.map((point) => point.count)}
+              delta={percentChange(statsView?.active_conversations ?? 0, statsView?.previous_active_conversations)}
             />
           </>
         )}
@@ -684,9 +843,15 @@ function DashboardPageInner() {
                 ? seriesFromDaily(statsView.daily, tenantTz)
                 : null
             }
-            subtitle={
-              range ? `New bookings · ${formatRangeLabel(range.start, range.end)}` : undefined
-            }
+            windowKind={windowKind}
+            customLabel={range ? formatRangeLabel(range.start, range.end) : undefined}
+            onPickWindow={(kind) => {
+              if (kind === 'all') {
+                router.replace('/')
+                return
+              }
+              openRange(presets[kind].start, presets[kind].end)
+            }}
           />
         </div>
         <div>
