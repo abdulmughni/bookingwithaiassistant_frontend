@@ -862,6 +862,40 @@ export interface AdminPlanChangeRequest {
 }
 
 /** Platform-wide stats for the admin console Overview page. */
+export interface DashboardMetric {
+  value: number
+  previous: number
+  delta_pct: number | null
+  series: number[]
+}
+
+export interface DashboardActivityPoint {
+  date: string
+  bookings: number
+  calls: number
+  messages: number
+}
+
+export interface AdminDashboard {
+  start: string
+  end: string
+  funnel_start: string
+  funnel_end: string
+  chart_start: string
+  chart_end: string
+  clients: DashboardMetric
+  active: DashboardMetric
+  pending: DashboardMetric
+  suspended: DashboardMetric
+  bookings: DashboardMetric
+  conversations: DashboardMetric
+  calls: DashboardMetric
+  messages: DashboardMetric
+  recovered: DashboardMetric
+  funnel: AdminFunnel
+  activity: DashboardActivityPoint[]
+}
+
 export interface AdminOverview {
   tenants_total: number
   tenants_active: number

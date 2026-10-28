@@ -521,6 +521,27 @@ export const api = {
     me: (token: string) => request<import('./types').AdminMe>('/api/admin/me', { token }),
     overview: (token: string) =>
       request<import('./types').AdminOverview>('/api/admin/overview', { token }),
+    overviewDashboard: (
+      token: string,
+      query: {
+        start: string
+        end: string
+        funnelStart: string
+        funnelEnd: string
+        chartStart: string
+        chartEnd: string
+      },
+    ) => {
+      const qs = new URLSearchParams({
+        start: query.start,
+        end: query.end,
+        funnel_start: query.funnelStart,
+        funnel_end: query.funnelEnd,
+        chart_start: query.chartStart,
+        chart_end: query.chartEnd,
+      })
+      return request<import('./types').AdminDashboard>(`/api/admin/overview/dashboard?${qs}`, { token })
+    },
     agencyActivity: (token: string, range: 7 | 30 | { start: string; end: string }) => {
       const qs =
         typeof range === 'number'
