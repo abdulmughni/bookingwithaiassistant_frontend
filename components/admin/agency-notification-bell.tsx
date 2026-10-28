@@ -90,10 +90,10 @@ export function AgencyNotificationBell() {
   return (
     <Headless.Popover className="relative">
       <Headless.PopoverButton
-        className="relative flex size-10 items-center justify-center rounded-full text-zinc-600 transition hover:bg-zinc-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 dark:text-zinc-300 dark:hover:bg-zinc-800"
+        className="relative flex size-10 items-center justify-center rounded-xl bg-zinc-50 text-zinc-600 shadow-sm ring-1 ring-zinc-200 transition hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 dark:bg-zinc-800 dark:text-zinc-200 dark:ring-zinc-700 dark:hover:bg-zinc-700"
         aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
       >
-        <BellIcon className="size-6" aria-hidden="true" />
+        <BellIcon className="size-5" aria-hidden="true" />
         {unreadCount > 0 ? (
           <span className="absolute -right-0.5 -top-0.5 flex min-w-4.5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-4.5 text-white ring-2 ring-white dark:ring-zinc-950">
             {unreadCount > 99 ? '99+' : unreadCount}

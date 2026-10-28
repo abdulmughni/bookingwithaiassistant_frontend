@@ -76,6 +76,8 @@ export interface TenantStats {
   completed_daily?: { date: string; count: number }[]
   conversation_daily?: { date: string; count: number }[]
   upcoming_daily?: { date: string; count: number }[]
+  call_daily?: { date: string; count: number }[]
+  message_daily?: { date: string; count: number }[]
   previous_total_bookings?: number | null
   previous_completed_bookings?: number | null
   previous_upcoming_bookings?: number | null
@@ -855,6 +857,11 @@ export interface AdminFunnel {
   booking_conversion_pct: number | null
   company_avg_conversion_pct: number | null
   period: string
+  /** Overview funnel only: real booking counts. Other funnels omit these. */
+  total_bookings?: number | null
+  message_bookings?: number | null
+  call_bookings?: number | null
+  completed_bookings?: number | null
 }
 
 export interface AdminPlanChangeRequest {

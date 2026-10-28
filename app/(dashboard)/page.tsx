@@ -15,15 +15,7 @@ import {
   ChatBubbleLeftRightIcon,
 } from '@heroicons/react/20/solid'
 import { ChevronDownIcon } from '@heroicons/react/16/solid'
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts'
+import { ActivityBars } from '@/components/activity-bars'
 import { Button } from '@/components/button'
 import { PageShell, dashCardClass } from '@/components/dashboard-ui'
 import { Input } from '@/components/input'
@@ -56,30 +48,6 @@ function dayKeyInTz(d: Date, timeZone: string): string {
   }).formatToParts(d)
   const get = (t: string) => parts.find((p) => p.type === t)?.value ?? '00'
   return `${get('year')}-${get('month')}-${get('day')}`
-}
-
-const WEEKDAY = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
-
-/** Last 7 calendar days (oldest → today) with new-booking counts. */
-function useWeeklySeries(bookings: Booking[] | null, tz: string) {
-  return useMemo(() => {
-    const days: { key: string; label: string; isToday: boolean; count: number }[] = []
-    const today = new Date()
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(today)
-      d.setDate(today.getDate() - i)
-      const key = dayKeyInTz(d, tz)
-      days.push({ key, label: WEEKDAY[d.getDay()], isToday: i === 0, count: 0 })
-    }
-    const index = new Map(days.map((d, i) => [d.key, i]))
-    for (const b of bookings ?? []) {
-      const key = dayKeyInTz(new Date(b.created_at), tz)
-      const i = index.get(key)
-      if (i !== undefined) days[i].count += 1
-    }
-    const max = Math.max(1, ...days.map((d) => d.count))
-    return { days, max, total: days.reduce((s, d) => s + d.count, 0) }
-  }, [bookings, tz])
 }
 
 // ---------------------------------------------------------------------------
@@ -130,7 +98,7 @@ function KpiCard({
   delta?: number | null
 }) {
   return (
-    <article className={`${dashCardClass} p-4`}>
+    <article className={`${dashCardClass} h-full p-4`}>
       <div className="flex items-center gap-3">
         <span className={`flex size-11 shrink-0 items-center justify-center rounded-full ${tone}`}>{icon}</span>
         <div className="min-w-0 flex-1">
@@ -157,42 +125,6 @@ function KpiCard({
 // Weekly bar chart (dependency-free)
 // ---------------------------------------------------------------------------
 
-function seriesFromDaily(
-  daily: { date: string; count: number }[],
-  tz: string,
-) {
-  const today = dayKeyInTz(new Date(), tz)
-  if (daily.length > 45) {
-    const months = new Map<string, { key: string; label: string; isToday: boolean; count: number }>()
-    for (const row of daily) {
-      const month = row.date.slice(0, 7)
-      const label = new Date(`${row.date}T12:00:00Z`).toLocaleDateString('en-US', {
-        month: 'short',
-        timeZone: 'UTC',
-      })
-      const current = months.get(month) ?? {
-        key: month,
-        label,
-        isToday: today.startsWith(month),
-        count: 0,
-      }
-      current.count += row.count
-      months.set(month, current)
-    }
-    return [...months.values()]
-  }
-  return daily.map((row) => ({
-    key: row.date,
-    label: new Date(`${row.date}T12:00:00Z`).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      timeZone: 'UTC',
-    }),
-    isToday: row.date === today,
-    count: row.count,
-  }))
-}
-
 type ChartWindow = 'week' | 'month' | 'year' | 'custom' | 'all'
 
 function chartCaption(kind: ChartWindow) {
@@ -209,106 +141,24 @@ function chartChipLabel(kind: ChartWindow, custom?: string) {
   return 'Last 7 days'
 }
 
-function WeeklyBarChart({
-  bookings,
-  tz,
-  loading,
-  series,
-  windowKind,
-  customLabel,
-  onPickWindow,
-}: {
-  bookings: Booking[] | null
-  tz: string
-  loading: boolean
-  series?: { key: string; label: string; isToday: boolean; count: number }[] | null
-  windowKind: ChartWindow
-  customLabel?: string
-  onPickWindow: (kind: 'week' | 'month' | 'year' | 'all') => void
-}) {
-  const weekly = useWeeklySeries(bookings, tz)
-  const days = series ?? weekly.days
-  const max = series ? Math.max(1, ...series.map((d) => d.count)) : weekly.max
-
-  const chart = days.map((day) => ({ label: day.label, bookings: day.count }))
-  const tickEvery = chart.length > 16 ? Math.ceil(chart.length / 8) - 1 : 0
-
-  return (
-    <section className={`${dashCardClass} flex h-full flex-col p-5`}>
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-base font-semibold text-zinc-950 dark:text-white">Booking activity</h2>
-          <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">
-            New bookings · {chartCaption(windowKind)}
-          </p>
-        </div>
-        <Menu as="div" className="relative shrink-0">
-          <MenuButton className="inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-600 ring-1 ring-zinc-200 hover:bg-zinc-50 dark:bg-zinc-900 dark:text-zinc-300 dark:ring-zinc-700">
-            {chartChipLabel(windowKind, customLabel)}
-            <ChevronDownIcon className="size-3.5 text-zinc-400" />
-          </MenuButton>
-          <MenuItems
-            anchor="bottom end"
-            className="z-20 mt-1 w-40 rounded-xl bg-white p-1 shadow-lg ring-1 ring-zinc-200 [--anchor-gap:6px] focus:outline-none dark:bg-zinc-900 dark:ring-zinc-700"
-          >
-            {(
-              [
-                ['week', 'Last 7 days'],
-                ['month', 'Last 30 days'],
-                ['year', 'This year'],
-                ['all', 'All time'],
-              ] as const
-            ).map(([kind, label]) => (
-              <MenuItem key={kind}>
-                <button
-                  type="button"
-                  onClick={() => onPickWindow(kind)}
-                  className="block w-full rounded-lg px-3 py-2 text-left text-sm text-zinc-700 data-focus:bg-zinc-100 dark:text-zinc-200 dark:data-focus:bg-zinc-800"
-                >
-                  {label}
-                </button>
-              </MenuItem>
-            ))}
-          </MenuItems>
-        </Menu>
-      </div>
-      {loading ? (
-        <div className="mt-4 h-72 animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-800" />
-      ) : (
-        <div className="mt-2 h-72 w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chart} barCategoryGap="38%" margin={{ top: 16, right: 8, left: -8, bottom: 0 }}>
-              <CartesianGrid stroke="#ececef" vertical={false} />
-              <XAxis
-                dataKey="label"
-                interval={tickEvery}
-                tick={{ fontSize: 11, fill: '#a1a1aa' }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <YAxis
-                allowDecimals={false}
-                domain={[0, Math.max(max, 1)]}
-                tick={{ fontSize: 11, fill: '#a1a1aa' }}
-                axisLine={false}
-                tickLine={false}
-                width={32}
-              />
-              <Tooltip
-                cursor={{ fill: 'rgba(37, 99, 235, 0.05)' }}
-                contentStyle={{
-                  borderRadius: 8,
-                  border: '1px solid #e4e4e7',
-                  fontSize: 12,
-                }}
-              />
-              <Bar dataKey="bookings" name="Bookings" fill="#2563eb" radius={[5, 5, 0, 0]} maxBarSize={18} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      )}
-    </section>
-  )
+function activityPoints(stats: TenantStats | null) {
+  const byDate = new Map<string, { bookings: number; calls: number; messages: number }>()
+  const add = (
+    rows: { date: string; count: number }[] | undefined,
+    key: 'bookings' | 'calls' | 'messages',
+  ) => {
+    for (const row of rows ?? []) {
+      const current = byDate.get(row.date) ?? { bookings: 0, calls: 0, messages: 0 }
+      current[key] = row.count
+      byDate.set(row.date, current)
+    }
+  }
+  add(stats?.daily, 'bookings')
+  add(stats?.call_daily, 'calls')
+  add(stats?.message_daily, 'messages')
+  return [...byDate.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([date, counts]) => ({ date, ...counts }))
 }
 
 // ---------------------------------------------------------------------------
@@ -332,7 +182,7 @@ function CompletionGauge({
   const dash = (pct / 100) * circumference
 
   return (
-    <section className={`${dashCardClass} flex h-full flex-col p-5`}>
+    <section className={`${dashCardClass} flex h-full min-h-full flex-col p-5`}>
         <h2 className="text-base font-semibold text-zinc-950 dark:text-white">Completion rate</h2>
 
         {loading ? (
@@ -634,9 +484,12 @@ function DashboardPageInner() {
     (token) => api.bookings.upcoming(token),
   )
 
-  const { data: allBookings, loading: allLoading } = useApiData<Booking[]>(
-    (token) => api.bookings.list(token, { limit: 200 }),
+  const chartStatsQuery = useApiData<TenantStats>(
+    (token) => (range ? Promise.resolve(null as unknown as TenantStats) : api.tenants.stats(token, presets.week)),
+    [range?.start ?? '', range?.end ?? '', presets.week.start, presets.week.end],
   )
+  const chartStats = range ? statsView : chartStatsQuery.data
+  const chartBusy = range ? statsBusy : chartStatsQuery.loading
 
   const sortedUpcoming = useMemo(() => {
     return [...(upcoming ?? [])].sort((a, b) => {
@@ -773,7 +626,7 @@ function DashboardPageInner() {
       </div>
 
       {/* KPI cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {statsBusy ? (
           Array.from({ length: 4 }).map((_, i) => (
             <div
@@ -832,43 +685,67 @@ function DashboardPageInner() {
       </div>
 
       {/* Chart + gauge */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          <WeeklyBarChart
-            bookings={allBookings}
-            tz={tenantTz}
-            loading={range ? statsBusy : allLoading}
-            series={
-              range && statsView?.daily
-                ? seriesFromDaily(statsView.daily, tenantTz)
-                : null
+      <div className="grid grid-cols-1 items-stretch gap-4 lg:grid-cols-3">
+        <div className="h-full lg:col-span-2">
+          <ActivityBars
+            title="Booking activity"
+            subtitle={`New bookings · ${chartCaption(windowKind)}`}
+            points={activityPoints(chartStats)}
+            loading={chartBusy}
+            menu={
+              <Menu as="div" className="relative shrink-0">
+                <MenuButton className="inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-600 ring-1 ring-zinc-200 hover:bg-zinc-50 dark:bg-zinc-900 dark:text-zinc-300 dark:ring-zinc-700">
+                  {chartChipLabel(windowKind, range ? formatRangeLabel(range.start, range.end) : undefined)}
+                  <ChevronDownIcon className="size-3.5 text-zinc-400" />
+                </MenuButton>
+                <MenuItems
+                  anchor="bottom end"
+                  className="z-20 w-40 rounded-xl bg-white p-1 shadow-lg ring-1 ring-zinc-200 [--anchor-gap:6px] focus:outline-none dark:bg-zinc-900 dark:ring-zinc-700"
+                >
+                  {(
+                    [
+                      ['week', 'Last 7 days'],
+                      ['month', 'Last 30 days'],
+                      ['year', 'This year'],
+                      ['all', 'All time'],
+                    ] as const
+                  ).map(([kind, label]) => (
+                    <MenuItem key={kind}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (kind === 'all') {
+                            router.replace('/')
+                            return
+                          }
+                          openRange(presets[kind].start, presets[kind].end)
+                        }}
+                        className="block w-full rounded-lg px-3 py-2 text-left text-sm text-zinc-700 data-focus:bg-zinc-100 dark:text-zinc-200 dark:data-focus:bg-zinc-800"
+                      >
+                        {label}
+                      </button>
+                    </MenuItem>
+                  ))}
+                </MenuItems>
+              </Menu>
             }
-            windowKind={windowKind}
-            customLabel={range ? formatRangeLabel(range.start, range.end) : undefined}
-            onPickWindow={(kind) => {
-              if (kind === 'all') {
-                router.replace('/')
-                return
-              }
-              openRange(presets[kind].start, presets[kind].end)
-            }}
           />
         </div>
-        <div>
+        <div className="h-full">
           <CompletionGauge stats={statsView} loading={statsBusy} />
         </div>
       </div>
 
       {/* Next appointment + upcoming list */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div>
+      <div className="grid grid-cols-1 items-stretch gap-4 lg:grid-cols-3">
+        <div className="h-full">
           <NextAppointmentCard
             booking={sortedUpcoming[0] ?? null}
             tz={tenantTz}
             loading={upcomingLoading}
           />
         </div>
-        <div className="lg:col-span-2">
+        <div className="h-full lg:col-span-2">
           <UpcomingList
             bookings={sortedUpcoming}
             tz={tenantTz}
