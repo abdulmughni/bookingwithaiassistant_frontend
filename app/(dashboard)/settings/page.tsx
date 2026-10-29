@@ -166,7 +166,8 @@ function snapshotFromTenant(
       stuck_turns: Number((er as { stuck_turns?: number }).stuck_turns ?? 3),
       low_confidence: Number((er as { low_confidence?: number }).low_confidence ?? 0.65),
     },
-    crm_type: allowedCrmValues.has(wantCrm) ? wantCrm : 'none',
+    crm_type:
+      wantCrm === 'google_calendar' || allowedCrmValues.has(wantCrm) ? wantCrm : 'none',
     confidence_threshold: Number(tenant.confidence_threshold ?? 0.75),
     max_turns: Number(tenant.max_turns ?? 12),
   }
@@ -385,7 +386,8 @@ export function TenantConfigTab({
     setCrmType(snap.crm_type)
     setConfidenceThreshold(String(snap.confidence_threshold))
     setMaxTurns(String(snap.max_turns))
-  }, [tenant, allowedCrmValues])
+    // Keep a Calendar choice the user just picked even if the saved tenant is still none.
+  }, [tenant])
 
   // Load the curated IANA list once. The dropdown is the only way to set the
   // tenant timezone — values saved on the tenant are pure IANA strings.
@@ -771,7 +773,13 @@ export function TenantConfigTab({
                 ? 'Google Calendar is connected.'
                 : 'Select Google Calendar, then connect your Google account on the Google Calendar tab.'}
             </Description>
-            <Select value={crmType} onChange={(e) => setCrmType(e.target.value)}>
+            <Select
+              value={crmType}
+              onChange={(e) => {
+                const next = e.target.value
+                setCrmType(next)
+              }}
+            >
               {crmSelectOptions.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
             </Select>
           </Field>
