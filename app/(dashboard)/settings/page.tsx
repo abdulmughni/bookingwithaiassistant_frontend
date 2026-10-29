@@ -62,6 +62,7 @@ const CUSTOMER_EDITABLE_KEYS = [
   'booking_buffers',
   'escalation_rules',
   'timezone',
+  'crm_type',
 ] as const satisfies readonly (keyof TenantFormSnapshot)[]
 
 type TenantFormSnapshot = {
@@ -239,16 +240,28 @@ export function TenantConfigTab({
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
 
+  const { data: googleStatus } = useApiData<{ connected: boolean }>(
+    (token) =>
+      isCustomer
+        ? api.oauth.googleCalendarStatus(token)
+        : Promise.resolve({ connected: false }),
+    [isCustomer],
+  )
+  const googleConnected = Boolean(googleStatus?.connected)
+
   const crmSelectOptions = useMemo(() => {
     const opts: { value: string; label: string }[] = [{ value: 'none', label: 'None' }]
-    if (credentials.some((c) => c.integration_type === 'jobber' && c.exists)) {
+    if (!isCustomer && credentials.some((c) => c.integration_type === 'jobber' && c.exists)) {
       opts.push({ value: 'jobber', label: 'Jobber' })
     }
-    if (credentials.some((c) => c.integration_type === 'hubspot' && c.exists)) {
+    if (!isCustomer && credentials.some((c) => c.integration_type === 'hubspot' && c.exists)) {
       opts.push({ value: 'hubspot', label: 'HubSpot' })
     }
+    if (googleConnected) {
+      opts.push({ value: 'google_calendar', label: 'Google Calendar' })
+    }
     return opts
-  }, [credentials])
+  }, [credentials, googleConnected, isCustomer])
 
   const allowedCrmValues = useMemo(
     () => new Set(crmSelectOptions.map((o) => o.value)),
@@ -484,30 +497,50 @@ export function TenantConfigTab({
             })()
           : []
 
-      await (saveSettings ?? api.tenants.update)(token, {
-        name: name.trim(),
-        industry_type: industryType.trim(),
-        offered_trades,
-        service_types: serviceTypes,
-        required_fields: requiredFields,
-        optional_fields: optionalFields,
-        service_areas: serviceAreas,
-        service_area_zips: serviceAreaZips,
-        payment_methods: paymentMethods,
-        waive_diagnostic_fee: waiveDiagnosticFee,
-        serves_commercial: servesCommercial,
-        timezone: timezone.trim() || 'UTC',
-        working_hours: workingHours as Record<string, unknown>,
-        booking_buffers: {
-          minimum_minutes: minM,
-          slot_duration_minutes: slotM,
-          max_simultaneous_bookings: maxSim,
-        },
-        escalation_rules: { stuck_turns: stuck, low_confidence: lowConf },
-        crm_type: crmType || 'none',
-        confidence_threshold: ct,
-        max_turns: mt,
-      })
+      const payload: Record<string, unknown> = isCustomer
+        ? {
+            name: name.trim(),
+            service_types: serviceTypes,
+            required_fields: requiredFields,
+            optional_fields: optionalFields,
+            service_areas: serviceAreas,
+            service_area_zips: serviceAreaZips,
+            payment_methods: paymentMethods,
+            timezone: timezone.trim() || 'UTC',
+            working_hours: workingHours as Record<string, unknown>,
+            booking_buffers: {
+              minimum_minutes: minM,
+              slot_duration_minutes: slotM,
+              max_simultaneous_bookings: maxSim,
+            },
+            escalation_rules: { stuck_turns: stuck, low_confidence: lowConf },
+            crm_type: crmType || 'none',
+          }
+        : {
+            name: name.trim(),
+            industry_type: industryType.trim(),
+            offered_trades,
+            service_types: serviceTypes,
+            required_fields: requiredFields,
+            optional_fields: optionalFields,
+            service_areas: serviceAreas,
+            service_area_zips: serviceAreaZips,
+            payment_methods: paymentMethods,
+            waive_diagnostic_fee: waiveDiagnosticFee,
+            serves_commercial: servesCommercial,
+            timezone: timezone.trim() || 'UTC',
+            working_hours: workingHours as Record<string, unknown>,
+            booking_buffers: {
+              minimum_minutes: minM,
+              slot_duration_minutes: slotM,
+              max_simultaneous_bookings: maxSim,
+            },
+            escalation_rules: { stuck_turns: stuck, low_confidence: lowConf },
+            crm_type: crmType || 'none',
+            confidence_threshold: ct,
+            max_turns: mt,
+          }
+      await (saveSettings ?? api.tenants.update)(token, payload)
       notifySuccess('Settings saved')
       setSaved(true)
       onSaved()
@@ -721,19 +754,23 @@ export function TenantConfigTab({
         </FieldGroup>
       </section>
 
-      {!isCustomer && (
-      <>
       <Divider />
 
       <section>
         <Subheading>Integrations</Subheading>
         <Text className="mb-4 text-sm text-zinc-500">
-          Choose your CRM for booking sync. Store OAuth keys on the <strong>Integrations</strong> page — not here.
+          {isCustomer
+            ? 'Choose Google Calendar after it is connected on the Google Calendar tab. One option at a time.'
+            : 'Choose your CRM for booking sync. Store OAuth keys on the Integrations page — not here.'}
         </Text>
         <FieldGroup>
           <Field>
             <Label>CRM provider</Label>
-            <Description>Only providers with stored credentials appear here.</Description>
+            <Description>
+              {googleConnected
+                ? 'Google Calendar is connected and can be selected here.'
+                : 'Connect Google Calendar first, then it will appear in this list.'}
+            </Description>
             <Select value={crmType} onChange={(e) => setCrmType(e.target.value)}>
               {crmSelectOptions.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
             </Select>
@@ -741,6 +778,8 @@ export function TenantConfigTab({
         </FieldGroup>
       </section>
 
+      {!isCustomer && (
+      <>
       <Divider />
 
       <section>
