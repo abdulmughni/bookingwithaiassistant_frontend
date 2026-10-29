@@ -250,18 +250,18 @@ export function TenantConfigTab({
   const googleConnected = Boolean(googleStatus?.connected)
 
   const crmSelectOptions = useMemo(() => {
-    const opts: { value: string; label: string }[] = [{ value: 'none', label: 'None' }]
+    const opts: { value: string; label: string }[] = [
+      { value: 'none', label: 'None' },
+      { value: 'google_calendar', label: 'Google Calendar' },
+    ]
     if (!isCustomer && credentials.some((c) => c.integration_type === 'jobber' && c.exists)) {
       opts.push({ value: 'jobber', label: 'Jobber' })
     }
     if (!isCustomer && credentials.some((c) => c.integration_type === 'hubspot' && c.exists)) {
       opts.push({ value: 'hubspot', label: 'HubSpot' })
     }
-    if (googleConnected) {
-      opts.push({ value: 'google_calendar', label: 'Google Calendar' })
-    }
     return opts
-  }, [credentials, googleConnected, isCustomer])
+  }, [credentials, isCustomer])
 
   const allowedCrmValues = useMemo(
     () => new Set(crmSelectOptions.map((o) => o.value)),
@@ -760,7 +760,7 @@ export function TenantConfigTab({
         <Subheading>Integrations</Subheading>
         <Text className="mb-4 text-sm text-zinc-500">
           {isCustomer
-            ? 'Choose Google Calendar after it is connected on the Google Calendar tab. One option at a time.'
+            ? 'Choose Google Calendar here, then connect it on the Google Calendar tab.'
             : 'Choose your CRM for booking sync. Store OAuth keys on the Integrations page — not here.'}
         </Text>
         <FieldGroup>
@@ -768,8 +768,8 @@ export function TenantConfigTab({
             <Label>CRM provider</Label>
             <Description>
               {googleConnected
-                ? 'Google Calendar is connected and can be selected here.'
-                : 'Connect Google Calendar first, then it will appear in this list.'}
+                ? 'Google Calendar is connected.'
+                : 'Select Google Calendar, then connect your Google account on the Google Calendar tab.'}
             </Description>
             <Select value={crmType} onChange={(e) => setCrmType(e.target.value)}>
               {crmSelectOptions.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
