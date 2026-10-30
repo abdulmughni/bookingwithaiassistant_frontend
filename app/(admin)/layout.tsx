@@ -219,9 +219,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <BrandTheme theme={isAgency ? (brand?.theme ?? CURRENT_THEME) : CURRENT_THEME} />
       <div
         className={
-          isAgency
-            ? 'agency-canvas min-h-full overflow-x-hidden bg-[radial-gradient(900px_280px_at_82%_-8%,rgba(196,181,253,0.38),transparent_60%),radial-gradient(720px_260px_at_100%_0%,rgba(191,219,254,0.5),transparent_55%)] px-4 py-6 sm:px-6 lg:px-8 lg:py-8'
-            : 'agency-canvas min-h-full bg-zinc-50/90 px-4 py-6 sm:px-6 lg:px-8 lg:py-8 dark:bg-zinc-950'
+          'min-h-full overflow-x-hidden bg-transparent px-4 py-6 sm:px-6 lg:px-8 lg:py-8'
         }
       >
         {children}

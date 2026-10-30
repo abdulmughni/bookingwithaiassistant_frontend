@@ -705,6 +705,10 @@ body {
 /* Agency palette. These classes do nothing until BrandTheme sets data-agency-theme. */
 html[data-agency-theme] .agency-canvas {
   background-color: var(--brand-page) !important;
+  background-image:
+    radial-gradient(1100px 520px at 82% -12%, color-mix(in srgb, var(--brand-soft) 58%, transparent), transparent 62%),
+    radial-gradient(860px 460px at 0% 8%, color-mix(in srgb, var(--brand-primary) 28%, transparent), transparent 58%) !important;
+  background-attachment: fixed;
   color: var(--brand-text);
 }
 html[data-agency-theme] .agency-soft {
@@ -823,6 +827,22 @@ html.dark .text-rose-500 { color: #fda4af !important; }
   background-color: rgba(113, 113, 122, 0.32);
 }
 
+.scroll-hide {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scroll-hide::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+html[data-agency-theme] {
+  --brand-bar-1: var(--brand-primary);
+  --brand-bar-2: color-mix(in srgb, var(--brand-accent) 72%, var(--brand-primary));
+  --brand-bar-3: color-mix(in srgb, var(--brand-soft) 58%, var(--brand-primary));
+}
+
 /* Saved brand palette drives chrome on every screen: buttons, links, cards, and type. */
 html[data-agency-theme] {
   --color-brand-50: color-mix(in srgb, var(--brand-primary) 12%, white);
@@ -915,14 +935,20 @@ html.dark[data-agency-theme] {
   --color-brand-100: color-mix(in srgb, var(--brand-primary) 32%, #18181b);
   --color-brand-200: color-mix(in srgb, var(--brand-primary) 42%, #18181b);
 }
-html.dark[data-agency-theme] .agency-canvas,
 html.dark[data-agency-theme] .agency-soft,
 html.dark[data-agency-theme] .bg-zinc-50,
 html.dark[data-agency-theme] .bg-zinc-50\/70,
 html.dark[data-agency-theme] .bg-zinc-50\/80,
 html.dark[data-agency-theme] .bg-zinc-50\/90 {
   background-color: color-mix(in srgb, var(--brand-page) 20%, #09090b) !important;
-  background-image: none !important;
+  color: #f4f4f5;
+}
+html.dark[data-agency-theme] .agency-canvas {
+  background-color: color-mix(in srgb, var(--brand-page) 72%, #050608) !important;
+  background-image:
+    radial-gradient(1100px 520px at 82% -12%, color-mix(in srgb, var(--brand-primary) 34%, transparent), transparent 62%),
+    radial-gradient(860px 460px at 0% 8%, color-mix(in srgb, var(--brand-accent) 28%, transparent), transparent 58%) !important;
+  background-attachment: fixed;
   color: #f4f4f5;
 }
 html.dark[data-agency-theme] .agency-surface,

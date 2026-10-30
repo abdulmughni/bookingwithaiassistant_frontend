@@ -1,7 +1,7 @@
 'use client'
 
 import clsx from 'clsx'
-import type { ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { ChevronUpIcon } from '@heroicons/react/20/solid'
 import {
   Bar,
@@ -95,8 +95,9 @@ export function ActivityBars({
   )
   const data = bucket(points)
   const tickEvery = data.length > 16 ? Math.ceil(data.length / 8) - 1 : 0
-  const series = variant === 'premium' ? PREMIUM_SERIES : SERIES
-  const barSize = variant === 'premium' ? 15 : 16
+  const themeBars = useThemeBars()
+  const series = variant === 'premium' ? themeBars : SERIES
+  const barSize = variant === 'premium' ? 28 : 16
 
   return (
     <section className={`${dashCardClass} flex h-full flex-col rounded-[18px] p-5`}>
@@ -125,19 +126,19 @@ export function ActivityBars({
       </div>
       <div
         className={clsx(
-          'grid motion-safe:transition-[grid-template-rows,opacity] motion-safe:duration-500 motion-safe:ease-[cubic-bezier(0.22,1,0.36,1)]',
-          minimized ? 'grid-rows-[0fr] opacity-0' : 'mt-1 grid-rows-[1fr] opacity-100',
+          'grid min-h-0 motion-safe:transition-[grid-template-rows,opacity] motion-safe:duration-500 motion-safe:ease-[cubic-bezier(0.22,1,0.36,1)]',
+          minimized ? 'grid-rows-[0fr] opacity-0' : 'mt-1 min-h-0 flex-1 grid-rows-[1fr] opacity-100',
         )}
       >
-        <div className="overflow-hidden">
+        <div className="flex min-h-0 flex-col overflow-hidden">
       {loading ? (
-        <div className={`mt-4 animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-800 ${variant === 'premium' ? 'h-52' : 'h-72'}`} />
+        <div className={`mt-4 animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-800 ${variant === 'premium' ? 'min-h-48 flex-1' : 'h-72'}`} />
       ) : (
-        <div className={`mt-2 w-full min-w-0 ${variant === 'premium' ? 'h-52' : 'h-72'}`}>
+        <div className={`mt-2 w-full min-w-0 ${variant === 'premium' ? 'min-h-48 flex-1' : 'h-72'}`}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={data}
-              barCategoryGap={variant === 'premium' ? '46%' : '42%'}
+              barCategoryGap={variant === 'premium' ? '18%' : '42%'}
               margin={{ top: 8, right: 8, left: -12, bottom: 0 }}
             >
               <CartesianGrid stroke="#eef0f2" vertical={false} />
@@ -171,6 +172,37 @@ export function ActivityBars({
       </div>
     </section>
   )
+}
+
+function useThemeBars() {
+  const [colors, setColors] = useState<{ key: 'bookings' | 'calls' | 'messages'; name: string; fill: string }[]>([...PREMIUM_SERIES])
+
+  useEffect(() => {
+    const read = () => {
+      const styles = getComputedStyle(document.documentElement)
+      const one = styles.getPropertyValue('--brand-bar-1').trim()
+      const two = styles.getPropertyValue('--brand-bar-2').trim()
+      const three = styles.getPropertyValue('--brand-bar-3').trim()
+      if (!one || !two || !three) return
+      setColors([
+        { key: 'bookings', name: 'Bookings', fill: one },
+        { key: 'calls', name: 'Calls', fill: two },
+        { key: 'messages', name: 'Messages', fill: three },
+      ])
+    }
+    read()
+    const observer = new MutationObserver(read)
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['style', 'class'] })
+    window.addEventListener('agency-brand-changed', read)
+    window.addEventListener('color-mode-changed', read)
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('agency-brand-changed', read)
+      window.removeEventListener('color-mode-changed', read)
+    }
+  }, [])
+
+  return colors
 }
 
 export function CollapseControl({

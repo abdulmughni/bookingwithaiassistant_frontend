@@ -85,6 +85,51 @@ export const BRAND_PRESETS: { id: string; name: string; colors: BrandThemeColors
       border: '#e2e6ec',
     },
   },
+  {
+    id: 'forest-depth',
+    name: 'Forest depth',
+    colors: {
+      page_background: '#051F20',
+      card_background: '#DAF1DE',
+      soft_background: '#8EB69B',
+      primary: '#235347',
+      accent: '#163832',
+      main_text: '#051F20',
+      subtext: '#235347',
+      button_text: '#DAF1DE',
+      border: '#8EB69B',
+    },
+  },
+  {
+    id: 'midnight-navy',
+    name: 'Midnight navy',
+    colors: {
+      page_background: '#06141B',
+      card_background: '#CCD0CF',
+      soft_background: '#9BA8AB',
+      primary: '#253745',
+      accent: '#11212D',
+      main_text: '#06141B',
+      subtext: '#4A5C6A',
+      button_text: '#CCD0CF',
+      border: '#9BA8AB',
+    },
+  },
+  {
+    id: 'dusty-mauve',
+    name: 'Dusty mauve',
+    colors: {
+      page_background: '#3E3239',
+      card_background: '#F7EFE7',
+      soft_background: '#E8D2C4',
+      primary: '#6B5560',
+      accent: '#3E3239',
+      main_text: '#3E3239',
+      subtext: '#6B5560',
+      button_text: '#F7EFE7',
+      border: '#C7A9A3',
+    },
+  },
 ]
 
 export const THEME_ROWS: { key: keyof BrandThemeColors; label: string }[] = [

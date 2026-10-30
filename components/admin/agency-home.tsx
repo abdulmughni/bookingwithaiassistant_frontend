@@ -469,7 +469,7 @@ export function AgencyHome() {
             placeholder="Search clients"
             onChange={setClientFind}
           />
-          <div className="agency-scroll mt-3 min-h-[16rem] flex-1 overflow-auto overscroll-contain scroll-smooth">
+          <div className="scroll-hide mt-3 max-h-[18.25rem] overflow-auto overscroll-contain">
           <table className="w-full min-w-[36rem] text-left text-sm">
             <thead className="sticky top-0 z-10 bg-white text-xs text-zinc-400">
               <tr>

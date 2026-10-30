@@ -70,7 +70,7 @@ export function SidebarLayout({
   return (
     <div
       className={clsx(
-        'agency-canvas relative isolate flex w-full bg-white max-lg:flex-col lg:bg-zinc-100 dark:bg-zinc-900 dark:lg:bg-zinc-950',
+        'agency-canvas relative isolate flex w-full max-lg:flex-col',
         contentViewportLocked
           ? 'h-dvh max-h-dvh min-h-0 overflow-hidden lg:flex-row'
           : 'min-h-svh lg:flex-row',
