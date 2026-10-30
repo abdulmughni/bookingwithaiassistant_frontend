@@ -12,18 +12,21 @@ import {
   CalendarDaysIcon,
   ChatBubbleLeftRightIcon,
   CheckCircleIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
   EnvelopeIcon,
   ExclamationTriangleIcon,
   MagnifyingGlassIcon,
   PhoneIcon,
   PlusIcon,
+  XMarkIcon,
   UsersIcon,
 } from '@heroicons/react/20/solid'
 import { ChevronDownIcon } from '@heroicons/react/16/solid'
 
 import { Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/react'
 
-import { ActivityBars } from '@/components/activity-bars'
+import { ActivityBars, CollapseControl } from '@/components/activity-bars'
 import { attentionReason } from '@/components/admin/agency-dashboard'
 import { AgencyNotificationBell } from '@/components/admin/agency-notification-bell'
 import { InviteCompanyDialog } from '@/components/admin/invite-company-dialog'
@@ -33,7 +36,7 @@ import { Button } from '@/components/button'
 import { PageShell, SkeletonBlock, dashCardClass } from '@/components/dashboard-ui'
 import { api } from '@/lib/api'
 import { agencyDemo, agencyDemoSeries, useAgencyDemo } from '@/lib/agency-dashboard-demo'
-import { useAgencyBrand, useApiData, useIsAdmin } from '@/lib/hooks'
+import { useApiData, useIsAdmin } from '@/lib/hooks'
 import type { AdminTenant, AgencyActivityEvent } from '@/lib/types'
 
 function timeAgo(iso: string): string {
@@ -61,34 +64,49 @@ function defaultRange() {
   return { start: localIso(start), end: localIso(end) }
 }
 
-function Sparkline({ values, color }: { values: number[]; color: string }) {
-  const width = 88
-  const height = 36
-  const gradientId = useId().replace(/:/g, '')
-  if (values.length < 2) {
-    return <span className="h-9 w-20 shrink-0" />
+function smoothLine(points: { x: number; y: number }[]) {
+  if (points.length === 0) return ''
+  let path = `M ${points[0].x} ${points[0].y}`
+  for (let index = 0; index < points.length - 1; index += 1) {
+    const previous = points[index - 1] ?? points[index]
+    const current = points[index]
+    const next = points[index + 1]
+    const after = points[index + 2] ?? next
+    const control1x = current.x + (next.x - previous.x) / 6
+    const control1y = current.y + (next.y - previous.y) / 6
+    const control2x = next.x - (after.x - current.x) / 6
+    const control2y = next.y - (after.y - current.y) / 6
+    path += ` C ${control1x} ${control1y}, ${control2x} ${control2y}, ${next.x} ${next.y}`
   }
+  return path
+}
+
+function Sparkline({ values, color, compact = false }: { values: number[]; color: string; compact?: boolean }) {
+  const width = 160
+  const height = 64
+  const gradientId = useId().replace(/:/g, '')
+  if (values.length < 2) return null
   const max = Math.max(...values, 1)
   const min = Math.min(...values, 0)
   const span = max - min || 1
   const step = width / (values.length - 1)
-  const coords = values.map((value, index) => {
-    const x = index * step
-    const y = height - 4 - ((value - min) / span) * (height - 10)
-    return `${x},${y}`
-  })
-  const line = coords.join(' ')
-  const area = `0,${height} ${line} ${width},${height}`
+  const coords = values.map((value, index) => ({
+    x: index * step,
+    y: height - 8 - ((value - min) / span) * (height - 18),
+  }))
+  const line = smoothLine(coords)
+  const area = `${line} L ${width} ${height} L 0 ${height} Z`
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="h-9 w-20 shrink-0" aria-hidden>
+    <svg viewBox={`0 0 ${width} ${height}`} className={compact ? 'h-8 w-24' : 'h-16 w-[58%] max-w-[11rem]'} preserveAspectRatio="none" aria-hidden>
       <defs>
         <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.35" />
+          <stop offset="0%" stopColor={color} stopOpacity="0.28" />
+          <stop offset="70%" stopColor={color} stopOpacity="0.08" />
           <stop offset="100%" stopColor={color} stopOpacity="0" />
         </linearGradient>
       </defs>
-      <polygon points={area} fill={`url(#${gradientId})`} />
-      <polyline fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" points={line} />
+      <path d={area} fill={`url(#${gradientId})`} />
+      <path d={line} fill="none" stroke={color} strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )
 }
@@ -110,6 +128,16 @@ function prettyRange(start: string, end: string) {
   return `${fmt(start)} – ${fmt(end)}`
 }
 
+function runningCount(createdAt: Array<string | null | undefined>, days: string[]) {
+  if (days.length < 2) return []
+  const stamps = createdAt.map((value) => (value || '').slice(0, 10)).filter(Boolean)
+  let count = stamps.filter((day) => day < days[0]).length
+  return days.map((day) => {
+    count += stamps.filter((stamp) => stamp === day).length
+    return count
+  })
+}
+
 function inRange(iso: string | null | undefined, start: string, end: string) {
   if (!iso) return false
   const day = iso.slice(0, 10)
@@ -125,9 +153,17 @@ export function AgencyHome() {
   const [query, setQuery] = useState('')
   const [chartMin, setChartMin] = useState(false)
   const [clientsMin, setClientsMin] = useState(false)
+  const [clientFind, setClientFind] = useState('')
+  const [clientPage, setClientPage] = useState(1)
+  const [signupFind, setSignupFind] = useState('')
+  const [signupPage, setSignupPage] = useState(1)
+  const [attentionFind, setAttentionFind] = useState('')
+  const [attentionPage, setAttentionPage] = useState(1)
+  const [activityFind, setActivityFind] = useState('')
+  const [activityPage, setActivityPage] = useState(1)
+  const welcomeName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || user?.fullName || ''
   const { enabled: demo, setDemo } = useAgencyDemo()
   const { tenantId, isAgencyStaff } = useIsAdmin()
-  const { brand } = useAgencyBrand(true)
   const clientsQuery = useApiData((token) => api.admin.listTenants(token), [])
   const activityQuery = useApiData(
     (token) => api.admin.agencyActivity(token, { start: range.start, end: range.end }),
@@ -140,7 +176,6 @@ export function AgencyHome() {
     for (const row of activityQuery.data?.clients ?? []) map.set(row.tenant_id, row)
     return map
   }, [activityQuery.data])
-  const agencyName = brand?.company_name || 'Your agency'
   const series = activityQuery.data?.series ?? []
 
   if (!demo && clientsQuery.loading) {
@@ -170,39 +205,31 @@ export function AgencyHome() {
   const topClients = [...clients]
     .filter((client) => !needle || client.name.toLowerCase().includes(needle))
     .sort((a, b) => (counts.get(b.id)?.bookings ?? 0) - (counts.get(a.id)?.bookings ?? 0))
-    .slice(0, 5)
   const signups = clients
     .filter((client) => !needle || client.name.toLowerCase().includes(needle))
     .filter((client) => inRange(client.created_at, range.start, range.end))
     .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
-    .slice(0, 5)
   const attention = clients
     .map((client) => ({ client, reason: attentionReason(client) }))
     .filter((item): item is { client: AdminTenant; reason: string } => item.reason !== null)
 
   return (
     <PageShell>
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-wrap items-center justify-end gap-3">
-          <label className="relative min-w-0 flex-1 sm:max-w-md">
-            <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
+      <div className="flex flex-col gap-5">
+        <div className="flex w-full flex-wrap items-center gap-3">
+          <label className="relative min-w-[220px] flex-1">
+            <MagnifyingGlassIcon className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search clients on this page"
-              className="w-full rounded-full border border-white/80 bg-white py-2 pl-9 pr-3 text-sm text-zinc-700 shadow-sm outline-none ring-1 ring-zinc-200/80 placeholder:text-zinc-400 focus:ring-blue-300"
+              placeholder="Search clients, bookings, conversations..."
+              className="h-11 w-full rounded-full border border-zinc-200/80 bg-white pr-16 pl-11 text-sm text-zinc-700 shadow-sm outline-none placeholder:text-zinc-400 focus:ring-2 focus:ring-blue-200"
             />
-          </label>
-          <button
-            type="button"
-            onClick={() => setDemo(!demo)}
-            className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-2 text-xs font-medium text-zinc-600 shadow-sm ring-1 ring-zinc-200"
-          >
-            <span className={demo ? 'text-blue-600' : 'text-zinc-400'}>{demo ? 'Demo data on' : 'Demo data off'}</span>
-            <span className={`relative h-5 w-9 rounded-full ${demo ? 'bg-blue-600' : 'bg-zinc-300'}`}>
-              <span className={`absolute top-0.5 size-4 rounded-full bg-white transition ${demo ? 'left-4' : 'left-0.5'}`} />
+            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded-md border border-zinc-200 bg-zinc-50 px-1.5 py-0.5 text-[11px] font-medium text-zinc-400">
+              ⌘ K
             </span>
-          </button>
+          </label>
+          <div className="flex flex-wrap items-center gap-2">
           <div className="relative">
             <button
               type="button"
@@ -210,7 +237,7 @@ export function AgencyHome() {
                 setDraft(range)
                 setRangeOpen((open) => !open)
               }}
-              className="inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-sm text-zinc-600 shadow-sm ring-1 ring-zinc-200"
+              className="inline-flex h-11 items-center gap-2 rounded-full bg-white px-4 text-sm text-zinc-600 shadow-sm ring-1 ring-zinc-200"
             >
               <CalendarDaysIcon className="size-4 text-zinc-400" />
               {prettyRange(range.start, range.end)}
@@ -251,18 +278,33 @@ export function AgencyHome() {
               </div>
             ) : null}
           </div>
+          <button
+            type="button"
+            onClick={() => setDemo(!demo)}
+            className="inline-flex h-11 items-center gap-2 rounded-full bg-white px-4 text-sm font-medium text-zinc-600 shadow-sm ring-1 ring-zinc-200"
+          >
+            <span>{demo ? 'Demo data on' : 'Demo data off'}</span>
+            <span className={`relative h-5 w-9 rounded-full ${demo ? 'bg-blue-600' : 'bg-zinc-300'}`}>
+              <span className={`absolute top-0.5 size-4 rounded-full bg-white shadow-sm transition ${demo ? 'left-4' : 'left-0.5'}`} />
+            </span>
+          </button>
           {isAgencyStaff || !tenantId ? null : (
-            <Button color="brand" onClick={() => setInviteOpen(true)}>
-              <PlusIcon data-slot="icon" />
+            <button
+              type="button"
+              onClick={() => setInviteOpen(true)}
+              className="inline-flex h-11 items-center gap-1.5 rounded-full bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+            >
+              <PlusIcon className="size-4" />
               Add New Client
-            </Button>
+            </button>
           )}
-          <AgencyNotificationBell />
+          <AgencyNotificationBell circle />
+          </div>
         </div>
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-zinc-950 sm:text-3xl">
-            Welcome back, {user?.firstName || user?.fullName || agencyName}{' '}
-            <span aria-hidden>👋</span>
+          <h1 className="text-[1.7rem] font-semibold tracking-tight text-zinc-950 sm:text-3xl">
+            Welcome back
+            {welcomeName ? `, ${welcomeName}` : ''} <span aria-hidden>👋</span>
           </h1>
           <p className="mt-1 text-sm text-zinc-500">
             Here&apos;s an overview of your clients, bookings, and AI performance.
@@ -277,48 +319,72 @@ export function AgencyHome() {
           const Icon = icons[index] ?? UsersIcon
           const cardSeries = demo ? agencyDemoSeries() : series
           const tones = [
-            'bg-blue-50 text-blue-600',
-            'bg-sky-50 text-sky-600',
-            'bg-cyan-50 text-cyan-600',
-            'bg-indigo-50 text-indigo-600',
-            'bg-emerald-50 text-emerald-600',
+            'bg-blue-100 text-blue-500',
+            'bg-violet-100 text-violet-500',
+            'bg-emerald-100 text-emerald-500',
+            'bg-orange-100 text-orange-500',
+            'bg-rose-100 text-rose-500',
           ]
-          const strokes = ['#2563eb', '#0284c7', '#0891b2', '#4f46e5', '#059669']
-          const spark =
-            index === 1
-              ? cardSeries.map((point) => point.bookings)
-              : index === 2
-                ? cardSeries.map((point) => (demo ? point.calls : point.call_minutes ?? 0))
-                : index === 3
-                  ? cardSeries.map((point) => point.messages)
-                  : []
+          const strokes = ['#60a5fa', '#a78bfa', '#34d399', '#fb923c', '#fb7185']
+          const demoWaves = [
+            [1.2, 1.5, 1.4, 1.8, 2.1, 2, 2.6, 3, 3.4, 4.1, 4.6, 5],
+            [6, 9, 8, 12, 11, 16, 14, 20, 18, 24, 26, 30],
+            [8, 11, 14, 12, 18, 16, 22, 20, 26, 24, 30, 34],
+            [4, 6, 5, 8, 9, 8, 12, 14, 13, 16, 18, 20],
+            [3, 5, 4, 7, 6, 9, 8, 12, 11, 14, 16, 18],
+          ]
+          const spark = demo
+            ? demoWaves[index] ?? []
+            : index === 0
+              ? runningCount(clients.map((client) => client.created_at), cardSeries.map((point) => point.date))
+              : index === 1
+                ? cardSeries.map((point) => point.bookings)
+                : index === 2
+                  ? cardSeries.map((point) => point.call_minutes ?? 0)
+                  : index === 3
+                    ? cardSeries.map((point) => point.messages)
+                    : []
           return (
-            <article key={kpi.label} className={`${dashCardClass} flex h-full items-center gap-3 rounded-[18px] p-4 transition hover:-translate-y-0.5 hover:shadow-md motion-safe:duration-200`}>
-              <span className={`flex size-11 shrink-0 items-center justify-center rounded-full ${tones[index] ?? tones[0]}`}>
-                <Icon className="size-5" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm text-zinc-500">
-                  {kpi.label.replace(/\b\w/g, (letter) => letter.toUpperCase())}
-                </p>
-                <p className="mt-0.5 text-2xl font-semibold tracking-tight text-zinc-950">{kpi.value}</p>
-                <p className="mt-1 flex min-h-4 items-center gap-1 text-xs font-medium text-emerald-600">
-                  {kpi.trend ? (
-                    <>
-                      <ArrowUpIcon className="size-3" />
-                      {kpi.trend}
-                    </>
-                  ) : null}
-                </p>
+            <article
+              key={kpi.label}
+              className={`${dashCardClass} relative flex h-full min-h-[148px] flex-col overflow-hidden rounded-[20px] p-4 transition hover:-translate-y-0.5 hover:shadow-md motion-safe:duration-200`}
+            >
+              <div className="relative z-10 flex items-start gap-3 pr-2">
+                <span className={`flex size-10 shrink-0 items-center justify-center rounded-full ${tones[index] ?? tones[0]}`}>
+                  <Icon className="size-5" />
+                </span>
+                <div className="min-w-0">
+                  <p className="truncate text-sm text-zinc-500">
+                    {kpi.label.replace(/\b\w/g, (letter) => letter.toUpperCase())}
+                  </p>
+                  <p className="mt-1 text-[1.65rem] font-semibold leading-none tracking-tight text-zinc-950">{kpi.value}</p>
+                  <p className="mt-2 flex min-h-4 items-center gap-1 text-xs font-medium text-emerald-500">
+                    {kpi.trend ? (
+                      <>
+                        <ArrowUpIcon className="size-3" />
+                        {kpi.trend}
+                      </>
+                    ) : null}
+                  </p>
+                </div>
               </div>
-              <Sparkline values={spark} color={strokes[index] ?? strokes[0]} />
+              <div className="pointer-events-none absolute right-0 bottom-0">
+                <Sparkline values={spark} color={strokes[index] ?? strokes[0]} />
+              </div>
             </article>
           )
         })}
       </div>
 
-      <div className={`grid items-stretch gap-4 ${chartMin ? '' : 'xl:grid-cols-5'}`}>
-        <div className={chartMin ? 'min-w-0' : 'h-full min-w-0 xl:col-span-3'}>
+      <div className="@container">
+      <div className="flex flex-col items-start gap-4 @min-[720px]:flex-row">
+        <div
+          className={`min-w-0 overflow-hidden motion-safe:transition-[flex-grow,flex-basis,max-width] motion-safe:duration-500 motion-safe:ease-[cubic-bezier(0.22,1,0.36,1)] ${
+            chartMin
+              ? 'w-full @min-[720px]:max-w-[26rem] @min-[720px]:flex-[0_0_26rem]'
+              : 'w-full @min-[720px]:max-w-none @min-[720px]:flex-[3_1_0%]'
+          }`}
+        >
           <ActivityBars
             variant="premium"
             minimized={chartMin}
@@ -374,15 +440,32 @@ export function AgencyHome() {
           {!demo && activityQuery.error ? <p className="mt-2 text-sm text-red-600">{activityQuery.error}</p> : null}
         </div>
 
-        <section className={`${dashCardClass} flex h-full min-w-0 flex-col rounded-[18px] p-5 ${chartMin ? '' : 'xl:col-span-2'}`}>
+        <section
+          className={`${dashCardClass} flex h-full min-w-0 flex-col rounded-[18px] p-5 motion-safe:transition-[flex-grow,flex-basis] motion-safe:duration-500 motion-safe:ease-[cubic-bezier(0.22,1,0.36,1)] ${
+            chartMin ? '@min-[720px]:flex-[1_1_0%]' : '@min-[720px]:flex-[2_1_0%]'
+          }`}
+        >
           <PanelHead
             title="Top performing clients"
             href="/admin/clients"
             minimized={clientsMin}
             onToggle={() => setClientsMin((value) => !value)}
           />
-          {clientsMin ? null : (
-          <div className="mt-2 overflow-x-auto">
+          <div
+            className={`grid motion-safe:transition-[grid-template-rows,opacity] motion-safe:duration-500 motion-safe:ease-[cubic-bezier(0.22,1,0.36,1)] ${
+              clientsMin ? 'grid-rows-[0fr] opacity-0' : 'grid-rows-[1fr] opacity-100'
+            }`}
+          >
+            <div className="overflow-hidden">
+          <CardFind
+            value={clientFind}
+            placeholder="Search clients"
+            onChange={(value) => {
+              setClientFind(value)
+              setClientPage(1)
+            }}
+          />
+          <div className="mt-3 overflow-x-auto">
           <table className="w-full min-w-[36rem] text-left text-sm">
             <thead className="text-xs text-zinc-400">
               <tr>
@@ -397,13 +480,14 @@ export function AgencyHome() {
             </thead>
             <tbody>
               {demo
-                ? agencyDemo.clients
-                    .filter((client) => !needle || client.name.toLowerCase().includes(needle))
-                    .map((client) => (
+                ? pageSlice(
+                    agencyDemo.clients.filter((client) => matches(client.name, needle, clientFind)),
+                    clientPage,
+                  ).rows.map((client) => (
                     <tr key={client.id} className="border-t border-zinc-100">
                       <td className="py-2.5">
                         <span className="flex items-center gap-2">
-                          <TradeIcon industry={client.industry} />
+                          <ClientMark name={client.name} image={client.image} />
                           <span className="truncate font-medium text-zinc-950">{client.name}</span>
                         </span>
                       </td>
@@ -415,17 +499,20 @@ export function AgencyHome() {
                         <Badge color={client.status === 'Active' ? 'green' : 'amber'}>{client.status}</Badge>
                       </td>
                       <td className="pl-2">
-                        <Sparkline values={client.trend} color={client.status === 'Active' ? '#10b981' : '#f59e0b'} />
+                        <Sparkline compact values={client.trend} color={client.status === 'Active' ? '#10b981' : '#f59e0b'} />
                       </td>
                     </tr>
                   ))
-                : topClients.map((client) => {
+                : pageSlice(
+                    topClients.filter((client) => matches(client.name, '', clientFind)),
+                    clientPage,
+                  ).rows.map((client) => {
                     const count = counts.get(client.id)
                     return (
                       <tr key={client.id} className="border-t border-zinc-100">
                         <td className="py-2.5">
                           <Link href={`/admin/clients/${encodeURIComponent(client.id)}`} className="flex items-center gap-2">
-                            <TradeIcon industry={client.industry_type} />
+                            <ClientMark name={client.name} />
                             <span className="truncate font-medium text-zinc-950">{client.name}</span>
                           </Link>
                         </td>
@@ -441,19 +528,47 @@ export function AgencyHome() {
             </tbody>
           </table>
           </div>
-          )}
+          <Pager
+            {...pageMeta(
+              demo
+                ? agencyDemo.clients.filter((client) => matches(client.name, needle, clientFind)).length
+                : topClients.filter((client) => matches(client.name, '', clientFind)).length,
+              clientPage,
+            )}
+            onChange={setClientPage}
+          />
+          <EmptyMatch
+            query={clientFind}
+            count={
+              demo
+                ? agencyDemo.clients.filter((client) => matches(client.name, needle, clientFind)).length
+                : topClients.filter((client) => matches(client.name, '', clientFind)).length
+            }
+            noun="clients"
+          />
+            </div>
+          </div>
           {!demo && !clientsMin && topClients.length === 0 ? <p className="py-6 text-sm text-zinc-500">No clients yet.</p> : null}
         </section>
+      </div>
       </div>
 
       <div className="grid items-stretch gap-4 xl:grid-cols-3">
         <section className={`${dashCardClass} flex h-full flex-col rounded-[18px] p-5`}>
           <PanelHead title="Recent client sign-ups" href="/admin/clients" />
-          <ul className="divide-y divide-zinc-100">
+          <CardFind
+            value={signupFind}
+            placeholder="Search sign-ups"
+            onChange={(value) => {
+              setSignupFind(value)
+              setSignupPage(1)
+            }}
+          />
+          <ul className="mt-2 divide-y divide-zinc-100">
             {demo
-              ? agencyDemo.signups.filter((row) => !needle || row.name.toLowerCase().includes(needle)).map((row) => (
+              ? pageSlice(agencyDemo.signups.filter((row) => matches(row.name, needle, signupFind)), signupPage).rows.map((row) => (
                   <li key={row.id} className="flex items-center gap-3 py-3">
-                    <TradeIcon industry={row.industry} />
+                    <ClientMark name={row.name} image={row.image} industry={row.industry} />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-medium text-zinc-950">{row.name}</span>
                       <span className="block text-xs text-zinc-500">{row.joined}</span>
@@ -461,10 +576,10 @@ export function AgencyHome() {
                     <Badge color={row.status === 'Active' ? 'green' : 'amber'}>{row.status}</Badge>
                   </li>
                 ))
-              : signups.map((client) => (
+              : pageSlice(signups.filter((client) => matches(client.name, '', signupFind)), signupPage).rows.map((client) => (
                   <li key={client.id}>
                     <Link href={`/admin/clients/${encodeURIComponent(client.id)}`} className="flex items-center gap-3 py-3">
-                      <TradeIcon industry={client.industry_type} />
+                      <ClientMark name={client.name} industry={client.industry_type} />
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-medium text-zinc-950">{client.name}</span>
                         <span className="block text-xs text-zinc-500">Joined {formatDate(client.created_at)}</span>
@@ -474,15 +589,41 @@ export function AgencyHome() {
                   </li>
                 ))}
           </ul>
+          <Pager
+            {...pageMeta(
+              demo
+                ? agencyDemo.signups.filter((row) => matches(row.name, needle, signupFind)).length
+                : signups.filter((client) => matches(client.name, '', signupFind)).length,
+              signupPage,
+            )}
+            onChange={setSignupPage}
+          />
+          <EmptyMatch
+            query={signupFind}
+            count={
+              demo
+                ? agencyDemo.signups.filter((row) => matches(row.name, needle, signupFind)).length
+                : signups.filter((client) => matches(client.name, '', signupFind)).length
+            }
+            noun="sign-ups"
+          />
         </section>
 
         <section className={`${dashCardClass} flex h-full flex-col rounded-[18px] p-5`}>
-          <PanelHead title="Needs attention" href="/admin/clients" count={demo ? agencyDemo.attentionCount : attention.length + (alertsQuery.data?.length ?? 0)} />
-          <ul className="divide-y divide-zinc-100">
+          <PanelHead title="Needs attention" href="/admin/clients" count={demo ? agencyDemo.attention.filter((row) => matches(`${row.name} ${row.detail}`, '', attentionFind)).length : attention.length + (alertsQuery.data?.length ?? 0)} />
+          <CardFind
+            value={attentionFind}
+            placeholder="Search alerts"
+            onChange={(value) => {
+              setAttentionFind(value)
+              setAttentionPage(1)
+            }}
+          />
+          <ul className="mt-2 divide-y divide-zinc-100">
             {demo
-              ? agencyDemo.attention.map((row) => (
+              ? pageSlice(agencyDemo.attention.filter((row) => matches(`${row.name} ${row.detail}`, '', attentionFind)), attentionPage).rows.map((row) => (
                   <li key={row.id} className="flex items-start gap-3 py-3">
-                    <ExclamationTriangleIcon className={row.tone === 'red' ? 'mt-0.5 size-5 text-red-500' : 'mt-0.5 size-5 text-amber-500'} />
+                    {row.image ? <ClientMark name={row.name} image={row.image} /> : <ExclamationTriangleIcon className={row.tone === 'red' ? 'mt-0.5 size-5 shrink-0 text-red-500' : 'mt-0.5 size-5 shrink-0 text-amber-500'} />}
                     <span className="min-w-0 flex-1">
                       <span className="block text-sm font-medium text-zinc-950">{row.name}</span>
                       <span className="block text-xs text-zinc-500">{row.detail}</span>
@@ -490,34 +631,55 @@ export function AgencyHome() {
                     <span className="shrink-0 text-xs text-zinc-400">{row.when}</span>
                   </li>
                 ))
-              : (
-                  <>
-                    {(alertsQuery.data ?? []).map((alert) => (
-                      <li key={`${alert.tenant_id}:${alert.rule_key}`}>
-                        <Link href={`/admin/clients/${encodeURIComponent(alert.tenant_id)}`} className="flex items-start gap-3 py-3">
-                          <ExclamationTriangleIcon className={alert.severity === 'red' ? 'mt-0.5 size-5 text-red-500' : 'mt-0.5 size-5 text-amber-500'} />
-                          <span className="min-w-0 flex-1">
-                            <span className="block truncate text-sm font-medium text-zinc-950">{alert.tenant_name}</span>
-                            <span className="block text-xs text-zinc-500">{alert.reason}</span>
-                          </span>
-                          <span className="shrink-0 text-xs text-zinc-400">{timeAgo(alert.since)}</span>
-                        </Link>
-                      </li>
-                    ))}
-                    {attention.map(({ client, reason }) => (
-                      <li key={`${client.id}:${reason}`}>
-                        <Link href={`/admin/clients/${encodeURIComponent(client.id)}`} className="flex items-start gap-3 py-3">
-                          <ExclamationTriangleIcon className="mt-0.5 size-5 text-amber-500" />
-                          <span className="min-w-0 flex-1">
-                            <span className="block truncate text-sm font-medium text-zinc-950">{client.name}</span>
-                            <span className="block text-xs text-zinc-500">{reason}</span>
-                          </span>
-                        </Link>
-                      </li>
-                    ))}
-                  </>
-                )}
+              : pageSlice(
+                  [
+                    ...(alertsQuery.data ?? []).filter((alert) => matches(`${alert.tenant_name} ${alert.reason}`, '', attentionFind)).map((alert) => ({ kind: 'alert' as const, alert })),
+                    ...attention.filter(({ client, reason }) => matches(`${client.name} ${reason}`, '', attentionFind)).map((item) => ({ kind: 'note' as const, item })),
+                  ],
+                  attentionPage,
+                ).rows.map((row) => row.kind === 'alert' ? (
+                  <li key={`${row.alert.tenant_id}:${row.alert.rule_key}`}>
+                    <Link href={`/admin/clients/${encodeURIComponent(row.alert.tenant_id)}`} className="flex items-start gap-3 py-3">
+                      <ExclamationTriangleIcon className={row.alert.severity === 'red' ? 'mt-0.5 size-5 text-red-500' : 'mt-0.5 size-5 text-amber-500'} />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium text-zinc-950">{row.alert.tenant_name}</span>
+                        <span className="block text-xs text-zinc-500">{row.alert.reason}</span>
+                      </span>
+                      <span className="shrink-0 text-xs text-zinc-400">{timeAgo(row.alert.since)}</span>
+                    </Link>
+                  </li>
+                ) : (
+                  <li key={`${row.item.client.id}:${row.item.reason}`}>
+                    <Link href={`/admin/clients/${encodeURIComponent(row.item.client.id)}`} className="flex items-start gap-3 py-3">
+                      <ExclamationTriangleIcon className="mt-0.5 size-5 text-amber-500" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium text-zinc-950">{row.item.client.name}</span>
+                        <span className="block text-xs text-zinc-500">{row.item.reason}</span>
+                      </span>
+                    </Link>
+                  </li>
+                ))}
           </ul>
+          <Pager
+            {...pageMeta(
+              demo
+                ? agencyDemo.attention.filter((row) => matches(`${row.name} ${row.detail}`, '', attentionFind)).length
+                : (alertsQuery.data ?? []).filter((alert) => matches(`${alert.tenant_name} ${alert.reason}`, '', attentionFind)).length
+                  + attention.filter(({ client, reason }) => matches(`${client.name} ${reason}`, '', attentionFind)).length,
+              attentionPage,
+            )}
+            onChange={setAttentionPage}
+          />
+          <EmptyMatch
+            query={attentionFind}
+            count={
+              demo
+                ? agencyDemo.attention.filter((row) => matches(`${row.name} ${row.detail}`, '', attentionFind)).length
+                : (alertsQuery.data ?? []).filter((alert) => matches(`${alert.tenant_name} ${alert.reason}`, '', attentionFind)).length
+                  + attention.filter(({ client, reason }) => matches(`${client.name} ${reason}`, '', attentionFind)).length
+            }
+            noun="alerts"
+          />
           {!demo && attention.length === 0 && (alertsQuery.data?.length ?? 0) === 0 ? (
             <p className="py-4 text-sm text-zinc-500">Nothing is waiting.</p>
           ) : null}
@@ -525,9 +687,17 @@ export function AgencyHome() {
 
         <section className={`${dashCardClass} flex h-full flex-col rounded-[18px] p-5`}>
           <PanelHead title="Recent activity" href="/admin/activity" />
-          <ul>
+          <CardFind
+            value={activityFind}
+            placeholder="Search activity"
+            onChange={(value) => {
+              setActivityFind(value)
+              setActivityPage(1)
+            }}
+          />
+          <ul className="mt-2">
             {demo
-              ? agencyDemo.activity.map((row) => (
+              ? pageSlice(agencyDemo.activity.filter((row) => matches(`${row.title} ${row.detail}`, '', activityFind)), activityPage).rows.map((row) => (
                   <li key={row.id} className="flex items-start gap-3 py-2.5">
                     <ActivityDot tone={row.tone} />
                     <span className="min-w-0 flex-1">
@@ -537,8 +707,26 @@ export function AgencyHome() {
                     <span className="shrink-0 text-xs text-zinc-400">{row.when}</span>
                   </li>
                 ))
-              : (activityQuery.data?.recent ?? []).map((event) => <RealActivity key={`${event.kind}-${event.at}-${event.tenant_id}`} event={event} />)}
+              : pageSlice((activityQuery.data?.recent ?? []).filter((event) => matches(`${event.title} ${event.tenant_name}`, '', activityFind)), activityPage).rows.map((event) => <RealActivity key={`${event.kind}-${event.at}-${event.tenant_id}`} event={event} />)}
           </ul>
+          <Pager
+            {...pageMeta(
+              demo
+                ? agencyDemo.activity.filter((row) => matches(`${row.title} ${row.detail}`, '', activityFind)).length
+                : (activityQuery.data?.recent ?? []).filter((event) => matches(`${event.title} ${event.tenant_name}`, '', activityFind)).length,
+              activityPage,
+            )}
+            onChange={setActivityPage}
+          />
+          <EmptyMatch
+            query={activityFind}
+            count={
+              demo
+                ? agencyDemo.activity.filter((row) => matches(`${row.title} ${row.detail}`, '', activityFind)).length
+                : (activityQuery.data?.recent ?? []).filter((event) => matches(`${event.title} ${event.tenant_name}`, '', activityFind)).length
+            }
+            noun="activity"
+          />
           {!demo && (activityQuery.data?.recent.length ?? 0) === 0 ? <p className="py-4 text-sm text-zinc-500">No activity yet.</p> : null}
         </section>
       </div>
@@ -558,6 +746,108 @@ export function AgencyHome() {
         />
       ) : null}
     </PageShell>
+  )
+}
+
+const PAGE_SIZE = 5
+
+function matches(text: string, header: string, card: string) {
+  const value = text.toLowerCase()
+  return (!header.trim() || value.includes(header.trim().toLowerCase())) && (!card.trim() || value.includes(card.trim().toLowerCase()))
+}
+
+function pageSlice<T>(items: T[], page: number) {
+  const meta = pageMeta(items.length, page)
+  return {
+    rows: items.slice((meta.current - 1) * PAGE_SIZE, meta.current * PAGE_SIZE),
+    ...meta,
+  }
+}
+
+function EmptyMatch({ query, count, noun }: { query: string; count: number; noun: string }) {
+  if (!query.trim() || count > 0) return null
+  return <p className="py-6 text-center text-sm text-zinc-400">No {noun} match “{query.trim()}”.</p>
+}
+
+function pageMeta(count: number, page: number) {
+  const pages = Math.max(1, Math.ceil(count / PAGE_SIZE))
+  const current = Math.min(Math.max(page, 1), pages)
+  return { current, pages, total: count }
+}
+
+function CardFind({ value, placeholder, onChange }: { value: string; placeholder: string; onChange: (value: string) => void }) {
+  return (
+    <label className="group relative mt-3 block">
+      <MagnifyingGlassIcon className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-zinc-400 transition group-focus-within:text-blue-500" />
+      <input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        className="h-10 w-full rounded-2xl bg-zinc-50/90 pr-9 pl-10 text-[13px] text-zinc-800 shadow-[inset_0_0_0_1px_rgba(228,228,231,0.95)] outline-none transition placeholder:text-zinc-400 focus:bg-white focus:shadow-[inset_0_0_0_1px_rgba(37,99,235,0.45),0_0_0_4px_rgba(37,99,235,0.10)]"
+      />
+      {value ? (
+        <button
+          type="button"
+          aria-label="Clear search"
+          onClick={() => onChange('')}
+          className="absolute top-1/2 right-2 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded-full text-zinc-400 transition hover:bg-zinc-200/70 hover:text-zinc-700"
+        >
+          <XMarkIcon className="size-3.5" />
+        </button>
+      ) : null}
+    </label>
+  )
+}
+
+function Pager({ current, pages, total, onChange }: { current: number; pages: number; total: number; onChange: (page: number) => void }) {
+  if (pages <= 1) return null
+  const start = (current - 1) * PAGE_SIZE + 1
+  const end = Math.min(current * PAGE_SIZE, total)
+  return (
+    <div className="mt-3 flex items-center justify-between gap-3 border-t border-zinc-100 pt-3">
+      <p className="text-xs text-zinc-400">
+        {start}–{end} of {total}
+      </p>
+      <div className="flex items-center gap-0.5 rounded-full bg-zinc-50 p-0.5 ring-1 ring-zinc-200/80">
+        <button
+          type="button"
+          aria-label="Previous page"
+          disabled={current <= 1}
+          onClick={() => onChange(current - 1)}
+          className="inline-flex size-7 items-center justify-center rounded-full text-zinc-500 transition hover:bg-white hover:text-blue-600 disabled:opacity-35"
+        >
+          <ChevronLeftIcon className="size-4" />
+        </button>
+        <span className="min-w-10 text-center text-xs font-medium text-zinc-600">
+          {current}/{pages}
+        </span>
+        <button
+          type="button"
+          aria-label="Next page"
+          disabled={current >= pages}
+          onClick={() => onChange(current + 1)}
+          className="inline-flex size-7 items-center justify-center rounded-full text-zinc-500 transition hover:bg-white hover:text-blue-600 disabled:opacity-35"
+        >
+          <ChevronRightIcon className="size-4" />
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function ClientMark({ name, image, industry }: { name: string; image?: string | null; industry?: string | null }) {
+  const [failed, setFailed] = useState(false)
+  if (image && !failed) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={image} alt="" className="size-8 shrink-0 rounded-lg object-cover ring-1 ring-zinc-200" onError={() => setFailed(true)} />
+    )
+  }
+  if (industry) return <TradeIcon industry={industry} />
+  return (
+    <span title={name} className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-zinc-100 text-zinc-400">
+      <BuildingOffice2Icon className="size-4" />
+    </span>
   )
 }
 
@@ -588,16 +878,7 @@ function PanelHead({
         <Link href={href} className="text-sm font-medium text-blue-600 hover:text-blue-700">
           View all
         </Link>
-        {onToggle ? (
-          <button
-            type="button"
-            onClick={onToggle}
-            aria-label={minimized ? `Restore ${title}` : `Minimize ${title}`}
-            className="inline-flex size-7 items-center justify-center rounded-lg text-zinc-400 ring-1 ring-zinc-200 hover:bg-zinc-50"
-          >
-            {minimized ? '＋' : '–'}
-          </button>
-        ) : null}
+        {onToggle ? <CollapseControl minimized={!!minimized} label={title} onClick={onToggle} /> : null}
       </span>
     </div>
   )

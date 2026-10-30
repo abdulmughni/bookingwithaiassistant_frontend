@@ -1,5 +1,6 @@
 'use client'
 
+import clsx from 'clsx'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState, type ReactNode } from 'react'
@@ -10,8 +11,8 @@ import {
   CalendarDaysIcon,
   ChartBarSquareIcon,
   ChatBubbleLeftRightIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
+  ChevronDoubleLeftIcon,
+  ChevronDoubleRightIcon,
   Cog6ToothIcon,
   CreditCardIcon,
   EnvelopeIcon,
@@ -41,7 +42,7 @@ import {
   SidebarSpacer,
 } from '@/components/sidebar'
 import { SidebarLayout } from '@/components/sidebar-layout'
-import { BrandLogo, ShellBrand } from '@/components/brand-logo'
+import { BrandLogo } from '@/components/brand-logo'
 import { BrandTheme } from '@/components/brand-theme'
 import { brandAssetUrl, brandGradientClass } from '@/lib/brand'
 import { useAgencyDemo } from '@/lib/agency-dashboard-demo'
@@ -136,6 +137,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   return (
     <SidebarLayout
       sidebarCollapsed={isAgency && collapsed}
+      sidebarCard={isAgency}
       navbar={
         <Navbar>
           <NavbarSpacer />
@@ -143,44 +145,49 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </Navbar>
       }
       sidebar={
+        isAgency ? (
+          <Sidebar className="rounded-[28px] bg-white shadow-[0_10px_40px_rgba(15,23,42,0.06)] ring-1 ring-zinc-200/80">
+            <AgencySidebarBrand
+              loading={brandLoading}
+              logoUrl={brandAssetUrl(brand?.logo_url)}
+              name={brand?.company_name || 'Agency'}
+              collapsed={collapsed}
+              onToggle={() => {
+                setCollapsed((value) => {
+                  const next = !value
+                  window.localStorage.setItem('agency-sidebar-collapsed', next ? '1' : '0')
+                  return next
+                })
+              }}
+            />
+            <SidebarBody className={collapsed ? 'px-2' : 'px-3'}>
+              <nav className={clsx('flex flex-col', collapsed ? 'items-center gap-1' : 'gap-0.5')}>
+                {agencyNav.map((item) => (
+                  <AgencyNavLink
+                    key={item.href}
+                    href={item.href}
+                    label={item.label}
+                    icon={item.icon}
+                    collapsed={collapsed}
+                    current={agencyItemCurrent(item, pathname, view, section)}
+                  />
+                ))}
+              </nav>
+              <SidebarSpacer />
+            </SidebarBody>
+            <div className={clsx('mt-auto', collapsed ? 'px-2 pb-3' : 'px-3 pb-3')}>
+              <AgencyPlanCard compact={collapsed} />
+              <AgencyProfileCard agencyName={portalName} compact={collapsed} staff={isAgencyStaff} />
+            </div>
+          </Sidebar>
+        ) : (
         <Sidebar>
           <SidebarHeader>
             <div className="flex min-w-0 flex-col gap-0 px-2 py-0.5">
-              {isAgency ? (
-                <div className="flex min-w-0 items-start justify-between gap-1">
-                  <div className="min-w-0">
-                    <ShellBrand
-                      loading={brandLoading}
-                      logoUrl={brandAssetUrl(brand?.logo_url)}
-                      name={collapsed ? null : brand?.company_name}
-                    />
-                    {collapsed ? null : (
-                      <p className="truncate pl-1 text-[11px] text-zinc-400">Agency dashboard</p>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-                    onClick={() => {
-                      setCollapsed((value) => {
-                        const next = !value
-                        window.localStorage.setItem('agency-sidebar-collapsed', next ? '1' : '0')
-                        return next
-                      })
-                    }}
-                    className="mt-1 inline-flex size-7 shrink-0 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-blue-50 hover:text-blue-600 motion-safe:duration-200"
-                  >
-                    {collapsed ? <ChevronRightIcon className="size-4" /> : <ChevronLeftIcon className="size-4" />}
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <BrandLogo height={31} priority className="max-w-44.5" />
-                  <p className="truncate pl-[25px] text-[10px] font-medium leading-tight text-zinc-500 dark:text-zinc-400">
-                    Admin Console
-                  </p>
-                </>
-              )}
+              <BrandLogo height={31} priority className="max-w-44.5" />
+              <p className="truncate pl-[25px] text-[10px] font-medium leading-tight text-zinc-500 dark:text-zinc-400">
+                Admin Console
+              </p>
             </div>
           </SidebarHeader>
 
@@ -190,18 +197,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 <SidebarItem
                   key={item.href}
                   href={item.href}
-                  title={isAgency && collapsed ? item.label : undefined}
-                  pill
-                  current={
-                    isAgency
-                      ? agencyItemCurrent(item, pathname, view, section)
-                      : item.exact
-                        ? pathname === item.href
-                        : pathname.startsWith(item.href)
-                  }
+                  current={item.exact ? pathname === item.href : pathname.startsWith(item.href)}
                 >
                   <item.icon data-slot="icon" />
-                  {isAgency && collapsed ? null : <SidebarLabel>{item.label}</SidebarLabel>}
+                  <SidebarLabel>{item.label}</SidebarLabel>
                 </SidebarItem>
               ))}
             </SidebarSection>
@@ -209,15 +208,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <SidebarSpacer />
           </SidebarBody>
 
-          <SidebarFooter className={isAgency ? 'border-t-0 bg-transparent' : undefined}>
-            {isAgency ? <AgencyPlanCard compact={collapsed} /> : null}
-            {isAgency ? (
-              <AgencyProfileCard agencyName={portalName} compact={collapsed} staff={isAgencyStaff} />
-            ) : (
-              <AccountMenu portalName={portalName} />
-            )}
+          <SidebarFooter>
+            <AccountMenu portalName={portalName} />
           </SidebarFooter>
         </Sidebar>
+        )
       }
     >
       {isAgency ? <BrandTheme theme={brand?.theme} /> : null}
@@ -231,6 +226,84 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         {children}
       </div>
     </SidebarLayout>
+  )
+}
+
+function AgencySidebarBrand({
+  loading,
+  logoUrl,
+  name,
+  collapsed,
+  onToggle,
+}: {
+  loading: boolean
+  logoUrl?: string | null
+  name: string
+  collapsed: boolean
+  onToggle: () => void
+}) {
+  const mark = (name.trim()[0] || 'A').toUpperCase()
+  return (
+    <div className={clsx('flex items-center gap-2', collapsed ? 'flex-col px-2 pt-3' : 'px-4 pt-4')}>
+      <span className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-blue-50 text-sm font-semibold text-blue-700 ring-1 ring-blue-100">
+        {loading ? null : logoUrl ? (
+          <BrandLogo src={logoUrl} alt="" height={40} className="size-10 max-w-10 object-cover" />
+        ) : (
+          mark
+        )}
+      </span>
+      {collapsed ? null : (
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-semibold text-zinc-950">{name}</span>
+          <span className="block truncate text-[11px] text-zinc-400">Agency dashboard</span>
+        </span>
+      )}
+      <button
+        type="button"
+        aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        onClick={onToggle}
+        className="inline-flex size-7 shrink-0 items-center justify-center rounded-lg text-zinc-400 transition duration-200 hover:bg-blue-50 hover:text-blue-600"
+      >
+        {collapsed ? <ChevronDoubleRightIcon className="size-4" /> : <ChevronDoubleLeftIcon className="size-4" />}
+      </button>
+    </div>
+  )
+}
+
+function AgencyNavLink({
+  href,
+  label,
+  icon: Icon,
+  current,
+  collapsed,
+}: {
+  href: string
+  label: string
+  icon: typeof HomeIcon
+  current: boolean
+  collapsed: boolean
+}) {
+  return (
+    <Link
+      href={href}
+      title={collapsed ? label : undefined}
+      aria-current={current ? 'page' : undefined}
+      className={clsx(
+        'group flex items-center rounded-xl text-sm font-medium transition duration-200',
+        collapsed ? 'size-10 justify-center' : 'gap-3 px-3 py-2',
+        current
+          ? 'bg-blue-50 text-blue-700 shadow-sm'
+          : 'text-zinc-600 hover:bg-blue-50/80 hover:text-blue-700',
+      )}
+    >
+      <Icon
+        className={clsx(
+          'size-5 shrink-0 transition duration-200 group-hover:scale-110',
+          current ? 'text-blue-600' : 'text-zinc-400 group-hover:text-blue-600',
+        )}
+      />
+      {collapsed ? null : <span className="truncate">{label}</span>}
+    </Link>
   )
 }
 
@@ -277,7 +350,7 @@ function AgencyPlanCard({ compact = false }: { compact?: boolean }) {
       <Link
         href="/admin/credits"
         title="Your plan"
-        className="mb-3 flex items-center justify-center rounded-2xl border border-zinc-200 bg-white p-2 text-blue-600 shadow-sm"
+        className="mx-auto mb-2 flex size-10 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 ring-1 ring-blue-100 transition duration-200 hover:scale-105 hover:bg-blue-100"
       >
         <CreditCardIcon className="size-5" />
       </Link>
@@ -285,7 +358,7 @@ function AgencyPlanCard({ compact = false }: { compact?: boolean }) {
   }
 
   return (
-    <div className="mb-3 rounded-2xl border border-zinc-200/80 bg-white p-3 shadow-sm">
+    <div className="mb-3 rounded-2xl bg-gradient-to-b from-white to-blue-50/40 p-3 shadow-sm ring-1 ring-zinc-200/80">
       <p className="text-[10px] font-semibold tracking-wide text-zinc-400">YOUR PLAN</p>
       <div className="mt-1 flex items-start justify-between gap-2">
         <div className="min-w-0">
@@ -326,7 +399,7 @@ function AgencyPlanCard({ compact = false }: { compact?: boolean }) {
       </div>
       <Link
         href="/admin/credits"
-        className="mt-3 flex w-full items-center justify-center gap-1 rounded-xl bg-blue-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-blue-700"
+        className="mt-3 flex w-full items-center justify-center gap-1 rounded-xl bg-blue-600 px-3 py-2.5 text-xs font-semibold text-white shadow-sm shadow-blue-600/20 transition duration-200 hover:bg-blue-700"
       >
         Manage Plan
         <span aria-hidden>→</span>
@@ -357,40 +430,61 @@ function AgencyProfileCard({
     .map((part) => part[0]?.toUpperCase() ?? '')
     .join('')
 
+  const avatar = (
+    <span className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-blue-50 text-xs font-semibold text-blue-700 ring-2 ring-white">
+      {user.imageUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={user.imageUrl} alt="" className="size-full object-cover" />
+      ) : (
+        initials || 'A'
+      )}
+    </span>
+  )
+
   return (
-    <Menu as="div" className="relative">
+    <Menu as="div" className={clsx('relative', compact && 'flex justify-center')}>
       <MenuButton
-        title={compact ? `${name} · ${role}` : undefined}
-        className="flex w-full items-center gap-2.5 rounded-2xl border border-zinc-200/80 bg-white p-2.5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md motion-safe:duration-200"
+        title={compact ? email || name : undefined}
+        className={clsx(
+          'flex items-center text-left transition duration-200 hover:-translate-y-0.5 hover:shadow-md',
+          compact
+            ? 'size-10 justify-center rounded-full'
+            : 'w-full gap-2.5 rounded-2xl bg-white p-2.5 shadow-sm ring-1 ring-zinc-200/80',
+        )}
       >
-        <span className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-blue-50 text-xs font-semibold text-blue-700">
-          {user.imageUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={user.imageUrl} alt="" className="size-full object-cover" />
-          ) : (
-            initials || 'A'
-          )}
-        </span>
+        {avatar}
         {compact ? null : (
           <>
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-semibold text-zinc-950">{name}</span>
-              <span className="block truncate text-[11px] text-zinc-500">{role}</span>
-              <span className="block truncate text-[11px] text-zinc-400">{agencyName}</span>
+              <span className="block truncate text-sm font-medium text-zinc-800">{email || name}</span>
+              <span className="block truncate text-[11px] text-zinc-400">{role}</span>
             </span>
             <span className="shrink-0 text-zinc-300" aria-hidden>›</span>
           </>
         )}
       </MenuButton>
       <MenuItems
+        transition
         anchor="top start"
-        className="z-50 w-56 rounded-xl bg-white p-1 shadow-lg ring-1 ring-zinc-200 [--anchor-gap:8px] focus:outline-none"
+        className="z-50 w-72 origin-bottom rounded-2xl bg-white p-2 shadow-xl ring-1 ring-zinc-200 transition duration-200 ease-out [--anchor-gap:10px] focus:outline-none data-closed:scale-95 data-closed:opacity-0"
       >
+        <div className="flex items-center gap-3 rounded-xl bg-blue-50/60 px-2.5 py-2.5">
+          {avatar}
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-zinc-950">{name}</p>
+            <p className="truncate text-xs text-zinc-500">{email}</p>
+          </div>
+        </div>
+        <div className="mt-2 space-y-1 px-2.5 py-1 text-xs text-zinc-500">
+          <p><span className="font-medium text-zinc-700">Role</span> · {role}</p>
+          <p className="truncate"><span className="font-medium text-zinc-700">Agency</span> · {agencyName}</p>
+        </div>
+        <div className="my-1 h-px bg-zinc-100" />
         <MenuItem>
           <button
             type="button"
             onClick={() => openUserProfile()}
-            className="block w-full rounded-lg px-3 py-2 text-left text-sm text-zinc-700 data-focus:bg-zinc-50"
+            className="block w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-zinc-700 data-focus:bg-blue-50 data-focus:text-blue-700"
           >
             Manage account
           </button>
@@ -399,7 +493,7 @@ function AgencyProfileCard({
           <button
             type="button"
             onClick={() => void signOut()}
-            className="block w-full rounded-lg px-3 py-2 text-left text-sm text-zinc-700 data-focus:bg-zinc-50"
+            className="block w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-zinc-700 data-focus:bg-blue-50 data-focus:text-blue-700"
           >
             Sign out
           </button>

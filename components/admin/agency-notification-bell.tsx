@@ -30,7 +30,7 @@ function typeLabel(type: string): string {
   return 'Update'
 }
 
-export function AgencyNotificationBell() {
+export function AgencyNotificationBell({ circle = false }: { circle?: boolean }) {
   const router = useRouter()
   const getToken = useApiToken()
   const [items, setItems] = useState<AgencyNotification[]>([])
@@ -90,7 +90,10 @@ export function AgencyNotificationBell() {
   return (
     <Headless.Popover className="relative">
       <Headless.PopoverButton
-        className="relative flex size-10 items-center justify-center rounded-xl bg-zinc-50 text-zinc-600 shadow-sm ring-1 ring-zinc-200 transition hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 dark:bg-zinc-800 dark:text-zinc-200 dark:ring-zinc-700 dark:hover:bg-zinc-700"
+        className={clsx(
+          'relative flex size-10 items-center justify-center text-zinc-600 shadow-sm ring-1 ring-zinc-200 transition hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30',
+          circle ? 'rounded-full bg-white' : 'rounded-xl bg-zinc-50 dark:bg-zinc-800 dark:text-zinc-200 dark:ring-zinc-700 dark:hover:bg-zinc-700',
+        )}
         aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
       >
         <BellIcon className="size-5" aria-hidden="true" />
