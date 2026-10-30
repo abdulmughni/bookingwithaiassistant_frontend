@@ -45,6 +45,7 @@ import { SidebarLayout } from '@/components/sidebar-layout'
 import { BrandLogo } from '@/components/brand-logo'
 import { BrandTheme } from '@/components/brand-theme'
 import { CURRENT_THEME } from '@/lib/brand-presets'
+import { useConsoleTheme } from '@/lib/console-theme'
 import { brandAssetUrl, brandGradientClass } from '@/lib/brand'
 import { useAgencyDemo } from '@/lib/agency-dashboard-demo'
 import { useAgencyBrand, useApiData, useIsAdmin } from '@/lib/hooks'
@@ -56,6 +57,7 @@ const superAdminNav = [
   { label: 'Clients', href: '/admin/clients', icon: UsersIcon, exact: false },
   { label: 'Plans', href: '/admin/plans', icon: CreditCardIcon, exact: false },
   { label: 'Plan requests', href: '/admin/requests', icon: InboxArrowDownIcon, exact: false },
+  { label: 'Settings', href: '/admin/settings', icon: Cog6ToothIcon, exact: true },
 ]
 
 const agencyNav = [
@@ -88,6 +90,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const { isLoaded, userId } = useAuth()
   const { isAdmin, isAgency, isAgencyStaff, loading } = useIsAdmin()
   const { brand, loading: brandLoading } = useAgencyBrand(isAgency)
+  const consoleTheme = useConsoleTheme()
   const router = useRouter()
   const pathname = usePathname()
   const [view, setView] = useState<string | null>(null)
@@ -216,7 +219,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         )
       }
     >
-      <BrandTheme theme={isAgency ? (brand?.theme ?? CURRENT_THEME) : CURRENT_THEME} />
+      <BrandTheme theme={isAgency ? (brand?.theme ?? CURRENT_THEME) : consoleTheme} />
       <div
         className={
           'min-h-full overflow-x-hidden bg-transparent px-4 py-6 sm:px-6 lg:px-8 lg:py-8'

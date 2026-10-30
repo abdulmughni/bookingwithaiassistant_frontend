@@ -5,7 +5,6 @@ import { useUser } from '@clerk/nextjs'
 import { toast } from 'sonner'
 
 import { AgencyBrandForm } from '@/components/admin/agency-brand-form'
-import { AgencyOnly } from '@/components/admin/agency-only'
 import { Button } from '@/components/button'
 import { Input } from '@/components/input'
 import { PageHeader, PageShell, SkeletonBlock, dashCardClass } from '@/components/dashboard-ui'
@@ -13,10 +12,34 @@ import { ApiError, api } from '@/lib/api'
 import { useApiData, useApiToken, useIsAdmin } from '@/lib/hooks'
 
 export default function AgencySettingsPage() {
+  const { isAgency, loading } = useIsAdmin()
+  if (loading) {
+    return (
+      <PageShell>
+        <SkeletonBlock className="h-10 w-48" />
+        <SkeletonBlock className="h-40" />
+      </PageShell>
+    )
+  }
+  if (!isAgency) return <ConsoleAppearance />
+  return <SettingsBody />
+}
+
+function ConsoleAppearance() {
   return (
-    <AgencyOnly>
-      <SettingsBody />
-    </AgencyOnly>
+    <PageShell>
+      <PageHeader
+        title="Settings"
+        description="Colors and light or dark mode for the admin console on this browser."
+      />
+      <section className={`${dashCardClass} p-5 sm:p-6`}>
+        <h2 className="text-sm font-semibold text-zinc-950 dark:text-white">Brand & White Label</h2>
+        <p className="mt-1 mb-4 text-sm text-zinc-500">
+          Presets and colors apply to the admin console on this browser. Agency and client colors stay on their own accounts.
+        </p>
+        <AgencyBrandForm showLogo={false} persist="browser" />
+      </section>
+    </PageShell>
   )
 }
 

@@ -939,9 +939,9 @@ export default function SettingsPage() {
         <>
           <ProfilePhotoForm />
           <section className={`${dashCardClass} p-5`}>
-            <Subheading>Colors</Subheading>
+            <Subheading>Brand & White Label</Subheading>
             <p className="mt-1 mb-5 text-sm text-zinc-500">
-              These colors are only for your dashboard. The logo stays with your agency.
+              Light and dark mode, presets, and colors apply to your dashboard. The logo stays with your agency.
             </p>
             <AgencyBrandForm showLogo={false} />
           </section>

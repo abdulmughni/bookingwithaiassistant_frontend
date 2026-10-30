@@ -1,12 +1,10 @@
 'use client'
 
-import { useId, useMemo, useState, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useUser } from '@clerk/nextjs'
 import { toast } from 'sonner'
 import {
-  ArrowDownIcon,
-  ArrowUpIcon,
   BanknotesIcon,
   BoltIcon,
   BuildingOffice2Icon,
@@ -33,6 +31,7 @@ import { StatusBadge, formatDate } from '@/components/admin/shared'
 import { Badge } from '@/components/badge'
 import { Button } from '@/components/button'
 import { PageShell, SkeletonBlock, dashCardClass } from '@/components/dashboard-ui'
+import { AreaSparkline, KpiStatCard } from '@/components/kpi-stat-card'
 import { api } from '@/lib/api'
 import { agencyDemo, agencyDemoSeries, useAgencyDemo } from '@/lib/agency-dashboard-demo'
 import { useApiData, useIsAdmin } from '@/lib/hooks'
@@ -61,55 +60,6 @@ function defaultRange() {
   const start = new Date()
   start.setDate(end.getDate() - 29)
   return { start: localIso(start), end: localIso(end) }
-}
-
-function smoothLine(points: { x: number; y: number }[]) {
-  if (points.length === 0) return ''
-  let path = `M ${points[0].x} ${points[0].y}`
-  for (let index = 0; index < points.length - 1; index += 1) {
-    const previous = points[index - 1] ?? points[index]
-    const current = points[index]
-    const next = points[index + 1]
-    const after = points[index + 2] ?? next
-    const control1x = current.x + (next.x - previous.x) / 6
-    const control1y = current.y + (next.y - previous.y) / 6
-    const control2x = next.x - (after.x - current.x) / 6
-    const control2y = next.y - (after.y - current.y) / 6
-    path += ` C ${control1x} ${control1y}, ${control2x} ${control2y}, ${next.x} ${next.y}`
-  }
-  return path
-}
-
-function Sparkline({ values, color, compact = false }: { values: number[]; color: string; compact?: boolean }) {
-  const width = compact ? 96 : 360
-  const height = compact ? 32 : 84
-  const gradientId = useId().replace(/:/g, '')
-  if (values.length < 2) return null
-  const max = Math.max(...values)
-  const min = Math.min(...values)
-  const span = max - min || 1
-  const step = width / (values.length - 1)
-  const top = compact ? 3 : 6
-  const bottom = compact ? 3 : 1
-  const coords = values.map((value, index) => ({
-    x: index * step,
-    y: height - bottom - ((value - min) / span) * (height - top - bottom),
-  }))
-  const line = smoothLine(coords)
-  const area = `${line} L ${width} ${height} L 0 ${height} Z`
-  return (
-    <svg viewBox={`0 0 ${width} ${height}`} className={compact ? 'h-8 w-24' : 'block h-16 w-full'} preserveAspectRatio="none" aria-hidden>
-      <defs>
-        <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.32" />
-          <stop offset="55%" stopColor={color} stopOpacity="0.14" />
-          <stop offset="100%" stopColor={color} stopOpacity="0.04" />
-        </linearGradient>
-      </defs>
-      <path d={area} fill={`url(#${gradientId})`} />
-      <path d={line} fill="none" stroke={color} strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
 }
 
 function chartPreset(kind: 'week' | 'month' | 'year') {
@@ -351,33 +301,17 @@ export function AgencyHome() {
                     : []
           const falling = spark.length > 1 && spark[spark.length - 1] < spark[0]
           return (
-            <article
+            <KpiStatCard
               key={kpi.label}
-              className={`${dashCardClass} relative flex h-full min-h-[148px] flex-col overflow-hidden rounded-[20px] p-4 pb-16 transition hover:-translate-y-0.5 hover:shadow-md motion-safe:duration-200`}
-            >
-              <div className="relative z-10 flex items-start gap-3 pr-2">
-                <span className={`flex size-10 shrink-0 items-center justify-center rounded-full ${tones[index] ?? tones[0]}`}>
-                  <Icon className="size-5" />
-                </span>
-                <div className="min-w-0">
-                  <p className="truncate text-sm text-zinc-500">
-                    {kpi.label.replace(/\b\w/g, (letter) => letter.toUpperCase())}
-                  </p>
-                  <p className="mt-1 text-[1.65rem] font-semibold leading-none tracking-tight text-zinc-950">{kpi.value}</p>
-                  <p className={`mt-2 flex min-h-4 items-center gap-1 text-xs font-medium ${falling ? 'text-rose-500' : 'text-emerald-500'}`}>
-                    {kpi.trend ? (
-                      <>
-                        {falling ? <ArrowDownIcon className="size-3" /> : <ArrowUpIcon className="size-3" />}
-                        {kpi.trend}
-                      </>
-                    ) : null}
-                  </p>
-                </div>
-              </div>
-              <div className="pointer-events-none absolute inset-x-0 bottom-0">
-                <Sparkline values={spark} color={strokes[index] ?? strokes[0]} />
-              </div>
-            </article>
+              label={kpi.label.replace(/\b\w/g, (letter) => letter.toUpperCase())}
+              value={kpi.value}
+              trend={kpi.trend}
+              trendTone={kpi.trend ? (falling ? 'down' : 'up') : 'flat'}
+              icon={<Icon className="size-5" />}
+              tone={tones[index] ?? tones[0]}
+              stroke={strokes[index] ?? strokes[0]}
+              series={spark}
+            />
           )
         })}
       </div>
@@ -500,7 +434,7 @@ export function AgencyHome() {
                         <Badge color={client.status === 'Active' ? 'green' : 'amber'}>{client.status}</Badge>
                       </td>
                       <td className="pl-2">
-                        <Sparkline compact values={client.trend} color={client.status === 'Active' ? '#10b981' : '#f59e0b'} />
+                        <AreaSparkline compact values={client.trend} color={client.status === 'Active' ? '#10b981' : '#f59e0b'} />
                       </td>
                     </tr>
                   ))
