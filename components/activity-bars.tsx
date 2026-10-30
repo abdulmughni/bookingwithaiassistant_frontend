@@ -80,7 +80,7 @@ export function ActivityBars({
   points: ActivityPoint[]
   menu?: ReactNode
   loading?: boolean
-  /** Agency home uses thicker pastel bars. Admin keeps the default chart. */
+  /** Premium matches the agency home bars. Default stays the smaller chart. */
   variant?: 'default' | 'premium'
   minimized?: boolean
   onToggleMinimize?: () => void

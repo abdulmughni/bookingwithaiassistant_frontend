@@ -3,9 +3,7 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import {
-  ArrowDownIcon,
   ArrowPathIcon,
-  ArrowUpIcon,
   BanknotesIcon,
   BuildingOffice2Icon,
   CalendarDaysIcon,
@@ -14,10 +12,12 @@ import {
   ClockIcon,
   DocumentTextIcon,
   EllipsisHorizontalIcon,
+  MagnifyingGlassIcon,
   EnvelopeIcon,
   PauseIcon,
   PhoneIcon,
   UsersIcon,
+  XMarkIcon,
 } from '@heroicons/react/20/solid'
 import { ChevronDownIcon } from '@heroicons/react/16/solid'
 import { BellIcon } from '@heroicons/react/24/outline'
@@ -25,6 +25,7 @@ import { BellIcon } from '@heroicons/react/24/outline'
 import { ActivityBars } from '@/components/activity-bars'
 import { Button } from '@/components/button'
 import { PageShell, SkeletonBlock, dashCardClass } from '@/components/dashboard-ui'
+import { KpiStatCard } from '@/components/kpi-stat-card'
 import { Dropdown, DropdownButton, DropdownItem, DropdownMenu } from '@/components/dropdown'
 import { HealthDot } from '@/components/admin/ops'
 import { StatusBadge, formatDate } from '@/components/admin/shared'
@@ -72,43 +73,11 @@ function periodLabel(range: { start: string; end: string }) {
   return options.find((option) => option.range.start === range.start && option.range.end === range.end)?.label ?? 'Custom'
 }
 
-function Sparkline({ values, color }: { values: number[]; color: string }) {
-  if (values.length < 2) return null
-  const width = 88
-  const height = 32
-  const max = Math.max(...values, 1)
-  const min = Math.min(...values, 0)
-  const span = max - min || 1
-  const step = width / (values.length - 1)
-  const points = values
-    .map((value, index) => `${index * step},${height - 3 - ((value - min) / span) * (height - 8)}`)
-    .join(' ')
-  return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="h-8 w-20" aria-hidden>
-      <polyline fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" points={points} />
-    </svg>
-  )
-}
-
-function TrendLine({ metric }: { metric: DashboardMetric }) {
-  if (metric.delta_pct == null && metric.value === metric.previous) {
-    return <p className="mt-1 text-xs text-zinc-400">— no change</p>
-  }
-  if (metric.delta_pct == null) {
-    return (
-      <p className="mt-1 flex items-center gap-1 text-xs font-medium text-emerald-600">
-        <ArrowUpIcon className="size-3" />
-        new
-      </p>
-    )
-  }
+function metricTrend(metric: DashboardMetric): { text: string; tone: 'up' | 'down' | 'flat' } {
+  if (metric.delta_pct == null && metric.value === metric.previous) return { text: '— no change', tone: 'flat' }
+  if (metric.delta_pct == null) return { text: 'new', tone: 'up' }
   const up = metric.delta_pct >= 0
-  return (
-    <p className={`mt-1 flex items-center gap-1 text-xs font-medium ${up ? 'text-emerald-600' : 'text-rose-600'}`}>
-      {up ? <ArrowUpIcon className="size-3" /> : <ArrowDownIcon className="size-3" />}
-      {Math.abs(metric.delta_pct)}% from last month
-    </p>
-  )
+  return { text: `${Math.abs(metric.delta_pct)}% from last month`, tone: up ? 'up' : 'down' }
 }
 
 function MetricCard({
@@ -131,23 +100,43 @@ function MetricCard({
   const shown = money
     ? `$${Math.round(metric.value).toLocaleString()}`
     : Math.round(metric.value).toLocaleString()
-  const body = (
-    <div className="flex items-center gap-3">
-      <span className={`flex size-11 shrink-0 items-center justify-center rounded-full ${tone}`}>{icon}</span>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm text-zinc-500">{label}</p>
-        <p className="mt-0.5 text-2xl font-semibold tracking-tight tabular-nums text-zinc-950">{shown}</p>
-        <TrendLine metric={metric} />
-      </div>
-      <Sparkline values={metric.series} color={stroke} />
-    </div>
-  )
-  const className = `${dashCardClass} block h-full p-4 transition hover:shadow-md`
-  if (!href) return <article className={className}>{body}</article>
+  const trend = metricTrend(metric)
   return (
-    <Link href={href} className={className}>
-      {body}
-    </Link>
+    <KpiStatCard
+      label={label}
+      value={shown}
+      trend={trend.text}
+      trendTone={trend.tone}
+      icon={icon}
+      tone={tone}
+      stroke={stroke}
+      series={metric.series}
+      href={href}
+    />
+  )
+}
+
+function CardFind({ value, placeholder, onChange }: { value: string; placeholder: string; onChange: (value: string) => void }) {
+  return (
+    <label className="group relative mt-2.5 block">
+      <MagnifyingGlassIcon className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-zinc-400 transition group-focus-within:text-blue-500" />
+      <input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        className="h-8 w-full rounded-lg bg-zinc-100/60 pr-7 pl-8 text-[13px] text-zinc-700 outline-none transition placeholder:text-zinc-400 focus:bg-zinc-100"
+      />
+      {value ? (
+        <button
+          type="button"
+          aria-label="Clear search"
+          onClick={() => onChange('')}
+          className="absolute top-1/2 right-1.5 inline-flex size-5 -translate-y-1/2 items-center justify-center rounded-full text-zinc-400 transition hover:bg-white hover:text-zinc-700"
+        >
+          <XMarkIcon className="size-3.5" />
+        </button>
+      ) : null}
+    </label>
   )
 }
 
@@ -191,7 +180,7 @@ function FunnelPanel({ funnel, range, onChange }: { funnel: AdminFunnel; range: 
     { label: 'Completed', value: funnel.completed_bookings ?? funnel.completed, pct: funnel.booked_to_completed_pct, tint: 'bg-amber-50 text-amber-800' },
   ]
   return (
-    <section className={`${dashCardClass} flex h-full flex-col p-5`}>
+    <section className={`${dashCardClass} flex h-full flex-col rounded-[18px] p-5`}>
       <div className="flex items-center justify-between gap-3">
         <h3 className="text-base font-semibold text-zinc-950">Company funnel (this month)</h3>
         <PeriodMenu value={range} onChange={onChange} />
@@ -264,6 +253,7 @@ function ActivityChart({
 }) {
   return (
     <ActivityBars
+      variant="premium"
       title="Platform activity"
       subtitle="Bookings, calls and messages across all agencies and clients."
       points={points}
@@ -280,6 +270,8 @@ function SuperAdminOverview() {
   const [chartRange, setChartRange] = useState(daysBack(30))
   const [bellOpen, setBellOpen] = useState(false)
   const [dismissed, setDismissed] = useState<Set<string>>(() => new Set())
+  const [signupFind, setSignupFind] = useState('')
+  const [requestFind, setRequestFind] = useState('')
   const overview = useApiData((token) => api.admin.overview(token), [])
   const dashboard = useApiData(
     (token) =>
@@ -320,7 +312,7 @@ function SuperAdminOverview() {
                 setDraft(cardRange)
                 setRangeOpen((open) => !open)
               }}
-              className="inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-sm text-zinc-600 shadow-sm ring-1 ring-zinc-200"
+              className="inline-flex h-11 items-center gap-2 rounded-full bg-white px-4 text-sm text-zinc-600 shadow-sm ring-1 ring-zinc-200"
             >
               <CalendarDaysIcon className="size-4 text-zinc-400" />
               {pretty(cardRange.start)} – {pretty(cardRange.end)}
@@ -369,7 +361,7 @@ function SuperAdminOverview() {
               type="button"
               aria-label="Alerts"
               onClick={() => setBellOpen((open) => !open)}
-              className="relative flex size-10 items-center justify-center rounded-xl bg-zinc-50 text-zinc-600 shadow-sm ring-1 ring-zinc-200 hover:bg-white"
+              className="relative flex size-11 items-center justify-center rounded-full bg-white text-zinc-600 shadow-sm ring-1 ring-zinc-200 hover:bg-zinc-50"
             >
               <BellIcon className="size-5" />
               {alerts.length > 0 ? (
@@ -432,46 +424,56 @@ function SuperAdminOverview() {
       ) : (
         <>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <MetricCard label="Total Clients" metric={stats.clients} href="/admin/clients" icon={<UsersIcon className="size-5" />} tone="bg-blue-50 text-blue-600" stroke="#2563eb" />
-            <MetricCard label="Active" metric={stats.active} href="/admin/clients?status=active" icon={<CheckCircleIcon className="size-5" />} tone="bg-emerald-50 text-emerald-600" stroke="#10b981" />
-            <MetricCard label="Pending activation" metric={stats.pending} href="/admin/clients?status=pending" icon={<ClockIcon className="size-5" />} tone="bg-amber-50 text-amber-600" stroke="#f59e0b" />
-            <MetricCard label="Suspended" metric={stats.suspended} href="/admin/clients?status=suspended" icon={<PauseIcon className="size-5" />} tone="bg-rose-50 text-rose-600" stroke="#f43f5e" />
+            <MetricCard label="Total Clients" metric={stats.clients} href="/admin/clients" icon={<UsersIcon className="size-5" />} tone="bg-blue-100 text-blue-500" stroke="#60a5fa" />
+            <MetricCard label="Active" metric={stats.active} href="/admin/clients?status=active" icon={<CheckCircleIcon className="size-5" />} tone="bg-emerald-100 text-emerald-500" stroke="#34d399" />
+            <MetricCard label="Pending activation" metric={stats.pending} href="/admin/clients?status=pending" icon={<ClockIcon className="size-5" />} tone="bg-amber-100 text-amber-500" stroke="#fbbf24" />
+            <MetricCard label="Suspended" metric={stats.suspended} href="/admin/clients?status=suspended" icon={<PauseIcon className="size-5" />} tone="bg-rose-100 text-rose-500" stroke="#fb7185" />
           </div>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-            <MetricCard label="Total Bookings" metric={stats.bookings} icon={<CalendarDaysIcon className="size-5" />} tone="bg-sky-50 text-sky-600" stroke="#0284c7" />
-            <MetricCard label="Conversations" metric={stats.conversations} icon={<ChatBubbleLeftRightIcon className="size-5" />} tone="bg-violet-50 text-violet-600" stroke="#7c3aed" />
-            <MetricCard label="Calls" metric={stats.calls} icon={<PhoneIcon className="size-5" />} tone="bg-cyan-50 text-cyan-600" stroke="#0891b2" />
-            <MetricCard label="Messages" metric={stats.messages} icon={<EnvelopeIcon className="size-5" />} tone="bg-indigo-50 text-indigo-600" stroke="#4f46e5" />
-            <MetricCard label="$ recovered this month" metric={stats.recovered} money icon={<BanknotesIcon className="size-5" />} tone="bg-emerald-50 text-emerald-600" stroke="#059669" />
+            <MetricCard label="Total Bookings" metric={stats.bookings} icon={<CalendarDaysIcon className="size-5" />} tone="bg-violet-100 text-violet-500" stroke="#a78bfa" />
+            <MetricCard label="Conversations" metric={stats.conversations} icon={<ChatBubbleLeftRightIcon className="size-5" />} tone="bg-sky-100 text-sky-500" stroke="#38bdf8" />
+            <MetricCard label="Calls" metric={stats.calls} icon={<PhoneIcon className="size-5" />} tone="bg-emerald-100 text-emerald-500" stroke="#34d399" />
+            <MetricCard label="Messages" metric={stats.messages} icon={<EnvelopeIcon className="size-5" />} tone="bg-orange-100 text-orange-500" stroke="#fb923c" />
+            <MetricCard label="$ recovered this month" metric={stats.recovered} money icon={<BanknotesIcon className="size-5" />} tone="bg-rose-100 text-rose-500" stroke="#fb7185" />
           </div>
           <div className="grid items-stretch gap-4 xl:grid-cols-2">
             <FunnelPanel funnel={stats.funnel} range={funnelRange} onChange={setFunnelRange} />
-            <ActivityChart points={stats.activity} range={chartRange} onChange={setChartRange} />
+            <div className="flex h-full min-h-0 flex-col">
+              <ActivityChart points={stats.activity} range={chartRange} onChange={setChartRange} />
+            </div>
           </div>
         </>
       )}
 
       <div className="grid items-stretch gap-4 lg:grid-cols-2">
-        <section className={`${dashCardClass} flex flex-col`}>
-          <div className="flex items-center justify-between px-5 py-4">
+        <section className={`${dashCardClass} flex h-full flex-col rounded-[18px] p-5`}>
+          <div className="flex items-center justify-between gap-3">
             <h3 className="text-base font-semibold text-zinc-950">Recent sign-ups</h3>
             <Link href="/admin/clients" className="text-sm font-medium text-blue-600 hover:text-blue-700">
               View all
             </Link>
           </div>
-          <div className="grid grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_auto_auto_auto] gap-3 px-5 pb-2 text-[11px] font-medium tracking-wide text-zinc-400 uppercase">
-            <span>Client</span>
-            <span>Agency</span>
-            <span>Joined</span>
-            <span>Status</span>
-            <span className="sr-only">Actions</span>
-          </div>
-          <ul className="divide-y divide-zinc-100">
-            {(overview.data?.recent_tenants.length ?? 0) === 0 && !overview.loading ? (
-              <li className="px-5 py-10 text-center text-sm text-zinc-500">No clients yet.</li>
-            ) : null}
-            {(overview.data?.recent_tenants ?? []).map((tenant) => (
-              <li key={tenant.id} className="grid grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_auto_auto_auto] items-center gap-3 px-5 py-3">
+          <CardFind value={signupFind} placeholder="Search sign-ups" onChange={setSignupFind} />
+          <div className="agency-scroll mt-3 h-80 overflow-auto overscroll-contain">
+            <div className="grid min-w-[36rem] grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_auto_auto_auto] gap-3 pb-2 text-[11px] font-medium tracking-wide text-zinc-400 uppercase">
+              <span>Client</span>
+              <span>Agency</span>
+              <span>Joined</span>
+              <span>Status</span>
+              <span className="sr-only">Actions</span>
+            </div>
+            <ul className="min-w-[36rem] divide-y divide-zinc-100">
+              {(overview.data?.recent_tenants.length ?? 0) === 0 && !overview.loading ? (
+                <li className="py-10 text-center text-sm text-zinc-500">No clients yet.</li>
+              ) : null}
+              {(overview.data?.recent_tenants ?? [])
+                .filter((tenant) => {
+                  const needle = signupFind.trim().toLowerCase()
+                  if (!needle) return true
+                  return `${tenant.name} ${tenant.parent_name ?? ''}`.toLowerCase().includes(needle)
+                })
+                .map((tenant) => (
+              <li key={tenant.id} className="grid grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_auto_auto_auto] items-center gap-3 py-3">
                 <Link href={`/admin/clients/${encodeURIComponent(tenant.id)}`} className="flex min-w-0 items-center gap-2.5">
                   <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600">
                     <BuildingOffice2Icon className="size-4" />
@@ -494,15 +496,16 @@ function SuperAdminOverview() {
                 </Dropdown>
               </li>
             ))}
-          </ul>
+            </ul>
+          </div>
         </section>
 
-        <section className={`${dashCardClass} flex min-h-72 flex-col`}>
-          <div className="flex items-center justify-between px-5 py-4">
-            <h3 className="text-base font-semibold text-zinc-950">
+        <section className={`${dashCardClass} flex h-full flex-col rounded-[18px] p-5`}>
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="flex items-center gap-2 text-base font-semibold text-zinc-950">
               Open plan requests
               {(overview.data?.open_plan_requests ?? 0) > 0 ? (
-                <span className="ml-2 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[11px] font-semibold text-white">
                   {overview.data?.open_plan_requests}
                 </span>
               ) : null}
@@ -511,17 +514,24 @@ function SuperAdminOverview() {
               Manage
             </Link>
           </div>
+          <CardFind value={requestFind} placeholder="Search requests" onChange={setRequestFind} />
           {(overview.data?.recent_requests.length ?? 0) === 0 ? (
-            <div className="flex flex-1 flex-col items-center justify-center px-6 py-10 text-center">
+            <div className="flex h-80 flex-col items-center justify-center px-6 text-center">
               <span className="flex size-16 items-center justify-center rounded-full bg-blue-50 text-blue-500">
                 <DocumentTextIcon className="size-7" />
               </span>
               <p className="mt-4 text-sm text-zinc-500">No open requests. All caught up.</p>
             </div>
           ) : (
-            <ul className="divide-y divide-zinc-100">
-              {(overview.data?.recent_requests ?? []).map((request) => (
-                <li key={request.id} className="flex items-center justify-between gap-3 px-5 py-3.5">
+            <ul className="agency-scroll mt-1 h-80 divide-y divide-zinc-100 overflow-y-auto overscroll-contain">
+              {(overview.data?.recent_requests ?? [])
+                .filter((request) => {
+                  const needle = requestFind.trim().toLowerCase()
+                  if (!needle) return true
+                  return `${request.tenant_name ?? ''} ${request.requested_plan_id ?? ''} ${request.message ?? ''}`.toLowerCase().includes(needle)
+                })
+                .map((request) => (
+                <li key={request.id} className="flex items-center justify-between gap-3 py-3.5">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium text-zinc-950">{request.tenant_name ?? request.tenant_id}</p>
                     <p className="truncate text-xs text-zinc-500">

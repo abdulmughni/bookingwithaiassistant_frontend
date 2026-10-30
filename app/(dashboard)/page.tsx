@@ -6,8 +6,6 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/react'
 import clsx from 'clsx'
 import {
-  ArrowDownIcon,
-  ArrowUpIcon,
   ArrowUpRightIcon,
   CalendarDaysIcon,
   CheckCircleIcon,
@@ -18,6 +16,7 @@ import { ChevronDownIcon } from '@heroicons/react/16/solid'
 import { ActivityBars } from '@/components/activity-bars'
 import { Button } from '@/components/button'
 import { PageShell, dashCardClass } from '@/components/dashboard-ui'
+import { KpiStatCard } from '@/components/kpi-stat-card'
 import { Input } from '@/components/input'
 import { Badge } from '@/components/badge'
 import { SourceBadge } from '@/components/channel-icon'
@@ -54,24 +53,6 @@ function dayKeyInTz(d: Date, timeZone: string): string {
 // KPI cards
 // ---------------------------------------------------------------------------
 
-function Sparkline({ values, color }: { values: number[]; color: string }) {
-  if (values.length < 2) return null
-  const width = 88
-  const height = 36
-  const max = Math.max(...values, 1)
-  const min = Math.min(...values, 0)
-  const span = max - min || 1
-  const step = width / (values.length - 1)
-  const points = values
-    .map((value, index) => `${index * step},${height - 4 - ((value - min) / span) * (height - 10)}`)
-    .join(' ')
-  return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="h-9 w-20 shrink-0" aria-hidden>
-      <polyline fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" points={points} />
-    </svg>
-  )
-}
-
 function percentChange(current: number, previous: number | null | undefined) {
   if (previous == null) return null
   if (previous === 0) return current === 0 ? 0 : null
@@ -97,27 +78,19 @@ function KpiCard({
   series?: number[]
   delta?: number | null
 }) {
+  const trendTone = delta == null || delta === 0 ? 'flat' : delta > 0 ? 'up' : 'down'
+  const trend = delta == null ? hint : delta === 0 ? 'No change' : `${Math.abs(delta)}% from last month`
   return (
-    <article className={`${dashCardClass} h-full p-4`}>
-      <div className="flex items-center gap-3">
-        <span className={`flex size-11 shrink-0 items-center justify-center rounded-full ${tone}`}>{icon}</span>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm text-zinc-500 dark:text-zinc-400">{label}</p>
-          <p className="mt-0.5 text-2xl font-semibold tracking-tight tabular-nums text-zinc-950 dark:text-white">{value}</p>
-          {delta == null ? (
-            hint ? <p className="mt-1 text-xs text-zinc-400">{hint}</p> : null
-          ) : delta === 0 ? (
-            <p className="mt-1 text-xs text-zinc-400">No change</p>
-          ) : (
-            <p className={`mt-1 flex items-center gap-1 text-xs font-medium ${delta > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-              {delta > 0 ? <ArrowUpIcon className="size-3" /> : <ArrowDownIcon className="size-3" />}
-              {Math.abs(delta)}% from last month
-            </p>
-          )}
-        </div>
-        <Sparkline values={series ?? []} color={stroke} />
-      </div>
-    </article>
+    <KpiStatCard
+      label={label}
+      value={value}
+      trend={trend}
+      trendTone={trendTone}
+      icon={icon}
+      tone={tone}
+      stroke={stroke}
+      series={series ?? []}
+    />
   )
 }
 
@@ -182,7 +155,7 @@ function CompletionGauge({
   const dash = (pct / 100) * circumference
 
   return (
-    <section className={`${dashCardClass} flex h-full min-h-full flex-col p-5`}>
+    <section className={`${dashCardClass} flex h-full min-h-full flex-col rounded-[18px] p-5`}>
         <h2 className="text-base font-semibold text-zinc-950 dark:text-white">Completion rate</h2>
 
         {loading ? (
@@ -303,27 +276,29 @@ function NextAppointmentCard({
   loading: boolean
 }) {
   return (
-    <section className="flex h-full flex-col overflow-hidden rounded-2xl bg-linear-to-br from-emerald-950 to-emerald-800 p-5 text-white shadow-sm">
-        <div className="flex items-center gap-2 text-sm font-medium text-zinc-300">
-          <ClockIcon className="size-4" />
+    <section className={`${dashCardClass} flex h-full flex-col rounded-[18px] p-5`}>
+        <div className="flex items-center gap-2 text-sm font-medium text-zinc-500">
+          <span className="flex size-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-500">
+            <ClockIcon className="size-5" />
+          </span>
           Next appointment
         </div>
 
         {loading ? (
-          <div className="mt-6 h-24 animate-pulse rounded-xl bg-white/10" />
+          <div className="mt-6 h-24 animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-800" />
         ) : booking ? (
           <>
-            <p className="mt-4 text-lg font-semibold text-white">
+            <p className="mt-4 text-lg font-semibold text-zinc-950">
               {booking.customer_name || 'Customer'}
             </p>
-            <p className="mt-1 text-sm text-zinc-300">
+            <p className="mt-1 text-sm text-zinc-500">
               {booking.service_type || 'Appointment'}
             </p>
-            <p className="mt-4 text-2xl font-semibold tracking-tight text-white">
+            <p className="mt-4 text-2xl font-semibold tracking-tight text-zinc-950">
               {booking.selected_slot ? formatDateTime(booking.selected_slot, tz) : '—'}
             </p>
             <div className="mt-auto pt-6">
-              <Button href="/bookings" color="white">
+              <Button href="/bookings" color="brand">
                 View all bookings
               </Button>
             </div>
@@ -332,15 +307,15 @@ function NextAppointmentCard({
           <>
             <div className="mt-5 flex items-start justify-between gap-4">
               <div>
-                <p className="text-base font-medium text-white">No upcoming appointments scheduled.</p>
-                <p className="mt-1 text-sm text-emerald-100/80">When a client books with you, it will appear here.</p>
+                <p className="text-base font-medium text-zinc-950">No upcoming appointments scheduled.</p>
+                <p className="mt-1 text-sm text-zinc-500">When a client books with you, it will appear here.</p>
               </div>
-              <span className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-emerald-100">
+              <span className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
                 <CalendarDaysIcon className="size-7" />
               </span>
             </div>
             <div className="mt-auto pt-6">
-              <Button href="/bookings" color="white">
+              <Button href="/bookings" color="brand">
                 View all bookings
               </Button>
             </div>
@@ -362,7 +337,7 @@ function UpcomingList({
   const items = (bookings ?? []).slice(0, 6)
 
   return (
-    <section className={`${dashCardClass} flex h-full flex-col p-5`}>
+    <section className={`${dashCardClass} flex h-full flex-col rounded-[18px] p-5`}>
         <div className="flex items-center justify-between">
           <h2 className="text-base font-semibold text-zinc-950 dark:text-white">Upcoming appointments</h2>
           <Button href="/bookings" plain className="text-xs">
@@ -531,7 +506,7 @@ function DashboardPageInner() {
           <p className="mt-1 text-sm text-zinc-500">Here is your booking activity at a glance.</p>
         </div>
         <div className="flex shrink-0 flex-nowrap items-center gap-2">
-          <div className="inline-flex rounded-xl bg-white p-1 shadow-sm ring-1 ring-zinc-200">
+          <div className="inline-flex h-11 items-center rounded-full bg-white p-1 shadow-sm ring-1 ring-zinc-200">
             {(
               [
                 ['week', 'Week'],
@@ -546,8 +521,8 @@ function DashboardPageInner() {
                   type="button"
                   onClick={() => openRange(presets[kind].start, presets[kind].end)}
                   className={clsx(
-                    'rounded-lg px-3 py-1.5 text-sm font-semibold',
-                    selected ? 'bg-emerald-800 text-white' : 'text-zinc-600 hover:bg-zinc-100',
+                    'rounded-full px-3 py-1.5 text-sm font-semibold',
+                    selected ? 'bg-blue-600 text-white' : 'text-zinc-600 hover:bg-zinc-100',
                   )}
                 >
                   {label}
@@ -563,7 +538,7 @@ function DashboardPageInner() {
                 setDraftEnd(range?.end ?? '')
                 setRangeOpen((open) => !open)
               }}
-              className="inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-sm text-zinc-600 shadow-sm ring-1 ring-zinc-200"
+              className="inline-flex h-11 items-center gap-2 rounded-full bg-white px-4 text-sm text-zinc-600 shadow-sm ring-1 ring-zinc-200"
             >
               <CalendarDaysIcon className="size-4 shrink-0 text-zinc-400" />
               <span className="whitespace-nowrap">{range ? formatRangeWithYear(range.start, range.end) : 'All time'}</span>
@@ -641,8 +616,8 @@ function DashboardPageInner() {
               value={statsView?.total_bookings ?? 0}
               hint={`${statsView?.confirmed_bookings ?? 0} confirmed`}
               icon={<CalendarDaysIcon className="size-5" />}
-              tone="bg-blue-50 text-blue-600"
-              stroke="#2563eb"
+              tone="bg-blue-100 text-blue-500"
+              stroke="#60a5fa"
               series={statsView?.daily?.map((point) => point.count)}
               delta={percentChange(statsView?.total_bookings ?? 0, statsView?.previous_total_bookings)}
             />
@@ -651,8 +626,8 @@ function DashboardPageInner() {
               value={statsView?.completed_bookings ?? 0}
               hint={`${statsView?.cancelled_bookings ?? 0} cancelled`}
               icon={<CheckCircleIcon className="size-5" />}
-              tone="bg-emerald-50 text-emerald-600"
-              stroke="#059669"
+              tone="bg-emerald-100 text-emerald-500"
+              stroke="#34d399"
               series={statsView?.completed_daily?.map((point) => point.count)}
               delta={percentChange(statsView?.completed_bookings ?? 0, statsView?.previous_completed_bookings)}
             />
@@ -661,8 +636,8 @@ function DashboardPageInner() {
               value={statsView?.upcoming_bookings ?? 0}
               hint="Scheduled ahead"
               icon={<ClockIcon className="size-5" />}
-              tone="bg-violet-50 text-violet-600"
-              stroke="#7c3aed"
+              tone="bg-violet-100 text-violet-500"
+              stroke="#a78bfa"
               series={statsView?.upcoming_daily?.map((point) => point.count)}
               delta={percentChange(statsView?.upcoming_bookings ?? 0, statsView?.previous_upcoming_bookings)}
             />
@@ -675,8 +650,8 @@ function DashboardPageInner() {
                   : `${statsView?.total_channel_accounts ?? 0} channels`
               }
               icon={<ChatBubbleLeftRightIcon className="size-5" />}
-              tone="bg-orange-50 text-orange-600"
-              stroke="#ea580c"
+              tone="bg-orange-100 text-orange-500"
+              stroke="#fb923c"
               series={statsView?.conversation_daily?.map((point) => point.count)}
               delta={percentChange(statsView?.active_conversations ?? 0, statsView?.previous_active_conversations)}
             />
@@ -685,9 +660,10 @@ function DashboardPageInner() {
       </div>
 
       {/* Chart + gauge */}
-      <div className="grid grid-cols-1 items-stretch gap-4 lg:grid-cols-3">
-        <div className="h-full lg:col-span-2">
+      <div className="grid grid-cols-1 items-stretch gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+        <div className="flex h-full min-h-0 flex-col">
           <ActivityBars
+            variant="premium"
             title="Booking activity"
             subtitle={`New bookings · ${chartCaption(windowKind)}`}
             points={activityPoints(chartStats)}

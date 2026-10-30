@@ -17,6 +17,7 @@ import {
   type BrandThemeColors,
 } from '@/lib/brand-presets'
 import { useColorMode } from '@/lib/color-mode'
+import { readConsoleTheme, writeConsoleTheme } from '@/lib/console-theme'
 import { useApiToken } from '@/lib/hooks'
 
 function BrandPreview({
@@ -120,9 +121,12 @@ function AppearanceMode() {
 export function AgencyBrandForm({
   agencyId,
   showLogo = true,
+  persist = 'account',
 }: {
   agencyId?: string
   showLogo?: boolean
+  /** Browser keeps the admin console palette on this device. Account saves to the signed-in company. */
+  persist?: 'account' | 'browser'
 }) {
   const getToken = useApiToken()
   const [colors, setColors] = useState<BrandThemeColors>(CURRENT_THEME)
@@ -134,6 +138,10 @@ export function AgencyBrandForm({
     let cancelled = false
     ;(async () => {
       try {
+        if (persist === 'browser') {
+          if (!cancelled) setColors(readConsoleTheme())
+          return
+        }
         const token = await getToken()
         if (!showLogo) {
           const mine = await api.brand.me(token)
@@ -153,7 +161,7 @@ export function AgencyBrandForm({
     return () => {
       cancelled = true
     }
-  }, [agencyId, getToken, showLogo])
+  }, [agencyId, getToken, persist, showLogo])
 
   function setColor(key: keyof BrandThemeColors, value: string) {
     setColors((current) => ({ ...current, [key]: value }))
@@ -170,6 +178,12 @@ export function AgencyBrandForm({
     ) as BrandThemeColors
     setSavingColors(true)
     try {
+      if (persist === 'browser') {
+        writeConsoleTheme(theme)
+        setColors(theme)
+        toast.success('Colors saved')
+        return
+      }
       const token = await getToken()
       const saved = showLogo
         ? await api.admin.saveBrandColors(token, agencyId ?? '', theme)
