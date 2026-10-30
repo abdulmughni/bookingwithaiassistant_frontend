@@ -3,13 +3,15 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState, type ReactNode } from 'react'
-import { useAuth } from '@clerk/nextjs'
+import { useAuth, useClerk, useUser } from '@clerk/nextjs'
 import {
   ArrowPathIcon,
   BuildingOffice2Icon,
   CalendarDaysIcon,
   ChartBarSquareIcon,
   ChatBubbleLeftRightIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
   Cog6ToothIcon,
   CreditCardIcon,
   EnvelopeIcon,
@@ -21,6 +23,8 @@ import {
   UserGroupIcon,
   UsersIcon,
 } from '@heroicons/react/20/solid'
+
+import { Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/react'
 
 import { AccountMenu } from '@/components/account-menu'
 import { AgencyNotificationBell } from '@/components/admin/agency-notification-bell'
@@ -80,12 +84,17 @@ function agencyItemCurrent(
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { isLoaded, userId } = useAuth()
-  const { isAdmin, isAgency, loading } = useIsAdmin()
+  const { isAdmin, isAgency, isAgencyStaff, loading } = useIsAdmin()
   const { brand, loading: brandLoading } = useAgencyBrand(isAgency)
   const router = useRouter()
   const pathname = usePathname()
   const [view, setView] = useState<string | null>(null)
   const [section, setSection] = useState<string | null>(null)
+  const [collapsed, setCollapsed] = useState(false)
+  useEffect(() => {
+    if (!isAgency) return
+    setCollapsed(window.localStorage.getItem('agency-sidebar-collapsed') === '1')
+  }, [isAgency])
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     setView(params.get('view'))
@@ -126,11 +135,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <SidebarLayout
+      sidebarCollapsed={isAgency && collapsed}
       navbar={
         <Navbar>
           <NavbarSpacer />
-          {isAgency ? <AgencyNotificationBell /> : null}
-          <AccountMenu portalName={portalName} compact />
+          {isAgency ? <AgencyNotificationBell /> : <AccountMenu portalName={portalName} compact />}
         </Navbar>
       }
       sidebar={
@@ -138,13 +147,31 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <SidebarHeader>
             <div className="flex min-w-0 flex-col gap-0 px-2 py-0.5">
               {isAgency ? (
-                <div className="min-w-0">
-                  <ShellBrand
-                    loading={brandLoading}
-                    logoUrl={brandAssetUrl(brand?.logo_url)}
-                    name={brand?.company_name}
-                  />
-                  <p className="truncate pl-1 text-[11px] text-zinc-400">Agency dashboard</p>
+                <div className="flex min-w-0 items-start justify-between gap-1">
+                  <div className="min-w-0">
+                    <ShellBrand
+                      loading={brandLoading}
+                      logoUrl={brandAssetUrl(brand?.logo_url)}
+                      name={collapsed ? null : brand?.company_name}
+                    />
+                    {collapsed ? null : (
+                      <p className="truncate pl-1 text-[11px] text-zinc-400">Agency dashboard</p>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                    onClick={() => {
+                      setCollapsed((value) => {
+                        const next = !value
+                        window.localStorage.setItem('agency-sidebar-collapsed', next ? '1' : '0')
+                        return next
+                      })
+                    }}
+                    className="mt-1 inline-flex size-7 shrink-0 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-blue-50 hover:text-blue-600 motion-safe:duration-200"
+                  >
+                    {collapsed ? <ChevronRightIcon className="size-4" /> : <ChevronLeftIcon className="size-4" />}
+                  </button>
                 </div>
               ) : (
                 <>
@@ -163,6 +190,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 <SidebarItem
                   key={item.href}
                   href={item.href}
+                  title={isAgency && collapsed ? item.label : undefined}
                   pill
                   current={
                     isAgency
@@ -173,7 +201,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   }
                 >
                   <item.icon data-slot="icon" />
-                  <SidebarLabel>{item.label}</SidebarLabel>
+                  {isAgency && collapsed ? null : <SidebarLabel>{item.label}</SidebarLabel>}
                 </SidebarItem>
               ))}
             </SidebarSection>
@@ -181,22 +209,32 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <SidebarSpacer />
           </SidebarBody>
 
-          <SidebarFooter>
-            {isAgency ? <AgencyPlanCard /> : null}
-            <AccountMenu portalName={portalName} />
+          <SidebarFooter className={isAgency ? 'border-t-0 bg-transparent' : undefined}>
+            {isAgency ? <AgencyPlanCard compact={collapsed} /> : null}
+            {isAgency ? (
+              <AgencyProfileCard agencyName={portalName} compact={collapsed} staff={isAgencyStaff} />
+            ) : (
+              <AccountMenu portalName={portalName} />
+            )}
           </SidebarFooter>
         </Sidebar>
       }
     >
       {isAgency ? <BrandTheme theme={brand?.theme} /> : null}
-      <div className="agency-canvas min-h-full bg-zinc-50/90 px-4 py-6 sm:px-6 lg:px-8 lg:py-8 dark:bg-zinc-950">
+      <div
+        className={
+          isAgency
+            ? 'agency-canvas min-h-full overflow-x-hidden bg-[radial-gradient(900px_280px_at_82%_-8%,rgba(196,181,253,0.38),transparent_60%),radial-gradient(720px_260px_at_100%_0%,rgba(191,219,254,0.5),transparent_55%)] px-4 py-6 sm:px-6 lg:px-8 lg:py-8'
+            : 'agency-canvas min-h-full bg-zinc-50/90 px-4 py-6 sm:px-6 lg:px-8 lg:py-8 dark:bg-zinc-950'
+        }
+      >
         {children}
       </div>
     </SidebarLayout>
   )
 }
 
-function AgencyPlanCard() {
+function AgencyPlanCard({ compact = false }: { compact?: boolean }) {
   const { enabled } = useAgencyDemo()
   const clients = useApiData((token) => api.admin.listTenants(token), [])
   const [refreshing, setRefreshing] = useState(false)
@@ -234,14 +272,29 @@ function AgencyPlanCard() {
         minutes: { used: minuteUsed, quota: minuteQuota },
       }
 
+  if (compact) {
+    return (
+      <Link
+        href="/admin/credits"
+        title="Your plan"
+        className="mb-3 flex items-center justify-center rounded-2xl border border-zinc-200 bg-white p-2 text-blue-600 shadow-sm"
+      >
+        <CreditCardIcon className="size-5" />
+      </Link>
+    )
+  }
+
   return (
-    <div className="mb-3 rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
+    <div className="mb-3 rounded-2xl border border-zinc-200/80 bg-white p-3 shadow-sm">
       <p className="text-[10px] font-semibold tracking-wide text-zinc-400">YOUR PLAN</p>
       <div className="mt-1 flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="flex items-center gap-1 truncate text-sm font-semibold text-zinc-950 dark:text-white">
             {view.name}
             {view.featured ? <span className="text-[10px] text-amber-500">★</span> : null}
+            {view.featured || view.name !== 'No pack' ? (
+              <span className="rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-600">Active</span>
+            ) : null}
           </p>
           <p className="mt-0.5 text-[11px] text-zinc-500">
             {view.until ? (
@@ -271,11 +324,88 @@ function AgencyPlanCard() {
         <UsageMeter icon={<ChatBubbleLeftRightIcon className="size-3.5" />} label="Messages" used={view.messages.used} quota={view.messages.quota} />
         <UsageMeter icon={<PhoneIcon className="size-3.5" />} label="Voice minutes" used={view.minutes.used} quota={view.minutes.quota} />
       </div>
-      <Link href="/admin/credits" className="mt-2.5 inline-flex items-center gap-1 text-xs font-medium text-brand-600 hover:text-brand-700">
-        Manage plan
-        <span aria-hidden>↗</span>
+      <Link
+        href="/admin/credits"
+        className="mt-3 flex w-full items-center justify-center gap-1 rounded-xl bg-blue-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-blue-700"
+      >
+        Manage Plan
+        <span aria-hidden>→</span>
       </Link>
     </div>
+  )
+}
+
+function AgencyProfileCard({
+  agencyName,
+  compact,
+  staff,
+}: {
+  agencyName: string
+  compact: boolean
+  staff: boolean
+}) {
+  const { user } = useUser()
+  const { openUserProfile, signOut } = useClerk()
+  if (!user) return null
+  const email = user.primaryEmailAddress?.emailAddress ?? ''
+  const name = user.fullName || user.firstName || email || 'Account'
+  const role = staff ? 'Team member' : 'Agency owner'
+  const initials = name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? '')
+    .join('')
+
+  return (
+    <Menu as="div" className="relative">
+      <MenuButton
+        title={compact ? `${name} · ${role}` : undefined}
+        className="flex w-full items-center gap-2.5 rounded-2xl border border-zinc-200/80 bg-white p-2.5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md motion-safe:duration-200"
+      >
+        <span className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-blue-50 text-xs font-semibold text-blue-700">
+          {user.imageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={user.imageUrl} alt="" className="size-full object-cover" />
+          ) : (
+            initials || 'A'
+          )}
+        </span>
+        {compact ? null : (
+          <>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-semibold text-zinc-950">{name}</span>
+              <span className="block truncate text-[11px] text-zinc-500">{role}</span>
+              <span className="block truncate text-[11px] text-zinc-400">{agencyName}</span>
+            </span>
+            <span className="shrink-0 text-zinc-300" aria-hidden>›</span>
+          </>
+        )}
+      </MenuButton>
+      <MenuItems
+        anchor="top start"
+        className="z-50 w-56 rounded-xl bg-white p-1 shadow-lg ring-1 ring-zinc-200 [--anchor-gap:8px] focus:outline-none"
+      >
+        <MenuItem>
+          <button
+            type="button"
+            onClick={() => openUserProfile()}
+            className="block w-full rounded-lg px-3 py-2 text-left text-sm text-zinc-700 data-focus:bg-zinc-50"
+          >
+            Manage account
+          </button>
+        </MenuItem>
+        <MenuItem>
+          <button
+            type="button"
+            onClick={() => void signOut()}
+            className="block w-full rounded-lg px-3 py-2 text-left text-sm text-zinc-700 data-focus:bg-zinc-50"
+          >
+            Sign out
+          </button>
+        </MenuItem>
+      </MenuItems>
+    </Menu>
   )
 }
 
@@ -310,8 +440,11 @@ function UsageMeter({
           {used.toLocaleString()} / {quota > 0 ? quota.toLocaleString() : '—'}
         </span>
       </div>
-      <div className="mt-1 h-2 overflow-hidden rounded-full bg-brand-100">
-        <div className={`h-full rounded-full ${warning ? 'bg-amber-500' : 'bg-brand-500'}`} style={{ width: `${pct}%` }} />
+      <div className="mt-1 h-2 overflow-hidden rounded-full bg-blue-100">
+        <div
+          className={`h-full rounded-full motion-safe:transition-[width] motion-safe:duration-500 ${warning ? 'bg-amber-500' : 'bg-blue-500'}`}
+          style={{ width: `${pct}%` }}
+        />
       </div>
       <p className="mt-1 text-[10px] text-zinc-500">{quota > 0 ? `${remaining.toLocaleString()} remaining` : 'No pack assigned'}</p>
     </div>

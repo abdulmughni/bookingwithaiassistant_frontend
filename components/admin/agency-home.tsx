@@ -1,7 +1,8 @@
 'use client'
 
-import { useMemo, useState, type ReactNode } from 'react'
+import { useId, useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
+import { useUser } from '@clerk/nextjs'
 import { toast } from 'sonner'
 import {
   ArrowUpIcon,
@@ -13,6 +14,7 @@ import {
   CheckCircleIcon,
   EnvelopeIcon,
   ExclamationTriangleIcon,
+  MagnifyingGlassIcon,
   PhoneIcon,
   PlusIcon,
   UsersIcon,
@@ -62,6 +64,7 @@ function defaultRange() {
 function Sparkline({ values, color }: { values: number[]; color: string }) {
   const width = 88
   const height = 36
+  const gradientId = useId().replace(/:/g, '')
   if (values.length < 2) {
     return <span className="h-9 w-20 shrink-0" />
   }
@@ -69,12 +72,23 @@ function Sparkline({ values, color }: { values: number[]; color: string }) {
   const min = Math.min(...values, 0)
   const span = max - min || 1
   const step = width / (values.length - 1)
-  const points = values
-    .map((value, index) => `${index * step},${height - 4 - ((value - min) / span) * (height - 10)}`)
-    .join(' ')
+  const coords = values.map((value, index) => {
+    const x = index * step
+    const y = height - 4 - ((value - min) / span) * (height - 10)
+    return `${x},${y}`
+  })
+  const line = coords.join(' ')
+  const area = `0,${height} ${line} ${width},${height}`
   return (
     <svg viewBox={`0 0 ${width} ${height}`} className="h-9 w-20 shrink-0" aria-hidden>
-      <polyline fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" points={points} />
+      <defs>
+        <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.35" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <polygon points={area} fill={`url(#${gradientId})`} />
+      <polyline fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" points={line} />
     </svg>
   )
 }
@@ -103,10 +117,14 @@ function inRange(iso: string | null | undefined, start: string, end: string) {
 }
 
 export function AgencyHome() {
+  const { user } = useUser()
   const [range, setRange] = useState(defaultRange)
   const [draft, setDraft] = useState(defaultRange)
   const [rangeOpen, setRangeOpen] = useState(false)
   const [inviteOpen, setInviteOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const [chartMin, setChartMin] = useState(false)
+  const [clientsMin, setClientsMin] = useState(false)
   const { enabled: demo, setDemo } = useAgencyDemo()
   const { tenantId, isAgencyStaff } = useIsAdmin()
   const { brand } = useAgencyBrand(true)
@@ -148,8 +166,13 @@ export function AgencyHome() {
         { label: 'Revenue this month', value: 'Not tracked', trend: '' },
       ]
   const icons = [UsersIcon, CalendarDaysIcon, PhoneIcon, EnvelopeIcon, BanknotesIcon]
-  const topClients = [...clients].sort((a, b) => (counts.get(b.id)?.bookings ?? 0) - (counts.get(a.id)?.bookings ?? 0)).slice(0, 5)
+  const needle = query.trim().toLowerCase()
+  const topClients = [...clients]
+    .filter((client) => !needle || client.name.toLowerCase().includes(needle))
+    .sort((a, b) => (counts.get(b.id)?.bookings ?? 0) - (counts.get(a.id)?.bookings ?? 0))
+    .slice(0, 5)
   const signups = clients
+    .filter((client) => !needle || client.name.toLowerCase().includes(needle))
     .filter((client) => inRange(client.created_at, range.start, range.end))
     .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
     .slice(0, 5)
@@ -159,15 +182,17 @@ export function AgencyHome() {
 
   return (
     <PageShell>
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-sm text-zinc-500">Welcome back,</p>
-          <h1 className="mt-0.5 text-3xl font-semibold tracking-tight text-zinc-950">{agencyName}</h1>
-          <p className="mt-1 text-sm text-zinc-500">
-            {demo ? agencyDemo.subtitle : 'Your clients, their usage, and what needs a look.'}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          <label className="relative min-w-0 flex-1 sm:max-w-md">
+            <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search clients on this page"
+              className="w-full rounded-full border border-white/80 bg-white py-2 pl-9 pr-3 text-sm text-zinc-700 shadow-sm outline-none ring-1 ring-zinc-200/80 placeholder:text-zinc-400 focus:ring-blue-300"
+            />
+          </label>
           <button
             type="button"
             onClick={() => setDemo(!demo)}
@@ -234,6 +259,15 @@ export function AgencyHome() {
           )}
           <AgencyNotificationBell />
         </div>
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-zinc-950 sm:text-3xl">
+            Welcome back, {user?.firstName || user?.fullName || agencyName}{' '}
+            <span aria-hidden>👋</span>
+          </h1>
+          <p className="mt-1 text-sm text-zinc-500">
+            Here&apos;s an overview of your clients, bookings, and AI performance.
+          </p>
+        </div>
       </div>
 
       {clientsQuery.error && !demo ? <p className="text-sm text-red-600">{clientsQuery.error}</p> : null}
@@ -259,12 +293,14 @@ export function AgencyHome() {
                   ? cardSeries.map((point) => point.messages)
                   : []
           return (
-            <article key={kpi.label} className={`${dashCardClass} flex h-full items-center gap-3 p-4`}>
+            <article key={kpi.label} className={`${dashCardClass} flex h-full items-center gap-3 rounded-[18px] p-4 transition hover:-translate-y-0.5 hover:shadow-md motion-safe:duration-200`}>
               <span className={`flex size-11 shrink-0 items-center justify-center rounded-full ${tones[index] ?? tones[0]}`}>
                 <Icon className="size-5" />
               </span>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm text-zinc-500">{kpi.label}</p>
+                <p className="truncate text-sm text-zinc-500">
+                  {kpi.label.replace(/\b\w/g, (letter) => letter.toUpperCase())}
+                </p>
                 <p className="mt-0.5 text-2xl font-semibold tracking-tight text-zinc-950">{kpi.value}</p>
                 <p className="mt-1 flex min-h-4 items-center gap-1 text-xs font-medium text-emerald-600">
                   {kpi.trend ? (
@@ -281,9 +317,12 @@ export function AgencyHome() {
         })}
       </div>
 
-      <div className="grid items-stretch gap-4 xl:grid-cols-5">
-        <div className="h-full xl:col-span-3">
+      <div className={`grid items-stretch gap-4 ${chartMin ? '' : 'xl:grid-cols-5'}`}>
+        <div className={chartMin ? 'min-w-0' : 'h-full min-w-0 xl:col-span-3'}>
           <ActivityBars
+            variant="premium"
+            minimized={chartMin}
+            onToggleMinimize={() => setChartMin((value) => !value)}
             title="Booking activity"
             subtitle="New bookings across all your clients."
             loading={!demo && activityQuery.loading}
@@ -335,21 +374,32 @@ export function AgencyHome() {
           {!demo && activityQuery.error ? <p className="mt-2 text-sm text-red-600">{activityQuery.error}</p> : null}
         </div>
 
-        <section className={`${dashCardClass} flex h-full flex-col p-5 xl:col-span-2`}>
-          <PanelHead title="Top performing clients" href="/admin/clients" />
-          <table className="mt-2 w-full text-left text-sm">
+        <section className={`${dashCardClass} flex h-full min-w-0 flex-col rounded-[18px] p-5 ${chartMin ? '' : 'xl:col-span-2'}`}>
+          <PanelHead
+            title="Top performing clients"
+            href="/admin/clients"
+            minimized={clientsMin}
+            onToggle={() => setClientsMin((value) => !value)}
+          />
+          {clientsMin ? null : (
+          <div className="mt-2 overflow-x-auto">
+          <table className="w-full min-w-[36rem] text-left text-sm">
             <thead className="text-xs text-zinc-400">
               <tr>
                 <th className="py-2 font-medium">Client</th>
                 <th className="px-2 py-2 font-medium">Bookings</th>
                 <th className="px-2 py-2 font-medium">Calls</th>
                 <th className="px-2 py-2 font-medium">Messages</th>
+                {demo ? <th className="px-2 py-2 font-medium">Revenue</th> : null}
                 <th className="py-2 font-medium">Status</th>
+                {demo ? <th className="py-2 font-medium">Trend</th> : null}
               </tr>
             </thead>
             <tbody>
               {demo
-                ? agencyDemo.clients.map((client) => (
+                ? agencyDemo.clients
+                    .filter((client) => !needle || client.name.toLowerCase().includes(needle))
+                    .map((client) => (
                     <tr key={client.id} className="border-t border-zinc-100">
                       <td className="py-2.5">
                         <span className="flex items-center gap-2">
@@ -360,8 +410,12 @@ export function AgencyHome() {
                       <td className="px-2 tabular-nums text-zinc-600">{client.bookings}</td>
                       <td className="px-2 tabular-nums text-zinc-600">{client.calls}</td>
                       <td className="px-2 tabular-nums text-zinc-600">{client.messages}</td>
+                      <td className="px-2 tabular-nums text-zinc-600">{client.revenue}</td>
                       <td>
                         <Badge color={client.status === 'Active' ? 'green' : 'amber'}>{client.status}</Badge>
+                      </td>
+                      <td className="pl-2">
+                        <Sparkline values={client.trend} color={client.status === 'Active' ? '#10b981' : '#f59e0b'} />
                       </td>
                     </tr>
                   ))
@@ -386,16 +440,18 @@ export function AgencyHome() {
                   })}
             </tbody>
           </table>
-          {!demo && topClients.length === 0 ? <p className="py-6 text-sm text-zinc-500">No clients yet.</p> : null}
+          </div>
+          )}
+          {!demo && !clientsMin && topClients.length === 0 ? <p className="py-6 text-sm text-zinc-500">No clients yet.</p> : null}
         </section>
       </div>
 
       <div className="grid items-stretch gap-4 xl:grid-cols-3">
-        <section className={`${dashCardClass} flex h-full flex-col p-5`}>
+        <section className={`${dashCardClass} flex h-full flex-col rounded-[18px] p-5`}>
           <PanelHead title="Recent client sign-ups" href="/admin/clients" />
           <ul className="divide-y divide-zinc-100">
             {demo
-              ? agencyDemo.signups.map((row) => (
+              ? agencyDemo.signups.filter((row) => !needle || row.name.toLowerCase().includes(needle)).map((row) => (
                   <li key={row.id} className="flex items-center gap-3 py-3">
                     <TradeIcon industry={row.industry} />
                     <span className="min-w-0 flex-1">
@@ -420,7 +476,7 @@ export function AgencyHome() {
           </ul>
         </section>
 
-        <section className={`${dashCardClass} flex h-full flex-col p-5`}>
+        <section className={`${dashCardClass} flex h-full flex-col rounded-[18px] p-5`}>
           <PanelHead title="Needs attention" href="/admin/clients" count={demo ? agencyDemo.attentionCount : attention.length + (alertsQuery.data?.length ?? 0)} />
           <ul className="divide-y divide-zinc-100">
             {demo
@@ -467,7 +523,7 @@ export function AgencyHome() {
           ) : null}
         </section>
 
-        <section className={`${dashCardClass} flex h-full flex-col p-5`}>
+        <section className={`${dashCardClass} flex h-full flex-col rounded-[18px] p-5`}>
           <PanelHead title="Recent activity" href="/admin/activity" />
           <ul>
             {demo
@@ -505,7 +561,19 @@ export function AgencyHome() {
   )
 }
 
-function PanelHead({ title, href, count }: { title: string; href: string; count?: number }) {
+function PanelHead({
+  title,
+  href,
+  count,
+  minimized,
+  onToggle,
+}: {
+  title: string
+  href: string
+  count?: number
+  minimized?: boolean
+  onToggle?: () => void
+}) {
   return (
     <div className="mb-1 flex items-center justify-between gap-3">
       <h2 className="flex items-center gap-2 text-base font-semibold text-zinc-950">
@@ -516,9 +584,21 @@ function PanelHead({ title, href, count }: { title: string; href: string; count?
           </span>
         ) : null}
       </h2>
-      <Link href={href} className="text-sm font-medium text-blue-600 hover:text-blue-700">
-        View all
-      </Link>
+      <span className="flex items-center gap-2">
+        <Link href={href} className="text-sm font-medium text-blue-600 hover:text-blue-700">
+          View all
+        </Link>
+        {onToggle ? (
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-label={minimized ? `Restore ${title}` : `Minimize ${title}`}
+            className="inline-flex size-7 items-center justify-center rounded-lg text-zinc-400 ring-1 ring-zinc-200 hover:bg-zinc-50"
+          >
+            {minimized ? '＋' : '–'}
+          </button>
+        ) : null}
+      </span>
     </div>
   )
 }

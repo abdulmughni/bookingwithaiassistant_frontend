@@ -25,11 +25,11 @@ export const agencyDemo = {
     minutesPct: 25,
   },
   clients: [
-    { id: 'skyline', name: 'Skyline HVAC', industry: 'hvac', bookings: 42, calls: 210, messages: 88, status: 'Active' as const },
-    { id: 'roof', name: 'Instamate Roofing', industry: 'roofing', bookings: 28, calls: 165, messages: 60, status: 'Active' as const },
-    { id: 'plumb', name: 'Instamate Plumbing', industry: 'plumbing', bookings: 16, calls: 120, messages: 55, status: 'Active' as const },
-    { id: 'elec', name: 'Instamate Electrical', industry: 'electrical', bookings: 16, calls: 98, messages: 42, status: 'Active' as const },
-    { id: 'one', name: 'Client One', industry: 'general', bookings: 12, calls: 49, messages: 39, status: 'Pending' as const },
+    { id: 'skyline', name: 'Skyline HVAC', industry: 'hvac', bookings: 42, calls: 210, messages: 88, revenue: '$420', status: 'Active' as const, trend: [2, 3, 3, 4, 5, 6] },
+    { id: 'roof', name: 'Instamate Roofing', industry: 'roofing', bookings: 28, calls: 165, messages: 60, revenue: '$320', status: 'Active' as const, trend: [2, 2, 3, 3, 4, 5] },
+    { id: 'plumb', name: 'Instamate Plumbing', industry: 'plumbing', bookings: 16, calls: 120, messages: 55, revenue: '$210', status: 'Active' as const, trend: [1, 2, 2, 3, 3, 4] },
+    { id: 'elec', name: 'Instamate Electrical', industry: 'electrical', bookings: 16, calls: 98, messages: 42, revenue: '$180', status: 'Active' as const, trend: [1, 1, 2, 2, 3, 3] },
+    { id: 'one', name: 'Client One', industry: 'general', bookings: 12, calls: 49, messages: 39, revenue: '$120', status: 'Pending' as const, trend: [3, 2, 2, 1, 2, 1] },
   ],
   signups: [
     { id: 'one', name: 'Client One', industry: 'general', joined: 'Joined Oct 24, 2026', status: 'Pending' as const },

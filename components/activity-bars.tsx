@@ -1,6 +1,7 @@
 'use client'
 
 import type { ReactNode } from 'react'
+import { ArrowsPointingInIcon, ArrowsPointingOutIcon } from '@heroicons/react/20/solid'
 import {
   Bar,
   BarChart,
@@ -24,6 +25,12 @@ const SERIES = [
   { key: 'bookings', name: 'Bookings', fill: '#1d4ed8' },
   { key: 'calls', name: 'Calls', fill: '#60a5fa' },
   { key: 'messages', name: 'Messages', fill: '#93c5fd' },
+] as const
+
+const PREMIUM_SERIES = [
+  { key: 'bookings', name: 'Bookings', fill: '#1d4ed8' },
+  { key: 'calls', name: 'Calls', fill: '#60a5fa' },
+  { key: 'messages', name: 'Messages', fill: '#c4b5fd' },
 ] as const
 
 function monthKey(date: string) {
@@ -63,12 +70,19 @@ export function ActivityBars({
   points,
   menu,
   loading,
+  variant = 'default',
+  minimized = false,
+  onToggleMinimize,
 }: {
   title: string
   subtitle: string
   points: ActivityPoint[]
   menu?: ReactNode
   loading?: boolean
+  /** Agency home uses thicker pastel bars. Admin keeps the default chart. */
+  variant?: 'default' | 'premium'
+  minimized?: boolean
+  onToggleMinimize?: () => void
 }) {
   const totals = points.reduce(
     (sum, point) => ({
@@ -80,18 +94,32 @@ export function ActivityBars({
   )
   const data = bucket(points)
   const tickEvery = data.length > 16 ? Math.ceil(data.length / 8) - 1 : 0
+  const series = variant === 'premium' ? PREMIUM_SERIES : SERIES
+  const barSize = variant === 'premium' ? 28 : 16
 
   return (
-    <section className={`${dashCardClass} flex h-full flex-col p-5`}>
+    <section className={`${dashCardClass} flex h-full flex-col rounded-[18px] p-5`}>
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-base font-semibold text-zinc-950 dark:text-white">{title}</h2>
           <p className="mt-0.5 text-sm text-zinc-500">{subtitle}</p>
         </div>
-        {menu}
+        <div className="flex shrink-0 items-center gap-2">
+          {menu}
+          {onToggleMinimize ? (
+            <button
+              type="button"
+              onClick={onToggleMinimize}
+              aria-label={minimized ? 'Restore booking activity' : 'Minimize booking activity'}
+              className="inline-flex size-8 items-center justify-center rounded-lg text-zinc-400 ring-1 ring-zinc-200 hover:bg-zinc-50 hover:text-zinc-700"
+            >
+              {minimized ? <ArrowsPointingOutIcon className="size-4" /> : <ArrowsPointingInIcon className="size-4" />}
+            </button>
+          ) : null}
+        </div>
       </div>
-      <div className="mt-3 flex flex-wrap items-center justify-end gap-x-4 gap-y-1">
-        {SERIES.map((item) => (
+      <div className={`mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 ${variant === 'premium' ? 'justify-center' : 'justify-end'}`}>
+        {series.map((item) => (
           <span key={item.key} className="inline-flex items-center gap-1.5 text-xs text-zinc-500">
             <span className="size-2 rounded-full" style={{ background: item.fill }} />
             {item.name}
@@ -101,12 +129,16 @@ export function ActivityBars({
           </span>
         ))}
       </div>
-      {loading ? (
+      {minimized ? null : loading ? (
         <div className="mt-4 h-72 animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-800" />
       ) : (
-        <div className="mt-2 h-72 w-full">
+        <div className="mt-2 h-72 w-full min-w-0">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} barCategoryGap="42%" margin={{ top: 12, right: 8, left: -12, bottom: 0 }}>
+            <BarChart
+              data={data}
+              barCategoryGap={variant === 'premium' ? '28%' : '42%'}
+              margin={{ top: 12, right: 8, left: -12, bottom: 0 }}
+            >
               <CartesianGrid stroke="#ececef" vertical={false} />
               <XAxis
                 dataKey="label"
@@ -117,12 +149,19 @@ export function ActivityBars({
               />
               <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#a1a1aa' }} axisLine={false} tickLine={false} width={32} />
               <Tooltip
-                cursor={{ fill: 'rgba(37, 99, 235, 0.05)' }}
-                contentStyle={{ borderRadius: 8, border: '1px solid #e4e4e7', fontSize: 12 }}
+                cursor={{ fill: 'rgba(37, 99, 235, 0.06)' }}
+                contentStyle={{ borderRadius: 12, border: '1px solid #e4e4e7', fontSize: 12, boxShadow: '0 8px 24px rgba(15,23,42,0.08)' }}
               />
-              <Bar dataKey="bookings" name="Bookings" stackId="day" fill="#1d4ed8" maxBarSize={16} />
-              <Bar dataKey="calls" name="Calls" stackId="day" fill="#60a5fa" maxBarSize={16} />
-              <Bar dataKey="messages" name="Messages" stackId="day" fill="#93c5fd" radius={[4, 4, 0, 0]} maxBarSize={16} />
+              <Bar dataKey="bookings" name="Bookings" stackId="day" fill={series[0].fill} maxBarSize={barSize} />
+              <Bar dataKey="calls" name="Calls" stackId="day" fill={series[1].fill} maxBarSize={barSize} />
+              <Bar
+                dataKey="messages"
+                name="Messages"
+                stackId="day"
+                fill={series[2].fill}
+                radius={[6, 6, 0, 0]}
+                maxBarSize={barSize}
+              />
             </BarChart>
           </ResponsiveContainer>
         </div>
