@@ -52,6 +52,7 @@ export function SidebarLayout({
   desktopHeader,
   contentViewportLocked = false,
   sidebarCollapsed = false,
+  sidebarCard = false,
 }: React.PropsWithChildren<{
   navbar: React.ReactNode
   sidebar: React.ReactNode
@@ -61,6 +62,8 @@ export function SidebarLayout({
   contentViewportLocked?: boolean
   /** Agency home only. Super-admin and client shells leave this false. */
   sidebarCollapsed?: boolean
+  /** Agency only: inset the sidebar as a floating card. */
+  sidebarCard?: boolean
 }>) {
   let [showSidebar, setShowSidebar] = useState(false)
 
@@ -76,8 +79,15 @@ export function SidebarLayout({
       {/* Sidebar on desktop */}
       <div
         className={clsx(
-          'agency-soft fixed inset-y-0 left-0 max-lg:hidden motion-safe:transition-[width] motion-safe:duration-300',
-          sidebarCollapsed ? 'w-[4.75rem]' : 'w-64',
+          'fixed inset-y-0 left-0 max-lg:hidden motion-safe:transition-[width] motion-safe:duration-300',
+          sidebarCard ? 'bg-transparent p-3' : 'agency-soft',
+          sidebarCard
+            ? sidebarCollapsed
+              ? 'w-[6.25rem]'
+              : 'w-[19rem]'
+            : sidebarCollapsed
+              ? 'w-[4.75rem]'
+              : 'w-64',
         )}
       >
         {sidebar}
@@ -107,7 +117,13 @@ export function SidebarLayout({
       <main
         className={clsx(
           'flex min-h-0 flex-1 flex-col lg:min-w-0 lg:pr-0 lg:pt-0 lg:pb-0 motion-safe:transition-[padding] motion-safe:duration-300',
-          sidebarCollapsed ? 'lg:pl-[4.75rem]' : 'lg:pl-64',
+          sidebarCard
+            ? sidebarCollapsed
+              ? 'lg:pl-[6.25rem]'
+              : 'lg:pl-[19rem]'
+            : sidebarCollapsed
+              ? 'lg:pl-[4.75rem]'
+              : 'lg:pl-64',
           contentViewportLocked && 'min-h-0 overflow-hidden',
         )}
       >

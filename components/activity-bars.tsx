@@ -1,7 +1,8 @@
 'use client'
 
+import clsx from 'clsx'
 import type { ReactNode } from 'react'
-import { ArrowsPointingInIcon, ArrowsPointingOutIcon } from '@heroicons/react/20/solid'
+import { ChevronUpIcon } from '@heroicons/react/20/solid'
 import {
   Bar,
   BarChart,
@@ -28,8 +29,8 @@ const SERIES = [
 ] as const
 
 const PREMIUM_SERIES = [
-  { key: 'bookings', name: 'Bookings', fill: '#1d4ed8' },
-  { key: 'calls', name: 'Calls', fill: '#60a5fa' },
+  { key: 'bookings', name: 'Bookings', fill: '#2563eb' },
+  { key: 'calls', name: 'Calls', fill: '#38bdf8' },
   { key: 'messages', name: 'Messages', fill: '#c4b5fd' },
 ] as const
 
@@ -95,30 +96,23 @@ export function ActivityBars({
   const data = bucket(points)
   const tickEvery = data.length > 16 ? Math.ceil(data.length / 8) - 1 : 0
   const series = variant === 'premium' ? PREMIUM_SERIES : SERIES
-  const barSize = variant === 'premium' ? 28 : 16
+  const barSize = variant === 'premium' ? 22 : 16
 
   return (
     <section className={`${dashCardClass} flex h-full flex-col rounded-[18px] p-5`}>
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-base font-semibold text-zinc-950 dark:text-white">{title}</h2>
-          <p className="mt-0.5 text-sm text-zinc-500">{subtitle}</p>
+        <div className="min-w-0">
+          <h2 className="truncate text-base font-semibold text-zinc-950 dark:text-white">{title}</h2>
+          <p className="mt-0.5 text-sm leading-5 text-zinc-500">{subtitle}</p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          {menu}
+          {minimized ? null : menu}
           {onToggleMinimize ? (
-            <button
-              type="button"
-              onClick={onToggleMinimize}
-              aria-label={minimized ? 'Restore booking activity' : 'Minimize booking activity'}
-              className="inline-flex size-8 items-center justify-center rounded-lg text-zinc-400 ring-1 ring-zinc-200 hover:bg-zinc-50 hover:text-zinc-700"
-            >
-              {minimized ? <ArrowsPointingOutIcon className="size-4" /> : <ArrowsPointingInIcon className="size-4" />}
-            </button>
+            <CollapseControl minimized={minimized} label={title} onClick={onToggleMinimize} />
           ) : null}
         </div>
       </div>
-      <div className={`mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 ${variant === 'premium' ? 'justify-center' : 'justify-end'}`}>
+      <div className={`mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 ${variant === 'premium' && !minimized ? 'justify-center' : 'justify-start'}`}>
         {series.map((item) => (
           <span key={item.key} className="inline-flex items-center gap-1.5 text-xs text-zinc-500">
             <span className="size-2 rounded-full" style={{ background: item.fill }} />
@@ -129,7 +123,14 @@ export function ActivityBars({
           </span>
         ))}
       </div>
-      {minimized ? null : loading ? (
+      <div
+        className={clsx(
+          'grid motion-safe:transition-[grid-template-rows,opacity] motion-safe:duration-500 motion-safe:ease-[cubic-bezier(0.22,1,0.36,1)]',
+          minimized ? 'grid-rows-[0fr] opacity-0' : 'mt-1 grid-rows-[1fr] opacity-100',
+        )}
+      >
+        <div className="overflow-hidden">
+      {loading ? (
         <div className="mt-4 h-72 animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-800" />
       ) : (
         <div className="mt-2 h-72 w-full min-w-0">
@@ -166,6 +167,30 @@ export function ActivityBars({
           </ResponsiveContainer>
         </div>
       )}
+        </div>
+      </div>
     </section>
+  )
+}
+
+export function CollapseControl({
+  minimized,
+  label,
+  onClick,
+}: {
+  minimized: boolean
+  label: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={minimized ? `Restore ${label}` : `Minimize ${label}`}
+      title={minimized ? 'Expand' : 'Minimize'}
+      className="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-zinc-50 text-zinc-500 ring-1 ring-zinc-200/90 transition duration-200 hover:bg-blue-600 hover:text-white hover:ring-blue-600"
+    >
+      <ChevronUpIcon className={clsx('size-4 transition-transform duration-300', minimized && 'rotate-180')} />
+    </button>
   )
 }
