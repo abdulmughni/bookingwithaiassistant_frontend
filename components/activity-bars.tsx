@@ -100,7 +100,7 @@ export function ActivityBars({
   const barSize = variant === 'premium' ? 28 : 16
 
   return (
-    <section className={`${dashCardClass} flex h-full flex-col rounded-[18px] p-5`}>
+    <section className={`${dashCardClass} flex h-full min-h-0 flex-1 flex-col rounded-[18px] p-5`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="truncate text-base font-semibold text-zinc-950 dark:text-white">{title}</h2>
@@ -127,14 +127,14 @@ export function ActivityBars({
       <div
         className={clsx(
           'grid min-h-0 motion-safe:transition-[grid-template-rows,opacity] motion-safe:duration-500 motion-safe:ease-[cubic-bezier(0.22,1,0.36,1)]',
-          minimized ? 'grid-rows-[0fr] opacity-0' : 'mt-1 min-h-0 flex-1 grid-rows-[1fr] opacity-100',
+          minimized ? 'grid-rows-[0fr] opacity-0' : 'relative mt-1 min-h-48 flex-1 grid-rows-[1fr] opacity-100',
         )}
       >
-        <div className="flex min-h-0 flex-col overflow-hidden">
+        <div className={variant === 'premium' && !minimized ? 'absolute inset-0' : 'overflow-hidden'}>
       {loading ? (
-        <div className={`mt-4 animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-800 ${variant === 'premium' ? 'min-h-48 flex-1' : 'h-72'}`} />
+        <div className={`mt-4 animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-800 ${variant === 'premium' ? 'h-full' : 'h-72'}`} />
       ) : (
-        <div className={`mt-2 w-full min-w-0 ${variant === 'premium' ? 'min-h-48 flex-1' : 'h-72'}`}>
+        <div className={`w-full min-w-0 ${variant === 'premium' ? 'h-full' : 'mt-2 h-72'}`}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={data}

@@ -383,13 +383,15 @@ export function AgencyHome() {
       </div>
 
       <div className="@container">
-      <div className={`flex flex-col gap-4 @min-[720px]:flex-row ${chartMin ? 'items-start' : 'items-stretch'}`}>
+      <div
+        className={
+          chartMin
+            ? 'flex flex-col items-start gap-4 @min-[720px]:flex-row'
+            : 'grid items-stretch gap-4 @min-[720px]:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]'
+        }
+      >
         <div
-          className={`flex min-w-0 flex-col overflow-hidden motion-safe:transition-[flex-grow,flex-basis,max-width] motion-safe:duration-500 motion-safe:ease-[cubic-bezier(0.22,1,0.36,1)] ${
-            chartMin
-              ? 'w-full @min-[720px]:max-w-[26rem] @min-[720px]:flex-[0_0_26rem]'
-              : 'h-full w-full @min-[720px]:max-w-none @min-[720px]:flex-[3_1_0%]'
-          }`}
+          className={`flex min-h-0 min-w-0 flex-col overflow-hidden ${chartMin ? 'w-full @min-[720px]:max-w-[26rem] @min-[720px]:flex-[0_0_26rem]' : 'h-full'}`}
         >
           <ActivityBars
             variant="premium"
@@ -447,9 +449,7 @@ export function AgencyHome() {
         </div>
 
         <section
-          className={`${dashCardClass} flex h-full min-w-0 flex-col rounded-[18px] p-5 motion-safe:transition-[flex-grow,flex-basis] motion-safe:duration-500 motion-safe:ease-[cubic-bezier(0.22,1,0.36,1)] ${
-            chartMin ? '@min-[720px]:flex-[1_1_0%]' : '@min-[720px]:flex-[2_1_0%]'
-          }`}
+          className={`${dashCardClass} flex h-full min-h-0 min-w-0 flex-col rounded-[18px] p-5 ${chartMin ? '@min-[720px]:flex-1' : ''}`}
         >
           <PanelHead
             title={clientOrder === 'latest' ? 'Latest clients' : 'Top performing clients'}
@@ -459,7 +459,7 @@ export function AgencyHome() {
             extra={<ClientOrderMenu value={clientOrder} onChange={setClientOrder} />}
           />
           <div
-            className={`grid min-h-0 flex-1 motion-safe:transition-[grid-template-rows,opacity] motion-safe:duration-500 motion-safe:ease-[cubic-bezier(0.22,1,0.36,1)] ${
+            className={`grid min-h-0 motion-safe:transition-[grid-template-rows,opacity] motion-safe:duration-500 motion-safe:ease-[cubic-bezier(0.22,1,0.36,1)] ${
               clientsMin ? 'grid-rows-[0fr] opacity-0' : 'grid-rows-[1fr] opacity-100'
             }`}
           >
@@ -469,7 +469,7 @@ export function AgencyHome() {
             placeholder="Search clients"
             onChange={setClientFind}
           />
-          <div className="scroll-hide mt-3 max-h-[18.25rem] overflow-auto overscroll-contain">
+          <div className="scroll-hide mt-3 h-[18.25rem] overflow-auto overscroll-contain">
           <table className="w-full min-w-[36rem] text-left text-sm">
             <thead className="sticky top-0 z-10 bg-white text-xs text-zinc-400">
               <tr>
