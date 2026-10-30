@@ -44,6 +44,7 @@ import {
 import { SidebarLayout } from '@/components/sidebar-layout'
 import { BrandLogo } from '@/components/brand-logo'
 import { BrandTheme } from '@/components/brand-theme'
+import { CURRENT_THEME } from '@/lib/brand-presets'
 import { brandAssetUrl, brandGradientClass } from '@/lib/brand'
 import { useAgencyDemo } from '@/lib/agency-dashboard-demo'
 import { useAgencyBrand, useApiData, useIsAdmin } from '@/lib/hooks'
@@ -215,7 +216,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         )
       }
     >
-      {isAgency ? <BrandTheme theme={brand?.theme} /> : null}
+      <BrandTheme theme={isAgency ? (brand?.theme ?? CURRENT_THEME) : CURRENT_THEME} />
       <div
         className={
           isAgency
@@ -358,7 +359,7 @@ function AgencyPlanCard({ compact = false }: { compact?: boolean }) {
   }
 
   return (
-    <div className="mb-3 rounded-2xl bg-gradient-to-b from-white to-blue-50/40 p-3 shadow-sm ring-1 ring-zinc-200/80">
+    <div className="agency-plan mb-3 rounded-2xl p-3 shadow-sm ring-1 ring-zinc-200/80">
       <p className="text-[10px] font-semibold tracking-wide text-zinc-400">YOUR PLAN</p>
       <div className="mt-1 flex items-start justify-between gap-2">
         <div className="min-w-0">
@@ -534,9 +535,9 @@ function UsageMeter({
           {used.toLocaleString()} / {quota > 0 ? quota.toLocaleString() : '—'}
         </span>
       </div>
-      <div className="mt-1 h-2 overflow-hidden rounded-full bg-blue-100">
+      <div className="mt-1 h-2 overflow-hidden rounded-full bg-brand-100">
         <div
-          className={`h-full rounded-full motion-safe:transition-[width] motion-safe:duration-500 ${warning ? 'bg-amber-500' : 'bg-blue-500'}`}
+          className={`h-full rounded-full motion-safe:transition-[width] motion-safe:duration-500 ${warning ? 'bg-amber-500' : 'bg-brand-600'}`}
           style={{ width: `${pct}%` }}
         />
       </div>

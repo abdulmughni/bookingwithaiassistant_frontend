@@ -16,6 +16,7 @@ import {
   themesMatch,
   type BrandThemeColors,
 } from '@/lib/brand-presets'
+import { useColorMode } from '@/lib/color-mode'
 import { useApiToken } from '@/lib/hooks'
 
 function BrandPreview({
@@ -79,6 +80,38 @@ function BrandPreview({
             Soft panel
           </div>
         </div>
+      </div>
+    </div>
+  )
+}
+
+function AppearanceMode() {
+  const { mode, setColorMode } = useColorMode()
+  const options = [
+    ['light', 'Light'],
+    ['dark', 'Dark'],
+  ] as const
+  return (
+    <div>
+      <p className="text-sm font-medium text-zinc-950 dark:text-white">Appearance</p>
+      <p className="mt-0.5 text-xs text-zinc-500">
+        Light is the default. Dark mode applies to every screen in the app, on this browser.
+      </p>
+      <div className="mt-3 inline-flex rounded-full bg-zinc-100 p-1 ring-1 ring-zinc-200 dark:bg-zinc-800 dark:ring-zinc-700">
+        {options.map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setColorMode(id)}
+            className={
+              mode === id
+                ? 'rounded-full bg-white px-4 py-1.5 text-sm font-medium text-zinc-950 shadow-sm dark:bg-zinc-950 dark:text-white'
+                : 'rounded-full px-4 py-1.5 text-sm text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-100'
+            }
+          >
+            {label}
+          </button>
+        ))}
       </div>
     </div>
   )
@@ -171,6 +204,7 @@ export function AgencyBrandForm({
 
   return (
     <div className="space-y-6">
+      <AppearanceMode />
       {showLogo ? <div className="flex flex-wrap items-center gap-4">
         <div className="flex size-16 items-center justify-center overflow-hidden rounded-xl border border-zinc-200 bg-white">
           {preview ? (

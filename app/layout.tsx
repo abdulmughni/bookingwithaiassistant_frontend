@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
-import { ClerkProvider } from '@clerk/nextjs'
+import Script from 'next/script'
+import { AppProviders } from '@/components/app-providers'
 import { AppToaster } from '@/components/app-toaster'
 import { APP_BRAND_NAME } from '@/lib/brand'
 import './globals.css'
@@ -35,13 +36,16 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <ClerkProvider>
-      <html lang="en">
-        <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+    <html lang="en" suppressHydrationWarning>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        <Script id="color-mode" strategy="beforeInteractive">
+          {`try{var m=localStorage.getItem('color-mode');if(m==='dark'){document.documentElement.classList.add('dark');document.documentElement.style.colorScheme='dark'}else{document.documentElement.classList.remove('dark');document.documentElement.style.colorScheme='light'}}catch(e){}`}
+        </Script>
+        <AppProviders>
           {children}
           <AppToaster />
-        </body>
-      </html>
-    </ClerkProvider>
+        </AppProviders>
+      </body>
+    </html>
   )
 }

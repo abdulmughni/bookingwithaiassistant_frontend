@@ -29,9 +29,9 @@ const SERIES = [
 ] as const
 
 const PREMIUM_SERIES = [
-  { key: 'bookings', name: 'Bookings', fill: '#2563eb' },
-  { key: 'calls', name: 'Calls', fill: '#38bdf8' },
-  { key: 'messages', name: 'Messages', fill: '#c4b5fd' },
+  { key: 'bookings', name: 'Bookings', fill: '#6d89a8' },
+  { key: 'calls', name: 'Calls', fill: '#8aafb8' },
+  { key: 'messages', name: 'Messages', fill: '#b7a9c8' },
 ] as const
 
 function monthKey(date: string) {
@@ -96,7 +96,7 @@ export function ActivityBars({
   const data = bucket(points)
   const tickEvery = data.length > 16 ? Math.ceil(data.length / 8) - 1 : 0
   const series = variant === 'premium' ? PREMIUM_SERIES : SERIES
-  const barSize = variant === 'premium' ? 22 : 16
+  const barSize = variant === 'premium' ? 15 : 16
 
   return (
     <section className={`${dashCardClass} flex h-full flex-col rounded-[18px] p-5`}>
@@ -131,16 +131,16 @@ export function ActivityBars({
       >
         <div className="overflow-hidden">
       {loading ? (
-        <div className="mt-4 h-72 animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-800" />
+        <div className={`mt-4 animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-800 ${variant === 'premium' ? 'h-52' : 'h-72'}`} />
       ) : (
-        <div className="mt-2 h-72 w-full min-w-0">
+        <div className={`mt-2 w-full min-w-0 ${variant === 'premium' ? 'h-52' : 'h-72'}`}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={data}
-              barCategoryGap={variant === 'premium' ? '28%' : '42%'}
-              margin={{ top: 12, right: 8, left: -12, bottom: 0 }}
+              barCategoryGap={variant === 'premium' ? '46%' : '42%'}
+              margin={{ top: 8, right: 8, left: -12, bottom: 0 }}
             >
-              <CartesianGrid stroke="#ececef" vertical={false} />
+              <CartesianGrid stroke="#eef0f2" vertical={false} />
               <XAxis
                 dataKey="label"
                 interval={tickEvery}
@@ -150,7 +150,7 @@ export function ActivityBars({
               />
               <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#a1a1aa' }} axisLine={false} tickLine={false} width={32} />
               <Tooltip
-                cursor={{ fill: 'rgba(37, 99, 235, 0.06)' }}
+                cursor={{ fill: 'rgba(109, 137, 168, 0.08)' }}
                 contentStyle={{ borderRadius: 12, border: '1px solid #e4e4e7', fontSize: 12, boxShadow: '0 8px 24px rgba(15,23,42,0.08)' }}
               />
               <Bar dataKey="bookings" name="Bookings" stackId="day" fill={series[0].fill} maxBarSize={barSize} />
@@ -160,7 +160,7 @@ export function ActivityBars({
                 name="Messages"
                 stackId="day"
                 fill={series[2].fill}
-                radius={[6, 6, 0, 0]}
+                radius={variant === 'premium' ? [4, 4, 0, 0] : [6, 6, 0, 0]}
                 maxBarSize={barSize}
               />
             </BarChart>
