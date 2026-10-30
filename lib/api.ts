@@ -84,6 +84,20 @@ async function requestFormData<T>(
   return res.json() as Promise<T>
 }
 
+async function requestBlob(path: string, token: string): Promise<Blob> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    headers: {
+      ...NGROK_BROWSER_HEADER,
+      Authorization: `Bearer ${token}`,
+    },
+  })
+  if (!res.ok) {
+    const body = await res.text()
+    throw new ApiError(res.status, parseApiErrorMessage(body))
+  }
+  return res.blob()
+}
+
 async function requestDelete(token: string, path: string): Promise<void> {
   const res = await fetch(`${API_BASE}${path}`, {
     method: 'DELETE',
@@ -438,6 +452,8 @@ export const api = {
     },
     get: (token: string, id: string) =>
       request<import('./types').CallLogDetail>(`/api/calls/${encodeURIComponent(id)}`, { token }),
+    recording: (token: string, id: string) =>
+      requestBlob(`/api/calls/${encodeURIComponent(id)}/recording`, token),
     remove: (token: string, id: string) =>
       requestDelete(token, `/api/calls/${encodeURIComponent(id)}`),
     stats: (token: string, period: 'week' | 'month' = 'week') =>
