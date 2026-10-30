@@ -719,3 +719,28 @@ html[data-agency-theme] .agency-text {
 html[data-agency-theme] .agency-muted {
   color: var(--brand-subtext) !important;
 }
+
+/* Quiet scrollbars: invisible until the region is hovered. */
+.agency-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+.agency-scroll:hover {
+  scrollbar-color: rgba(113, 113, 122, 0.35) transparent;
+}
+.agency-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.agency-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.agency-scroll::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+.agency-scroll:hover::-webkit-scrollbar-thumb {
+  background-color: rgba(113, 113, 122, 0.32);
+}

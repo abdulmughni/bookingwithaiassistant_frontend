@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useUser } from '@clerk/nextjs'
 import { toast } from 'sonner'
 import {
+  ArrowDownIcon,
   ArrowUpIcon,
   BanknotesIcon,
   BoltIcon,
@@ -12,8 +13,6 @@ import {
   CalendarDaysIcon,
   ChatBubbleLeftRightIcon,
   CheckCircleIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
   EnvelopeIcon,
   ExclamationTriangleIcon,
   MagnifyingGlassIcon,
@@ -82,27 +81,29 @@ function smoothLine(points: { x: number; y: number }[]) {
 }
 
 function Sparkline({ values, color, compact = false }: { values: number[]; color: string; compact?: boolean }) {
-  const width = 160
-  const height = 64
+  const width = compact ? 96 : 360
+  const height = compact ? 32 : 84
   const gradientId = useId().replace(/:/g, '')
   if (values.length < 2) return null
-  const max = Math.max(...values, 1)
-  const min = Math.min(...values, 0)
+  const max = Math.max(...values)
+  const min = Math.min(...values)
   const span = max - min || 1
   const step = width / (values.length - 1)
+  const top = compact ? 3 : 6
+  const bottom = compact ? 3 : 1
   const coords = values.map((value, index) => ({
     x: index * step,
-    y: height - 8 - ((value - min) / span) * (height - 18),
+    y: height - bottom - ((value - min) / span) * (height - top - bottom),
   }))
   const line = smoothLine(coords)
   const area = `${line} L ${width} ${height} L 0 ${height} Z`
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} className={compact ? 'h-8 w-24' : 'h-16 w-[58%] max-w-[11rem]'} preserveAspectRatio="none" aria-hidden>
+    <svg viewBox={`0 0 ${width} ${height}`} className={compact ? 'h-8 w-24' : 'block h-16 w-full'} preserveAspectRatio="none" aria-hidden>
       <defs>
         <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.28" />
-          <stop offset="70%" stopColor={color} stopOpacity="0.08" />
-          <stop offset="100%" stopColor={color} stopOpacity="0" />
+          <stop offset="0%" stopColor={color} stopOpacity="0.32" />
+          <stop offset="55%" stopColor={color} stopOpacity="0.14" />
+          <stop offset="100%" stopColor={color} stopOpacity="0.04" />
         </linearGradient>
       </defs>
       <path d={area} fill={`url(#${gradientId})`} />
@@ -154,13 +155,9 @@ export function AgencyHome() {
   const [chartMin, setChartMin] = useState(false)
   const [clientsMin, setClientsMin] = useState(false)
   const [clientFind, setClientFind] = useState('')
-  const [clientPage, setClientPage] = useState(1)
   const [signupFind, setSignupFind] = useState('')
-  const [signupPage, setSignupPage] = useState(1)
   const [attentionFind, setAttentionFind] = useState('')
-  const [attentionPage, setAttentionPage] = useState(1)
   const [activityFind, setActivityFind] = useState('')
-  const [activityPage, setActivityPage] = useState(1)
   const welcomeName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || user?.fullName || ''
   const { enabled: demo, setDemo } = useAgencyDemo()
   const { tenantId, isAgencyStaff } = useIsAdmin()
@@ -330,7 +327,7 @@ export function AgencyHome() {
             [1.2, 1.5, 1.4, 1.8, 2.1, 2, 2.6, 3, 3.4, 4.1, 4.6, 5],
             [6, 9, 8, 12, 11, 16, 14, 20, 18, 24, 26, 30],
             [8, 11, 14, 12, 18, 16, 22, 20, 26, 24, 30, 34],
-            [4, 6, 5, 8, 9, 8, 12, 14, 13, 16, 18, 20],
+            [22, 20, 21, 18, 16, 17, 14, 12, 13, 10, 8, 5],
             [3, 5, 4, 7, 6, 9, 8, 12, 11, 14, 16, 18],
           ]
           const spark = demo
@@ -344,10 +341,11 @@ export function AgencyHome() {
                   : index === 3
                     ? cardSeries.map((point) => point.messages)
                     : []
+          const falling = spark.length > 1 && spark[spark.length - 1] < spark[0]
           return (
             <article
               key={kpi.label}
-              className={`${dashCardClass} relative flex h-full min-h-[148px] flex-col overflow-hidden rounded-[20px] p-4 transition hover:-translate-y-0.5 hover:shadow-md motion-safe:duration-200`}
+              className={`${dashCardClass} relative flex h-full min-h-[148px] flex-col overflow-hidden rounded-[20px] p-4 pb-16 transition hover:-translate-y-0.5 hover:shadow-md motion-safe:duration-200`}
             >
               <div className="relative z-10 flex items-start gap-3 pr-2">
                 <span className={`flex size-10 shrink-0 items-center justify-center rounded-full ${tones[index] ?? tones[0]}`}>
@@ -358,17 +356,17 @@ export function AgencyHome() {
                     {kpi.label.replace(/\b\w/g, (letter) => letter.toUpperCase())}
                   </p>
                   <p className="mt-1 text-[1.65rem] font-semibold leading-none tracking-tight text-zinc-950">{kpi.value}</p>
-                  <p className="mt-2 flex min-h-4 items-center gap-1 text-xs font-medium text-emerald-500">
+                  <p className={`mt-2 flex min-h-4 items-center gap-1 text-xs font-medium ${falling ? 'text-rose-500' : 'text-emerald-500'}`}>
                     {kpi.trend ? (
                       <>
-                        <ArrowUpIcon className="size-3" />
+                        {falling ? <ArrowDownIcon className="size-3" /> : <ArrowUpIcon className="size-3" />}
                         {kpi.trend}
                       </>
                     ) : null}
                   </p>
                 </div>
               </div>
-              <div className="pointer-events-none absolute right-0 bottom-0">
+              <div className="pointer-events-none absolute inset-x-0 bottom-0">
                 <Sparkline values={spark} color={strokes[index] ?? strokes[0]} />
               </div>
             </article>
@@ -460,14 +458,11 @@ export function AgencyHome() {
           <CardFind
             value={clientFind}
             placeholder="Search clients"
-            onChange={(value) => {
-              setClientFind(value)
-              setClientPage(1)
-            }}
+            onChange={setClientFind}
           />
-          <div className="mt-3 overflow-x-auto">
+          <div className="agency-scroll mt-3 max-h-[19.5rem] overflow-auto overscroll-contain scroll-smooth">
           <table className="w-full min-w-[36rem] text-left text-sm">
-            <thead className="text-xs text-zinc-400">
+            <thead className="sticky top-0 z-10 bg-white text-xs text-zinc-400">
               <tr>
                 <th className="py-2 font-medium">Client</th>
                 <th className="px-2 py-2 font-medium">Bookings</th>
@@ -480,10 +475,7 @@ export function AgencyHome() {
             </thead>
             <tbody>
               {demo
-                ? pageSlice(
-                    agencyDemo.clients.filter((client) => matches(client.name, needle, clientFind)),
-                    clientPage,
-                  ).rows.map((client) => (
+                ? agencyDemo.clients.filter((client) => matches(client.name, needle, clientFind)).map((client) => (
                     <tr key={client.id} className="border-t border-zinc-100">
                       <td className="py-2.5">
                         <span className="flex items-center gap-2">
@@ -503,10 +495,7 @@ export function AgencyHome() {
                       </td>
                     </tr>
                   ))
-                : pageSlice(
-                    topClients.filter((client) => matches(client.name, '', clientFind)),
-                    clientPage,
-                  ).rows.map((client) => {
+                : topClients.filter((client) => matches(client.name, '', clientFind)).map((client) => {
                     const count = counts.get(client.id)
                     return (
                       <tr key={client.id} className="border-t border-zinc-100">
@@ -528,15 +517,6 @@ export function AgencyHome() {
             </tbody>
           </table>
           </div>
-          <Pager
-            {...pageMeta(
-              demo
-                ? agencyDemo.clients.filter((client) => matches(client.name, needle, clientFind)).length
-                : topClients.filter((client) => matches(client.name, '', clientFind)).length,
-              clientPage,
-            )}
-            onChange={setClientPage}
-          />
           <EmptyMatch
             query={clientFind}
             count={
@@ -556,17 +536,10 @@ export function AgencyHome() {
       <div className="grid items-stretch gap-4 xl:grid-cols-3">
         <section className={`${dashCardClass} flex h-full flex-col rounded-[18px] p-5`}>
           <PanelHead title="Recent client sign-ups" href="/admin/clients" />
-          <CardFind
-            value={signupFind}
-            placeholder="Search sign-ups"
-            onChange={(value) => {
-              setSignupFind(value)
-              setSignupPage(1)
-            }}
-          />
-          <ul className="mt-2 divide-y divide-zinc-100">
+          <CardFind value={signupFind} placeholder="Search sign-ups" onChange={setSignupFind} />
+          <ul className="agency-scroll mt-1 h-80 divide-y divide-zinc-100 overflow-y-auto overscroll-contain scroll-smooth">
             {demo
-              ? pageSlice(agencyDemo.signups.filter((row) => matches(row.name, needle, signupFind)), signupPage).rows.map((row) => (
+              ? agencyDemo.signups.filter((row) => matches(row.name, needle, signupFind)).map((row) => (
                   <li key={row.id} className="flex items-center gap-3 py-3">
                     <ClientMark name={row.name} image={row.image} industry={row.industry} />
                     <span className="min-w-0 flex-1">
@@ -576,7 +549,7 @@ export function AgencyHome() {
                     <Badge color={row.status === 'Active' ? 'green' : 'amber'}>{row.status}</Badge>
                   </li>
                 ))
-              : pageSlice(signups.filter((client) => matches(client.name, '', signupFind)), signupPage).rows.map((client) => (
+              : signups.filter((client) => matches(client.name, '', signupFind)).map((client) => (
                   <li key={client.id}>
                     <Link href={`/admin/clients/${encodeURIComponent(client.id)}`} className="flex items-center gap-3 py-3">
                       <ClientMark name={client.name} industry={client.industry_type} />
@@ -589,15 +562,6 @@ export function AgencyHome() {
                   </li>
                 ))}
           </ul>
-          <Pager
-            {...pageMeta(
-              demo
-                ? agencyDemo.signups.filter((row) => matches(row.name, needle, signupFind)).length
-                : signups.filter((client) => matches(client.name, '', signupFind)).length,
-              signupPage,
-            )}
-            onChange={setSignupPage}
-          />
           <EmptyMatch
             query={signupFind}
             count={
@@ -611,17 +575,10 @@ export function AgencyHome() {
 
         <section className={`${dashCardClass} flex h-full flex-col rounded-[18px] p-5`}>
           <PanelHead title="Needs attention" href="/admin/clients" count={demo ? agencyDemo.attention.filter((row) => matches(`${row.name} ${row.detail}`, '', attentionFind)).length : attention.length + (alertsQuery.data?.length ?? 0)} />
-          <CardFind
-            value={attentionFind}
-            placeholder="Search alerts"
-            onChange={(value) => {
-              setAttentionFind(value)
-              setAttentionPage(1)
-            }}
-          />
-          <ul className="mt-2 divide-y divide-zinc-100">
+          <CardFind value={attentionFind} placeholder="Search alerts" onChange={setAttentionFind} />
+          <ul className="agency-scroll mt-1 h-80 divide-y divide-zinc-100 overflow-y-auto overscroll-contain scroll-smooth">
             {demo
-              ? pageSlice(agencyDemo.attention.filter((row) => matches(`${row.name} ${row.detail}`, '', attentionFind)), attentionPage).rows.map((row) => (
+              ? agencyDemo.attention.filter((row) => matches(`${row.name} ${row.detail}`, '', attentionFind)).map((row) => (
                   <li key={row.id} className="flex items-start gap-3 py-3">
                     {row.image ? <ClientMark name={row.name} image={row.image} /> : <ExclamationTriangleIcon className={row.tone === 'red' ? 'mt-0.5 size-5 shrink-0 text-red-500' : 'mt-0.5 size-5 shrink-0 text-amber-500'} />}
                     <span className="min-w-0 flex-1">
@@ -631,45 +588,34 @@ export function AgencyHome() {
                     <span className="shrink-0 text-xs text-zinc-400">{row.when}</span>
                   </li>
                 ))
-              : pageSlice(
-                  [
+              : [
                     ...(alertsQuery.data ?? []).filter((alert) => matches(`${alert.tenant_name} ${alert.reason}`, '', attentionFind)).map((alert) => ({ kind: 'alert' as const, alert })),
                     ...attention.filter(({ client, reason }) => matches(`${client.name} ${reason}`, '', attentionFind)).map((item) => ({ kind: 'note' as const, item })),
-                  ],
-                  attentionPage,
-                ).rows.map((row) => row.kind === 'alert' ? (
-                  <li key={`${row.alert.tenant_id}:${row.alert.rule_key}`}>
-                    <Link href={`/admin/clients/${encodeURIComponent(row.alert.tenant_id)}`} className="flex items-start gap-3 py-3">
-                      <ExclamationTriangleIcon className={row.alert.severity === 'red' ? 'mt-0.5 size-5 text-red-500' : 'mt-0.5 size-5 text-amber-500'} />
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium text-zinc-950">{row.alert.tenant_name}</span>
-                        <span className="block text-xs text-zinc-500">{row.alert.reason}</span>
-                      </span>
-                      <span className="shrink-0 text-xs text-zinc-400">{timeAgo(row.alert.since)}</span>
-                    </Link>
-                  </li>
-                ) : (
-                  <li key={`${row.item.client.id}:${row.item.reason}`}>
-                    <Link href={`/admin/clients/${encodeURIComponent(row.item.client.id)}`} className="flex items-start gap-3 py-3">
-                      <ExclamationTriangleIcon className="mt-0.5 size-5 text-amber-500" />
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium text-zinc-950">{row.item.client.name}</span>
-                        <span className="block text-xs text-zinc-500">{row.item.reason}</span>
-                      </span>
-                    </Link>
-                  </li>
-                ))}
+                  ].map((row) =>
+                    row.kind === 'alert' ? (
+                      <li key={`${row.alert.tenant_id}:${row.alert.rule_key}`}>
+                        <Link href={`/admin/clients/${encodeURIComponent(row.alert.tenant_id)}`} className="flex items-start gap-3 py-3">
+                          <ExclamationTriangleIcon className={row.alert.severity === 'red' ? 'mt-0.5 size-5 text-red-500' : 'mt-0.5 size-5 text-amber-500'} />
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm font-medium text-zinc-950">{row.alert.tenant_name}</span>
+                            <span className="block text-xs text-zinc-500">{row.alert.reason}</span>
+                          </span>
+                          <span className="shrink-0 text-xs text-zinc-400">{timeAgo(row.alert.since)}</span>
+                        </Link>
+                      </li>
+                    ) : (
+                      <li key={`${row.item.client.id}:${row.item.reason}`}>
+                        <Link href={`/admin/clients/${encodeURIComponent(row.item.client.id)}`} className="flex items-start gap-3 py-3">
+                          <ExclamationTriangleIcon className="mt-0.5 size-5 text-amber-500" />
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm font-medium text-zinc-950">{row.item.client.name}</span>
+                            <span className="block text-xs text-zinc-500">{row.item.reason}</span>
+                          </span>
+                        </Link>
+                      </li>
+                    ),
+                  )}
           </ul>
-          <Pager
-            {...pageMeta(
-              demo
-                ? agencyDemo.attention.filter((row) => matches(`${row.name} ${row.detail}`, '', attentionFind)).length
-                : (alertsQuery.data ?? []).filter((alert) => matches(`${alert.tenant_name} ${alert.reason}`, '', attentionFind)).length
-                  + attention.filter(({ client, reason }) => matches(`${client.name} ${reason}`, '', attentionFind)).length,
-              attentionPage,
-            )}
-            onChange={setAttentionPage}
-          />
           <EmptyMatch
             query={attentionFind}
             count={
@@ -687,17 +633,10 @@ export function AgencyHome() {
 
         <section className={`${dashCardClass} flex h-full flex-col rounded-[18px] p-5`}>
           <PanelHead title="Recent activity" href="/admin/activity" />
-          <CardFind
-            value={activityFind}
-            placeholder="Search activity"
-            onChange={(value) => {
-              setActivityFind(value)
-              setActivityPage(1)
-            }}
-          />
-          <ul className="mt-2">
+          <CardFind value={activityFind} placeholder="Search activity" onChange={setActivityFind} />
+          <ul className="agency-scroll mt-1 h-80 overflow-y-auto overscroll-contain scroll-smooth">
             {demo
-              ? pageSlice(agencyDemo.activity.filter((row) => matches(`${row.title} ${row.detail}`, '', activityFind)), activityPage).rows.map((row) => (
+              ? agencyDemo.activity.filter((row) => matches(`${row.title} ${row.detail}`, '', activityFind)).map((row) => (
                   <li key={row.id} className="flex items-start gap-3 py-2.5">
                     <ActivityDot tone={row.tone} />
                     <span className="min-w-0 flex-1">
@@ -707,17 +646,8 @@ export function AgencyHome() {
                     <span className="shrink-0 text-xs text-zinc-400">{row.when}</span>
                   </li>
                 ))
-              : pageSlice((activityQuery.data?.recent ?? []).filter((event) => matches(`${event.title} ${event.tenant_name}`, '', activityFind)), activityPage).rows.map((event) => <RealActivity key={`${event.kind}-${event.at}-${event.tenant_id}`} event={event} />)}
+              : (activityQuery.data?.recent ?? []).filter((event) => matches(`${event.title} ${event.tenant_name}`, '', activityFind)).map((event) => <RealActivity key={`${event.kind}-${event.at}-${event.tenant_id}`} event={event} />)}
           </ul>
-          <Pager
-            {...pageMeta(
-              demo
-                ? agencyDemo.activity.filter((row) => matches(`${row.title} ${row.detail}`, '', activityFind)).length
-                : (activityQuery.data?.recent ?? []).filter((event) => matches(`${event.title} ${event.tenant_name}`, '', activityFind)).length,
-              activityPage,
-            )}
-            onChange={setActivityPage}
-          />
           <EmptyMatch
             query={activityFind}
             count={
@@ -749,19 +679,9 @@ export function AgencyHome() {
   )
 }
 
-const PAGE_SIZE = 5
-
 function matches(text: string, header: string, card: string) {
   const value = text.toLowerCase()
   return (!header.trim() || value.includes(header.trim().toLowerCase())) && (!card.trim() || value.includes(card.trim().toLowerCase()))
-}
-
-function pageSlice<T>(items: T[], page: number) {
-  const meta = pageMeta(items.length, page)
-  return {
-    rows: items.slice((meta.current - 1) * PAGE_SIZE, meta.current * PAGE_SIZE),
-    ...meta,
-  }
 }
 
 function EmptyMatch({ query, count, noun }: { query: string; count: number; noun: string }) {
@@ -769,69 +689,27 @@ function EmptyMatch({ query, count, noun }: { query: string; count: number; noun
   return <p className="py-6 text-center text-sm text-zinc-400">No {noun} match “{query.trim()}”.</p>
 }
 
-function pageMeta(count: number, page: number) {
-  const pages = Math.max(1, Math.ceil(count / PAGE_SIZE))
-  const current = Math.min(Math.max(page, 1), pages)
-  return { current, pages, total: count }
-}
-
 function CardFind({ value, placeholder, onChange }: { value: string; placeholder: string; onChange: (value: string) => void }) {
   return (
-    <label className="group relative mt-3 block">
-      <MagnifyingGlassIcon className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-zinc-400 transition group-focus-within:text-blue-500" />
+    <label className="group relative mt-2.5 block">
+      <MagnifyingGlassIcon className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-zinc-400 transition group-focus-within:text-blue-500" />
       <input
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
-        className="h-10 w-full rounded-2xl bg-zinc-50/90 pr-9 pl-10 text-[13px] text-zinc-800 shadow-[inset_0_0_0_1px_rgba(228,228,231,0.95)] outline-none transition placeholder:text-zinc-400 focus:bg-white focus:shadow-[inset_0_0_0_1px_rgba(37,99,235,0.45),0_0_0_4px_rgba(37,99,235,0.10)]"
+        className="h-8 w-full rounded-lg bg-zinc-100/60 pr-7 pl-8 text-[13px] text-zinc-700 outline-none transition placeholder:text-zinc-400 focus:bg-zinc-100"
       />
       {value ? (
         <button
           type="button"
           aria-label="Clear search"
           onClick={() => onChange('')}
-          className="absolute top-1/2 right-2 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded-full text-zinc-400 transition hover:bg-zinc-200/70 hover:text-zinc-700"
+          className="absolute top-1/2 right-1.5 inline-flex size-5 -translate-y-1/2 items-center justify-center rounded-full text-zinc-400 transition hover:bg-white hover:text-zinc-700"
         >
           <XMarkIcon className="size-3.5" />
         </button>
       ) : null}
     </label>
-  )
-}
-
-function Pager({ current, pages, total, onChange }: { current: number; pages: number; total: number; onChange: (page: number) => void }) {
-  if (pages <= 1) return null
-  const start = (current - 1) * PAGE_SIZE + 1
-  const end = Math.min(current * PAGE_SIZE, total)
-  return (
-    <div className="mt-3 flex items-center justify-between gap-3 border-t border-zinc-100 pt-3">
-      <p className="text-xs text-zinc-400">
-        {start}–{end} of {total}
-      </p>
-      <div className="flex items-center gap-0.5 rounded-full bg-zinc-50 p-0.5 ring-1 ring-zinc-200/80">
-        <button
-          type="button"
-          aria-label="Previous page"
-          disabled={current <= 1}
-          onClick={() => onChange(current - 1)}
-          className="inline-flex size-7 items-center justify-center rounded-full text-zinc-500 transition hover:bg-white hover:text-blue-600 disabled:opacity-35"
-        >
-          <ChevronLeftIcon className="size-4" />
-        </button>
-        <span className="min-w-10 text-center text-xs font-medium text-zinc-600">
-          {current}/{pages}
-        </span>
-        <button
-          type="button"
-          aria-label="Next page"
-          disabled={current >= pages}
-          onClick={() => onChange(current + 1)}
-          className="inline-flex size-7 items-center justify-center rounded-full text-zinc-500 transition hover:bg-white hover:text-blue-600 disabled:opacity-35"
-        >
-          <ChevronRightIcon className="size-4" />
-        </button>
-      </div>
-    </div>
   )
 }
 

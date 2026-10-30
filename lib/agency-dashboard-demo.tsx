@@ -14,7 +14,7 @@ export const agencyDemo = {
     { label: 'Total clients', value: '9', trend: '4 this month' },
     { label: 'Total bookings', value: '128', trend: '18% from last month' },
     { label: 'Call minutes', value: '642', trend: '22% from last month' },
-    { label: 'Messages', value: '284', trend: '16% from last month' },
+    { label: 'Messages', value: '284', trend: '8% from last month' },
     { label: 'Revenue this month', value: '$1,240', trend: '28% from last month' },
   ],
   plan: {

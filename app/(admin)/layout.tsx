@@ -160,7 +160,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 })
               }}
             />
-            <SidebarBody className={collapsed ? 'px-2' : 'px-3'}>
+            <SidebarBody className={clsx('agency-scroll', collapsed ? 'px-2' : 'px-3')}>
               <nav className={clsx('flex flex-col', collapsed ? 'items-center gap-1' : 'gap-0.5')}>
                 {agencyNav.map((item) => (
                   <AgencyNavLink
