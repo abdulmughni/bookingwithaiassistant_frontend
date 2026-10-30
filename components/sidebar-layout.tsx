@@ -51,6 +51,7 @@ export function SidebarLayout({
   children,
   desktopHeader,
   contentViewportLocked = false,
+  sidebarCollapsed = false,
 }: React.PropsWithChildren<{
   navbar: React.ReactNode
   sidebar: React.ReactNode
@@ -58,6 +59,8 @@ export function SidebarLayout({
   desktopHeader?: React.ReactNode
   /** When true, shell is exactly one viewport tall and does not scroll — children must scroll internally (e.g. chat messages). */
   contentViewportLocked?: boolean
+  /** Agency home only. Super-admin and client shells leave this false. */
+  sidebarCollapsed?: boolean
 }>) {
   let [showSidebar, setShowSidebar] = useState(false)
 
@@ -71,7 +74,14 @@ export function SidebarLayout({
       )}
     >
       {/* Sidebar on desktop */}
-      <div className="agency-soft fixed inset-y-0 left-0 w-64 max-lg:hidden">{sidebar}</div>
+      <div
+        className={clsx(
+          'agency-soft fixed inset-y-0 left-0 max-lg:hidden motion-safe:transition-[width] motion-safe:duration-300',
+          sidebarCollapsed ? 'w-[4.75rem]' : 'w-64',
+        )}
+      >
+        {sidebar}
+      </div>
 
       {/* Desktop top-right header region (e.g. notification bell) */}
       {desktopHeader ? (
@@ -96,7 +106,8 @@ export function SidebarLayout({
       {/* Content — full width, no max-width card (pages add their own horizontal padding if needed) */}
       <main
         className={clsx(
-          'flex min-h-0 flex-1 flex-col lg:min-w-0 lg:pl-64 lg:pr-0 lg:pt-0 lg:pb-0',
+          'flex min-h-0 flex-1 flex-col lg:min-w-0 lg:pr-0 lg:pt-0 lg:pb-0 motion-safe:transition-[padding] motion-safe:duration-300',
+          sidebarCollapsed ? 'lg:pl-[4.75rem]' : 'lg:pl-64',
           contentViewportLocked && 'min-h-0 overflow-hidden',
         )}
       >
