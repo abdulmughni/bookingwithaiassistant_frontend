@@ -34,6 +34,7 @@ import { NotificationBell } from '@/components/notification-bell'
 import { RealtimeProvider } from '@/lib/realtime'
 import { ShellBrand } from '@/components/brand-logo'
 import { BrandTheme } from '@/components/brand-theme'
+import { CURRENT_THEME } from '@/lib/brand-presets'
 import { brandAssetUrl } from '@/lib/brand'
 
 export default function DashboardLayout({
@@ -75,7 +76,7 @@ export default function DashboardLayout({
     <OrganizationGate>
       <AccountStatusGate>
       <RealtimeProvider>
-      <BrandTheme theme={brand?.theme} />
+      <BrandTheme theme={brand?.theme ?? CURRENT_THEME} />
       <SidebarLayout
       contentViewportLocked={fullBleedPage}
       desktopHeader={pathname === '/' ? null : <NotificationBell />}
@@ -157,7 +158,7 @@ export default function DashboardLayout({
       {fullBleedPage ? (
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">{children}</div>
       ) : (
-        <div className="min-h-full bg-zinc-50/90 px-4 py-6 sm:px-6 lg:px-8 lg:py-8 dark:bg-zinc-950">
+        <div className="agency-canvas min-h-full bg-zinc-50/90 px-4 py-6 sm:px-6 lg:px-8 lg:py-8 dark:bg-zinc-950">
           <PendingActivationBanner />
           <JobberReconnectBanner />
           <ClientOpsBanners />

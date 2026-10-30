@@ -17,6 +17,8 @@ export function BrandTheme({ theme }: { theme?: BrandThemeColors | null }) {
       '--brand-subtext': theme.subtext,
       '--brand-button-text': theme.button_text,
       '--brand-border': theme.border,
+      '--brand-primary': theme.primary,
+      '--brand-accent': theme.accent,
       '--color-brand-400': theme.primary,
       '--color-brand-500': theme.primary,
       '--color-brand-600': theme.primary,

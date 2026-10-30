@@ -155,6 +155,7 @@ export function AgencyHome() {
   const [chartMin, setChartMin] = useState(false)
   const [clientsMin, setClientsMin] = useState(false)
   const [clientFind, setClientFind] = useState('')
+  const [clientOrder, setClientOrder] = useState<'latest' | 'performance'>('latest')
   const [signupFind, setSignupFind] = useState('')
   const [attentionFind, setAttentionFind] = useState('')
   const [activityFind, setActivityFind] = useState('')
@@ -201,7 +202,14 @@ export function AgencyHome() {
   const needle = query.trim().toLowerCase()
   const topClients = [...clients]
     .filter((client) => !needle || client.name.toLowerCase().includes(needle))
-    .sort((a, b) => (counts.get(b.id)?.bookings ?? 0) - (counts.get(a.id)?.bookings ?? 0))
+    .sort((a, b) =>
+      clientOrder === 'latest'
+        ? (b.created_at || '').localeCompare(a.created_at || '')
+        : (counts.get(b.id)?.bookings ?? b.bookings_count ?? 0) - (counts.get(a.id)?.bookings ?? a.bookings_count ?? 0),
+    )
+  const demoClients = [...agencyDemo.clients]
+    .filter((client) => matches(client.name, needle, clientFind))
+    .sort((a, b) => (clientOrder === 'latest' ? b.created.localeCompare(a.created) : b.bookings - a.bookings))
   const signups = clients
     .filter((client) => !needle || client.name.toLowerCase().includes(needle))
     .filter((client) => inRange(client.created_at, range.start, range.end))
@@ -282,7 +290,7 @@ export function AgencyHome() {
           >
             <span>{demo ? 'Demo data on' : 'Demo data off'}</span>
             <span className={`relative h-5 w-9 rounded-full ${demo ? 'bg-blue-600' : 'bg-zinc-300'}`}>
-              <span className={`absolute top-0.5 size-4 rounded-full bg-white shadow-sm transition ${demo ? 'left-4' : 'left-0.5'}`} />
+              <span className={`absolute top-0.5 size-4 rounded-full bg-[var(--brand-button-text,#fff)] shadow-sm transition ${demo ? 'left-4' : 'left-0.5'}`} />
             </span>
           </button>
           {isAgencyStaff || !tenantId ? null : (
@@ -375,12 +383,12 @@ export function AgencyHome() {
       </div>
 
       <div className="@container">
-      <div className="flex flex-col items-start gap-4 @min-[720px]:flex-row">
+      <div className={`flex flex-col gap-4 @min-[720px]:flex-row ${chartMin ? 'items-start' : 'items-stretch'}`}>
         <div
-          className={`min-w-0 overflow-hidden motion-safe:transition-[flex-grow,flex-basis,max-width] motion-safe:duration-500 motion-safe:ease-[cubic-bezier(0.22,1,0.36,1)] ${
+          className={`flex min-w-0 flex-col overflow-hidden motion-safe:transition-[flex-grow,flex-basis,max-width] motion-safe:duration-500 motion-safe:ease-[cubic-bezier(0.22,1,0.36,1)] ${
             chartMin
               ? 'w-full @min-[720px]:max-w-[26rem] @min-[720px]:flex-[0_0_26rem]'
-              : 'w-full @min-[720px]:max-w-none @min-[720px]:flex-[3_1_0%]'
+              : 'h-full w-full @min-[720px]:max-w-none @min-[720px]:flex-[3_1_0%]'
           }`}
         >
           <ActivityBars
@@ -444,23 +452,24 @@ export function AgencyHome() {
           }`}
         >
           <PanelHead
-            title="Top performing clients"
+            title={clientOrder === 'latest' ? 'Latest clients' : 'Top performing clients'}
             href="/admin/clients"
             minimized={clientsMin}
             onToggle={() => setClientsMin((value) => !value)}
+            extra={<ClientOrderMenu value={clientOrder} onChange={setClientOrder} />}
           />
           <div
-            className={`grid motion-safe:transition-[grid-template-rows,opacity] motion-safe:duration-500 motion-safe:ease-[cubic-bezier(0.22,1,0.36,1)] ${
+            className={`grid min-h-0 flex-1 motion-safe:transition-[grid-template-rows,opacity] motion-safe:duration-500 motion-safe:ease-[cubic-bezier(0.22,1,0.36,1)] ${
               clientsMin ? 'grid-rows-[0fr] opacity-0' : 'grid-rows-[1fr] opacity-100'
             }`}
           >
-            <div className="overflow-hidden">
+            <div className="flex min-h-0 flex-col overflow-hidden">
           <CardFind
             value={clientFind}
             placeholder="Search clients"
             onChange={setClientFind}
           />
-          <div className="agency-scroll mt-3 max-h-[19.5rem] overflow-auto overscroll-contain scroll-smooth">
+          <div className="agency-scroll mt-3 min-h-[16rem] flex-1 overflow-auto overscroll-contain scroll-smooth">
           <table className="w-full min-w-[36rem] text-left text-sm">
             <thead className="sticky top-0 z-10 bg-white text-xs text-zinc-400">
               <tr>
@@ -475,7 +484,7 @@ export function AgencyHome() {
             </thead>
             <tbody>
               {demo
-                ? agencyDemo.clients.filter((client) => matches(client.name, needle, clientFind)).map((client) => (
+                ? demoClients.map((client) => (
                     <tr key={client.id} className="border-t border-zinc-100">
                       <td className="py-2.5">
                         <span className="flex items-center gap-2">
@@ -519,11 +528,7 @@ export function AgencyHome() {
           </div>
           <EmptyMatch
             query={clientFind}
-            count={
-              demo
-                ? agencyDemo.clients.filter((client) => matches(client.name, needle, clientFind)).length
-                : topClients.filter((client) => matches(client.name, '', clientFind)).length
-            }
+            count={demo ? demoClients.length : topClients.filter((client) => matches(client.name, '', clientFind)).length}
             noun="clients"
           />
             </div>
@@ -729,30 +734,72 @@ function ClientMark({ name, image, industry }: { name: string; image?: string | 
   )
 }
 
+function ClientOrderMenu({
+  value,
+  onChange,
+}: {
+  value: 'latest' | 'performance'
+  onChange: (value: 'latest' | 'performance') => void
+}) {
+  const options = [
+    ['latest', 'Latest clients'],
+    ['performance', 'Top performance'],
+  ] as const
+  return (
+    <Menu as="div" className="relative">
+      <MenuButton className="inline-flex items-center gap-1 rounded-full bg-zinc-50 px-2.5 py-1 text-xs font-medium text-zinc-600 ring-1 ring-zinc-200 transition hover:bg-white dark:bg-zinc-800 dark:text-zinc-200 dark:ring-zinc-700 dark:hover:bg-zinc-700">
+        {value === 'latest' ? 'Latest clients' : 'Top performance'}
+        <ChevronDownIcon className="size-3.5 text-zinc-400" />
+      </MenuButton>
+      <MenuItems
+        anchor="bottom end"
+        className="z-20 w-44 rounded-xl bg-white p-1 shadow-lg ring-1 ring-zinc-200 [--anchor-gap:6px] focus:outline-none dark:bg-zinc-900 dark:ring-zinc-700"
+      >
+        {options.map(([id, label]) => (
+          <MenuItem key={id}>
+            <button
+              type="button"
+              onClick={() => onChange(id)}
+              className={`block w-full rounded-lg px-3 py-2 text-left text-sm data-focus:bg-zinc-100 dark:data-focus:bg-zinc-800 ${
+                value === id ? 'font-medium text-blue-700 dark:text-blue-300' : 'text-zinc-700 dark:text-zinc-200'
+              }`}
+            >
+              {label}
+            </button>
+          </MenuItem>
+        ))}
+      </MenuItems>
+    </Menu>
+  )
+}
+
 function PanelHead({
   title,
   href,
   count,
   minimized,
   onToggle,
+  extra,
 }: {
   title: string
   href: string
   count?: number
   minimized?: boolean
   onToggle?: () => void
+  extra?: ReactNode
 }) {
   return (
     <div className="mb-1 flex items-center justify-between gap-3">
-      <h2 className="flex items-center gap-2 text-base font-semibold text-zinc-950">
-        {title}
+      <h2 className="flex min-w-0 items-center gap-2 text-base font-semibold text-zinc-950">
+        <span className="truncate">{title}</span>
         {count ? (
           <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[11px] font-semibold text-white">
             {count}
           </span>
         ) : null}
       </h2>
-      <span className="flex items-center gap-2">
+      <span className="flex shrink-0 items-center gap-2">
+        {extra}
         <Link href={href} className="text-sm font-medium text-blue-600 hover:text-blue-700">
           View all
         </Link>
