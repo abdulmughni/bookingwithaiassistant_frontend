@@ -3,6 +3,7 @@
 import clsx from 'clsx'
 import { useEffect, useState } from 'react'
 import {
+  ArrowDownTrayIcon,
   CalendarDaysIcon,
   ChatBubbleLeftRightIcon,
   ClipboardDocumentListIcon,
@@ -32,6 +33,73 @@ function formatDuration(seconds: number | null): string {
   const secs = seconds % 60
   if (mins === 0) return `${secs}s`
   return `${mins}m ${String(secs).padStart(2, '0')}s`
+}
+
+function recordingFilename(callId: string, blob: Blob): string {
+  const type = (blob.type || '').toLowerCase()
+  const ext = type.includes('mpeg') || type.includes('mp3') ? 'mp3' : 'wav'
+  return `call-${callId}.${ext}`
+}
+
+function LinkedCallRecording({ callId }: { callId: string }) {
+  const getToken = useApiToken()
+  const [src, setSrc] = useState<string | null>(null)
+  const [filename, setFilename] = useState('call-recording.wav')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let objectUrl: string | null = null
+    let cancelled = false
+    setLoading(true)
+    setError(null)
+    setSrc(null)
+    ;(async () => {
+      try {
+        const token = await getToken()
+        const blob = await api.calls.recording(token, callId)
+        if (cancelled) return
+        objectUrl = URL.createObjectURL(blob)
+        setFilename(recordingFilename(callId, blob))
+        setSrc(objectUrl)
+      } catch (e) {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : 'Recording could not be loaded')
+        }
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+  }, [callId, getToken])
+
+  if (loading) {
+    return <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400">Loading recording…</p>
+  }
+  if (error || !src) {
+    return (
+      <p className="mt-3 text-sm text-red-600 dark:text-red-400">
+        {error || 'Recording could not be loaded'}
+      </p>
+    )
+  }
+
+  return (
+    <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+      <audio controls preload="metadata" src={src} className="w-full flex-1" />
+      <a
+        href={src}
+        download={filename}
+        className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold text-zinc-800 hover:bg-zinc-50 dark:border-white/10 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
+      >
+        <ArrowDownTrayIcon className="h-4 w-4" aria-hidden="true" />
+        Download
+      </a>
+    </div>
+  )
 }
 
 function MetaTile({
@@ -356,12 +424,7 @@ export function BookingDetailsDialog({
               </p>
             )}
             {details.call.recording_url && (
-              <audio
-                controls
-                preload="none"
-                src={details.call.recording_url}
-                className="mt-3 w-full"
-              />
+              <LinkedCallRecording callId={details.call.id} />
             )}
           </section>
         )}
