@@ -1,7 +1,9 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 
+import { AgencyBookings } from '@/components/admin/agency-bookings'
 import { AgencyOnly } from '@/components/admin/agency-only'
 import { RangeToggle } from '@/components/admin/agency-home'
 import {
@@ -14,9 +16,10 @@ import { api } from '@/lib/api'
 import { useApiData } from '@/lib/hooks'
 
 export default function AgencyActivityPage() {
+  const view = useSearchParams().get('view')
   return (
     <AgencyOnly>
-      <ActivityBody />
+      {view === 'bookings' ? <AgencyBookings /> : <ActivityBody />}
     </AgencyOnly>
   )
 }

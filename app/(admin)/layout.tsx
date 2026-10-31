@@ -20,7 +20,6 @@ import {
   InboxArrowDownIcon,
   PhoneIcon,
   ShieldCheckIcon,
-  SparklesIcon,
   UserGroupIcon,
   UsersIcon,
 } from '@heroicons/react/20/solid'
@@ -59,7 +58,6 @@ const agencyNav = [
   { label: 'Conversations', href: '/admin/activity?view=conversations', icon: ChatBubbleLeftRightIcon, exact: false, view: 'conversations' },
   { label: 'Calls', href: '/admin/activity?view=calls', icon: PhoneIcon, exact: false, view: 'calls' },
   { label: 'Messages', href: '/admin/activity?view=messages', icon: EnvelopeIcon, exact: false, view: 'messages' },
-  { label: 'AI Assistants', href: '/admin/activity?view=assistants', icon: SparklesIcon, exact: false, view: 'assistants' },
   { label: 'Team Members', href: '/admin/team', icon: UserGroupIcon, exact: false },
   { label: 'Plans & billing', href: '/admin/credits', icon: CreditCardIcon, exact: false },
   { label: 'Settings', href: '/admin/settings', icon: Cog6ToothIcon, exact: true },

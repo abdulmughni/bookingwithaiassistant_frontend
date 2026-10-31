@@ -751,9 +751,9 @@ export const api = {
         `/api/admin/tenants/${encodeURIComponent(tenantId)}/funnel?period=${period}`,
         { token },
       ),
-    listTenantBookings: (token: string, tenantId: string) =>
+    listTenantBookings: (token: string, tenantId: string, limit = 50) =>
       request<import('./types').AdminBookingRow[]>(
-        `/api/admin/tenants/${encodeURIComponent(tenantId)}/bookings`,
+        `/api/admin/tenants/${encodeURIComponent(tenantId)}/bookings?limit=${limit}`,
         { token },
       ),
     updateTenantBooking: (
