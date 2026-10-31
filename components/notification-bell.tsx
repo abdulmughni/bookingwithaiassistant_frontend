@@ -121,7 +121,7 @@ export function NotificationBell({ className, circle = false }: { className?: st
     <Headless.Popover className={clsx('relative', className)}>
       <Headless.PopoverButton
         className={clsx(
-          'relative flex size-11 items-center justify-center text-zinc-600 shadow-sm ring-1 ring-zinc-200 transition hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 dark:text-zinc-200 dark:ring-zinc-700',
+          'relative flex size-10 items-center justify-center text-zinc-600 shadow-sm ring-1 ring-zinc-200 transition hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 dark:text-zinc-200 dark:ring-zinc-700',
           circle ? 'rounded-full bg-white dark:bg-zinc-900' : 'rounded-xl bg-zinc-50 hover:bg-white dark:bg-zinc-800 dark:hover:bg-zinc-700',
         )}
         aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}

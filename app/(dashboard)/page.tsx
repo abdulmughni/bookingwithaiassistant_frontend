@@ -4,10 +4,10 @@ import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useAuth, useOrganization } from '@clerk/nextjs'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { toast } from 'sonner'
 import { Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/react'
 import clsx from 'clsx'
 import {
-  ArrowUpRightIcon,
   CalendarDaysIcon,
   CheckCircleIcon,
   ClockIcon,
@@ -16,7 +16,8 @@ import {
   XMarkIcon,
 } from '@heroicons/react/20/solid'
 import { ChevronDownIcon } from '@heroicons/react/16/solid'
-import { ActivityBars } from '@/components/activity-bars'
+import { ActivityBars, CollapseControl } from '@/components/activity-bars'
+import { ChannelIcon } from '@/components/channel-icon'
 import { Button } from '@/components/button'
 import { PageShell, dashCardClass } from '@/components/dashboard-ui'
 import { KpiStatCard } from '@/components/kpi-stat-card'
@@ -31,10 +32,10 @@ import {
   decodeReportRange,
   encodeReportRange,
   formatRangeLabel,
-  presetRange,
   rangeDayCount,
+  shiftDateKey,
 } from '@/lib/report-range'
-import type { TenantStats, Booking } from '@/lib/types'
+import type { TenantStats, Booking, ChannelAccount } from '@/lib/types'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -105,15 +106,15 @@ type ChartWindow = 'week' | 'month' | 'year' | 'custom' | 'all'
 
 function chartCaption(kind: ChartWindow) {
   if (kind === 'month') return 'last 30 days'
-  if (kind === 'year') return 'this year'
   if (kind === 'custom') return 'selected range'
+  if (kind === 'all') return 'all time'
   return 'last 7 days'
 }
 
 function chartChipLabel(kind: ChartWindow, custom?: string) {
   if (kind === 'month') return 'Last 30 days'
-  if (kind === 'year') return 'This year'
   if (kind === 'custom') return custom || 'Custom range'
+  if (kind === 'all') return 'All time'
   return 'Last 7 days'
 }
 
@@ -238,8 +239,17 @@ function GaugeLegend({
 }
 
 // ---------------------------------------------------------------------------
-// Next appointment + upcoming list
+// Booking list + connected accounts
 // ---------------------------------------------------------------------------
+
+type BookingFilter = 'all' | 'confirmed' | 'completed' | 'cancelled'
+
+const BOOKING_FILTERS: { id: BookingFilter; label: string }[] = [
+  { id: 'all', label: 'All' },
+  { id: 'confirmed', label: 'Confirmed' },
+  { id: 'completed', label: 'Completed' },
+  { id: 'cancelled', label: 'Cancelled' },
+]
 
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean)
@@ -269,159 +279,229 @@ function Avatar({ name, index }: { name: string; index: number }) {
   )
 }
 
-function NextAppointmentCard({
-  booking,
-  tz,
-  loading,
-}: {
-  booking: Booking | null
-  tz: string
-  loading: boolean
-}) {
-  return (
-    <section className={`${dashCardClass} flex h-full flex-col rounded-[18px] p-5`}>
-        <div className="flex items-center gap-2 text-sm font-medium text-zinc-500">
-          <span className="flex size-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-500">
-            <ClockIcon className="size-5" />
-          </span>
-          Next appointment
-        </div>
-
-        {loading ? (
-          <div className="mt-6 h-24 animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-800" />
-        ) : booking ? (
-          <>
-            <p className="mt-4 text-lg font-semibold text-zinc-950">
-              {booking.customer_name || 'Customer'}
-            </p>
-            <p className="mt-1 text-sm text-zinc-500">
-              {booking.service_type || 'Appointment'}
-            </p>
-            <p className="mt-4 text-2xl font-semibold tracking-tight text-zinc-950">
-              {booking.selected_slot ? formatDateTime(booking.selected_slot, tz) : '—'}
-            </p>
-            <div className="mt-auto pt-6">
-              <Button href="/bookings" color="brand">
-                View all bookings
-              </Button>
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="mt-5 flex items-start justify-between gap-4">
-              <div>
-                <p className="text-base font-medium text-zinc-950">No upcoming appointments scheduled.</p>
-                <p className="mt-1 text-sm text-zinc-500">When a client books with you, it will appear here.</p>
-              </div>
-              <span className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
-                <CalendarDaysIcon className="size-7" />
-              </span>
-            </div>
-            <div className="mt-auto pt-6">
-              <Button href="/bookings" color="brand">
-                View all bookings
-              </Button>
-            </div>
-          </>
-        )}
-    </section>
-  )
-}
-
-function UpcomingList({
+function BookingListCard({
   bookings,
   tz,
   loading,
+  pageFind,
+  minimized,
+  onToggle,
 }: {
   bookings: Booking[] | null
   tz: string
   loading: boolean
+  pageFind: string
+  minimized: boolean
+  onToggle: () => void
 }) {
   const [find, setFind] = useState('')
-  const needle = find.trim().toLowerCase()
+  const [status, setStatus] = useState<BookingFilter>('all')
+  const needle = `${pageFind} ${find}`.trim().toLowerCase()
   const items = (bookings ?? []).filter((booking) => {
+    if (status !== 'all' && booking.status !== status) return false
     if (!needle) return true
-    return `${booking.customer_name ?? ''} ${booking.service_type ?? ''}`.toLowerCase().includes(needle)
+    return `${booking.customer_name ?? ''} ${booking.service_type ?? ''} ${booking.status}`.toLowerCase().includes(needle)
   })
+  const filterLabel = BOOKING_FILTERS.find((item) => item.id === status)?.label ?? 'All'
 
   return (
-    <section className={`${dashCardClass} flex h-full flex-col rounded-[18px] p-5`}>
-        <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold text-zinc-950 dark:text-white">Upcoming appointments</h2>
-          <Button href="/bookings" plain className="text-xs">
-            View all
-            <ArrowUpRightIcon data-slot="icon" />
-          </Button>
-        </div>
-        <label className="group relative mt-2.5 block">
-          <MagnifyingGlassIcon className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-zinc-400 transition group-focus-within:text-blue-500" />
-          <input
-            value={find}
-            onChange={(event) => setFind(event.target.value)}
-            placeholder="Search appointments"
-            className="h-8 w-full rounded-lg bg-zinc-100/60 pr-7 pl-8 text-[13px] text-zinc-700 outline-none transition placeholder:text-zinc-400 focus:bg-zinc-100"
-          />
-          {find ? (
-            <button
-              type="button"
-              aria-label="Clear search"
-              onClick={() => setFind('')}
-              className="absolute top-1/2 right-1.5 inline-flex size-5 -translate-y-1/2 items-center justify-center rounded-full text-zinc-400 transition hover:bg-white hover:text-zinc-700"
+    <section className={`${dashCardClass} flex h-full min-h-0 min-w-0 flex-col rounded-[18px] p-5`}>
+      <div className="mb-1 flex items-center justify-between gap-3">
+        <h2 className="truncate text-base font-semibold text-zinc-950 dark:text-white">Bookings</h2>
+        <span className="flex shrink-0 items-center gap-2">
+          <Menu as="div" className="relative shrink-0">
+            <MenuButton className="inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-600 ring-1 ring-zinc-200 hover:bg-zinc-50 dark:bg-zinc-900 dark:text-zinc-300 dark:ring-zinc-700">
+              {filterLabel}
+              <ChevronDownIcon className="size-3.5 text-zinc-400" />
+            </MenuButton>
+            <MenuItems
+              anchor="bottom end"
+              className="z-20 w-40 rounded-xl bg-white p-1 shadow-lg ring-1 ring-zinc-200 [--anchor-gap:6px] focus:outline-none dark:bg-zinc-900 dark:ring-zinc-700"
             >
-              <XMarkIcon className="size-3.5" />
-            </button>
-          ) : null}
-        </label>
+              {BOOKING_FILTERS.map((item) => (
+                <MenuItem key={item.id}>
+                  <button
+                    type="button"
+                    onClick={() => setStatus(item.id)}
+                    className="block w-full rounded-lg px-3 py-2 text-left text-sm text-zinc-700 data-focus:bg-zinc-100 dark:text-zinc-200 dark:data-focus:bg-zinc-800"
+                  >
+                    {item.label}
+                  </button>
+                </MenuItem>
+              ))}
+            </MenuItems>
+          </Menu>
+          <Link href="/bookings" className="text-sm font-medium text-blue-600 hover:text-blue-700">
+            View all
+          </Link>
+          <CollapseControl minimized={minimized} label="Bookings" onClick={onToggle} />
+        </span>
+      </div>
+      <div
+        className={`grid min-h-0 motion-safe:transition-[grid-template-rows,opacity] motion-safe:duration-500 motion-safe:ease-[cubic-bezier(0.22,1,0.36,1)] ${
+          minimized ? 'grid-rows-[0fr] opacity-0' : 'grid-rows-[1fr] opacity-100'
+        }`}
+      >
+        <div className="flex min-h-0 flex-col overflow-hidden">
+          <label className="group relative mt-2.5 block">
+            <MagnifyingGlassIcon className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-zinc-400 transition group-focus-within:text-blue-500" />
+            <input
+              value={find}
+              onChange={(event) => setFind(event.target.value)}
+              placeholder="Search bookings"
+              className="h-8 w-full rounded-lg bg-zinc-100/60 pr-7 pl-8 text-[13px] text-zinc-700 outline-none transition placeholder:text-zinc-400 focus:bg-zinc-100 dark:bg-zinc-800/60 dark:text-zinc-200"
+            />
+            {find ? (
+              <button
+                type="button"
+                aria-label="Clear search"
+                onClick={() => setFind('')}
+                className="absolute top-1/2 right-1.5 inline-flex size-5 -translate-y-1/2 items-center justify-center rounded-full text-zinc-400 transition hover:bg-white hover:text-zinc-700"
+              >
+                <XMarkIcon className="size-3.5" />
+              </button>
+            ) : null}
+          </label>
+          {loading ? (
+            <div className="mt-4 space-y-3">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <div key={index} className="h-14 animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-800" />
+              ))}
+            </div>
+          ) : items.length > 0 ? (
+            <ul className="scroll-hide mt-3 max-h-[16.25rem] divide-y divide-zinc-950/5 overflow-y-auto overscroll-contain dark:divide-white/5">
+              {items.map((booking, index) => (
+                <li key={booking.id}>
+                  <Link
+                    href="/bookings"
+                    className="-mx-2 flex items-center gap-3 rounded-xl px-2 py-3 transition hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
+                  >
+                    <Avatar name={booking.customer_name || 'Customer'} index={index} />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-zinc-900 dark:text-white">
+                        {booking.customer_name || 'Customer'}
+                      </p>
+                      <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">
+                        {booking.service_type || 'Appointment'} ·{' '}
+                        {booking.selected_slot ? formatDateTime(booking.selected_slot, tz) : '—'}
+                      </p>
+                    </div>
+                    <div className="hidden sm:block">
+                      <SourceBadge channel={booking.source_channel} />
+                    </div>
+                    <Badge color={statusColor(booking.status)} className="shrink-0 capitalize">
+                      {booking.status}
+                    </Badge>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="mt-4 flex flex-1 flex-col items-center justify-center px-4 py-8 text-center">
+              <span className="flex size-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
+                <CalendarDaysIcon className="size-7" />
+              </span>
+              <p className="mt-4 text-sm font-medium text-zinc-950 dark:text-white">No bookings in this view</p>
+              <p className="mt-1 text-sm text-zinc-500">Try another status, or clear the search.</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
+  )
+}
 
-        {loading ? (
-          <div className="mt-4 space-y-3">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div
-                key={i}
-                className="h-14 animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-800"
-              />
-            ))}
+function pickChannel(rows: ChannelAccount[] | null | undefined, channel: 'facebook' | 'instagram') {
+  const matches = (rows ?? []).filter((row) => row.channel === channel)
+  return (
+    matches.find((row) => row.connection_status === 'verified' && row.is_active) ??
+    matches.find((row) => row.is_active) ??
+    matches[0] ??
+    null
+  )
+}
+
+function channelStatus(account: ChannelAccount | null) {
+  if (!account) return { label: 'Not connected', className: 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-300' }
+  if (account.connection_status === 'verified') {
+    return { label: 'Connected', className: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300' }
+  }
+  if (account.connection_status === 'error') {
+    return { label: 'Needs attention', className: 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300' }
+  }
+  return { label: 'Pending', className: 'bg-amber-50 text-amber-800 dark:bg-amber-500/10 dark:text-amber-200' }
+}
+
+function SocialAccountCard({
+  channel,
+  account,
+}: {
+  channel: 'facebook' | 'instagram'
+  account: ChannelAccount | null
+}) {
+  const title = channel === 'facebook' ? 'Facebook' : 'Instagram'
+  const status = channelStatus(account)
+  const connected = Boolean(account)
+  return (
+    <section className={`${dashCardClass} flex h-full flex-col rounded-[18px] p-5`}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <span
+            className={clsx(
+              'flex size-10 shrink-0 items-center justify-center rounded-full ring-1',
+              connected ? 'bg-white ring-zinc-200 dark:bg-zinc-900 dark:ring-zinc-700' : 'bg-zinc-50 ring-zinc-200 dark:bg-zinc-800 dark:ring-zinc-700',
+            )}
+          >
+            <ChannelIcon channel={channel} className="size-6" colored />
+          </span>
+          <div className="min-w-0">
+            <h2 className="text-base font-semibold text-zinc-950 dark:text-white">{title}</h2>
+            <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">
+              {connected ? account?.label || 'Connected account' : 'Not linked yet'}
+            </p>
           </div>
-        ) : items.length > 0 ? (
-          <ul className="scroll-hide mt-3 max-h-[18.25rem] divide-y divide-zinc-950/5 overflow-y-auto overscroll-contain dark:divide-white/5">
-            {items.map((b, i) => (
-              <li key={b.id}>
-                <a
-                  href={`/bookings`}
-                  className="-mx-2 flex items-center gap-3 rounded-xl px-2 py-3 transition hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
-                >
-                  <Avatar name={b.customer_name || 'Customer'} index={i} />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-zinc-900 dark:text-white">
-                      {b.customer_name || 'Customer'}
-                    </p>
-                    <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">
-                      {b.service_type || 'Appointment'} ·{' '}
-                      {b.selected_slot ? formatDateTime(b.selected_slot, tz) : '—'}
-                    </p>
-                  </div>
-                  <div className="hidden sm:block">
-                    <SourceBadge channel={b.source_channel} />
-                  </div>
-                  <Badge color={statusColor(b.status)} className="shrink-0 capitalize">
-                    {b.status}
-                  </Badge>
-                </a>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <div className="mt-4 flex flex-1 flex-col items-center justify-center px-4 py-8 text-center">
-            <span className="flex size-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
-              <CalendarDaysIcon className="size-7" />
-            </span>
-            <p className="mt-4 text-sm font-medium text-zinc-950 dark:text-white">No upcoming appointments</p>
-            <p className="mt-1 text-sm text-zinc-500">You don&apos;t have any scheduled appointments.</p>
-            <Button href="/bookings" color="brand" className="mt-4">
-              View all bookings
+        </div>
+        <span className={clsx('shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium', status.className)}>
+          {status.label}
+        </span>
+      </div>
+      {connected && account ? (
+        <div className="mt-4 flex flex-1 flex-col">
+          <p className="text-sm text-zinc-600 dark:text-zinc-300">
+            {account.connection_message ||
+              (account.connection_status === 'verified'
+                ? 'Messages from this account can create bookings.'
+                : 'Finish setup on the accounts page.')}
+          </p>
+          <p className="mt-2 text-xs text-zinc-400">
+            {account.is_active ? 'Active' : 'Inactive'}
+            {account.last_verified_at ? ` · checked ${formatDateTime(account.last_verified_at)}` : ''}
+          </p>
+          <div className="mt-auto pt-4">
+            <Link href="/accounts" className="text-sm font-medium text-blue-600 hover:text-blue-700">
+              Manage
+            </Link>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-4 flex flex-1 flex-col">
+          <div className="rounded-2xl border border-dashed border-zinc-200 bg-zinc-50/80 px-4 py-5 dark:border-zinc-700 dark:bg-zinc-800/40">
+            <p className="text-sm font-medium text-zinc-800 dark:text-zinc-100">
+              {channel === 'facebook' ? 'Connect Facebook Messenger' : 'Connect Instagram'}
+            </p>
+            <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+              {channel === 'facebook'
+                ? 'Page messages show up here once the account is connected.'
+                : 'Instagram messages show up here once the account is connected.'}
+            </p>
+          </div>
+          <div className="mt-auto pt-4">
+            <Button href="/accounts" color="brand">
+              Connect
             </Button>
           </div>
-        )}
+        </div>
+      )}
     </section>
   )
 }
@@ -446,15 +526,12 @@ function DashboardPageInner() {
     decoded?.tenantId && orgId && decoded.tenantId !== orgId,
   )
   const range =
-    decoded && orgId && !linkIgnored
+    decoded && orgId && !linkIgnored && rangeDayCount(decoded.start, decoded.end) <= 61
       ? { start: decoded.start, end: decoded.end }
       : null
   const today = dayKeyInTz(new Date(), tenantTz)
-  const presets = {
-    week: presetRange('week', today),
-    month: presetRange('month', today),
-    year: presetRange('year', today),
-  }
+  const last7 = { start: shiftDateKey(today, -6), end: today }
+  const last30 = { start: shiftDateKey(today, -29), end: today }
 
   const { data: stats, loading: statsLoading } = useApiData<TenantStats>(
     (token) => {
@@ -470,48 +547,45 @@ function DashboardPageInner() {
   const [draftEnd, setDraftEnd] = useState(range?.end ?? '')
   const [rangeOpen, setRangeOpen] = useState(false)
   const [pageFind, setPageFind] = useState('')
+  const [chartMin, setChartMin] = useState(false)
+  const [listMin, setListMin] = useState(false)
   useEffect(() => {
     setDraftStart(range?.start ?? '')
     setDraftEnd(range?.end ?? '')
   }, [range?.start, range?.end])
 
   function openRange(start: string, end: string) {
-    if (!orgId || !start || !end || end < start) return
-    if (rangeDayCount(start, end) > 366) return
-    const token = encodeReportRange(start, end, orgId)
+    if (!orgId || !start || !end) return false
+    const next = start <= end ? { start, end } : { start: end, end: start }
+    if (rangeDayCount(next.start, next.end) > 61) {
+      toast.error('Choose a range of two months or less.')
+      return false
+    }
+    const token = encodeReportRange(next.start, next.end, orgId)
     router.replace(`/?r=${encodeURIComponent(token)}`)
+    return true
   }
 
-  const { data: upcoming, loading: upcomingLoading } = useApiData<Booking[]>(
-    (token) => api.bookings.upcoming(token),
+  const bookingsQuery = useApiData<Booking[]>(
+    (token) => (pendingLink ? Promise.resolve([] as Booking[]) : api.bookings.list(token, { limit: 100 })),
+    [pendingLink],
   )
-
-  const chartStatsQuery = useApiData<TenantStats>(
-    (token) => (range ? Promise.resolve(null as unknown as TenantStats) : api.tenants.stats(token, presets.week)),
-    [range?.start ?? '', range?.end ?? '', presets.week.start, presets.week.end],
+  const channelsQuery = useApiData<ChannelAccount[]>(
+    (token) => (pendingLink ? Promise.resolve([] as ChannelAccount[]) : api.channels.list(token)),
+    [pendingLink],
   )
-  const chartStats = range ? statsView : chartStatsQuery.data
-  const chartBusy = range ? statsBusy : chartStatsQuery.loading
-
-  const sortedUpcoming = useMemo(() => {
-    return [...(upcoming ?? [])].sort((a, b) => {
-      const ta = a.selected_slot ? new Date(a.selected_slot).getTime() : Infinity
-      const tb = b.selected_slot ? new Date(b.selected_slot).getTime() : Infinity
-      return ta - tb
-    })
-  }, [upcoming])
+  const chartStats = statsView
+  const chartBusy = statsBusy
 
   const businessName = organization?.name || 'Dashboard'
 
   const windowKind: ChartWindow = !range
     ? 'all'
-    : range.start === presets.week.start && range.end === presets.week.end
+    : range.start === last7.start && range.end === last7.end
       ? 'week'
-      : range.start === presets.month.start && range.end === presets.month.end
+      : range.start === last30.start && range.end === last30.end
         ? 'month'
-        : range.start === presets.year.start && range.end === presets.year.end
-          ? 'year'
-          : 'custom'
+        : 'custom'
 
   function formatRangeWithYear(start: string, end: string) {
     const fmt = (iso: string) =>
@@ -533,35 +607,14 @@ function DashboardPageInner() {
             <input
               value={pageFind}
               onChange={(event) => setPageFind(event.target.value)}
-              placeholder="Search appointments..."
-              className="h-11 w-full rounded-full border border-zinc-200/80 bg-white pr-4 pl-11 text-sm text-zinc-700 shadow-sm outline-none placeholder:text-zinc-400 focus:ring-2 focus:ring-blue-200"
+              placeholder="Search bookings, conversations..."
+              className="h-11 w-full rounded-full border border-zinc-200/80 bg-white pr-16 pl-11 text-sm text-zinc-700 shadow-sm outline-none placeholder:text-zinc-400 focus:ring-2 focus:ring-blue-200"
             />
+            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded-md border border-zinc-200 bg-zinc-50 px-1.5 py-0.5 text-[11px] font-medium text-zinc-400">
+              ⌘ K
+            </span>
           </label>
           <div className="ml-auto flex flex-wrap items-center gap-2">
-          <div className="inline-flex h-11 items-center rounded-full bg-white p-1 shadow-sm ring-1 ring-zinc-200">
-            {(
-              [
-                ['week', 'Week'],
-                ['month', 'Month'],
-                ['year', 'Year'],
-              ] as const
-            ).map(([kind, label]) => {
-              const selected = range?.start === presets[kind].start && range?.end === presets[kind].end
-              return (
-                <button
-                  key={kind}
-                  type="button"
-                  onClick={() => openRange(presets[kind].start, presets[kind].end)}
-                  className={clsx(
-                    'rounded-full px-3 py-1.5 text-sm font-semibold',
-                    selected ? 'bg-blue-600 text-white' : 'text-zinc-600 hover:bg-zinc-100',
-                  )}
-                >
-                  {label}
-                </button>
-              )
-            })}
-          </div>
           <div className="relative">
             <button
               type="button"
@@ -596,28 +649,26 @@ function DashboardPageInner() {
                     onChange={(event) => setDraftEnd(event.target.value)}
                   />
                 </label>
+                <p className="mt-2 text-[11px] text-zinc-400">Up to two months.</p>
                 <div className="mt-3 flex gap-2">
                   <Button
                     color="brand"
                     className="flex-1"
                     onClick={() => {
-                      openRange(draftStart, draftEnd)
-                      setRangeOpen(false)
+                      if (openRange(draftStart, draftEnd)) setRangeOpen(false)
                     }}
                   >
                     Apply
                   </Button>
-                  {range ? (
-                    <Button
-                      outline
-                      onClick={() => {
-                        router.replace('/')
-                        setRangeOpen(false)
-                      }}
-                    >
-                      Clear
-                    </Button>
-                  ) : null}
+                  <Button
+                    outline
+                    onClick={() => {
+                      router.replace('/')
+                      setRangeOpen(false)
+                    }}
+                  >
+                    All time
+                  </Button>
                 </div>
               </div>
             ) : null}
@@ -698,79 +749,82 @@ function DashboardPageInner() {
         )}
       </div>
 
-      {/* Chart + gauge */}
-      <div className="grid grid-cols-1 items-stretch gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-        <div className="flex h-full min-h-0 flex-col">
-          <ActivityBars
-            variant="premium"
-            title="Booking activity"
-            subtitle={`New bookings · ${chartCaption(windowKind)}`}
-            points={activityPoints(chartStats)}
-            loading={chartBusy}
-            menu={
-              <Menu as="div" className="relative shrink-0">
-                <MenuButton className="inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-600 ring-1 ring-zinc-200 hover:bg-zinc-50 dark:bg-zinc-900 dark:text-zinc-300 dark:ring-zinc-700">
-                  {chartChipLabel(windowKind, range ? formatRangeLabel(range.start, range.end) : undefined)}
-                  <ChevronDownIcon className="size-3.5 text-zinc-400" />
-                </MenuButton>
-                <MenuItems
-                  anchor="bottom end"
-                  className="z-20 w-40 rounded-xl bg-white p-1 shadow-lg ring-1 ring-zinc-200 [--anchor-gap:6px] focus:outline-none dark:bg-zinc-900 dark:ring-zinc-700"
-                >
-                  {(
-                    [
-                      ['week', 'Last 7 days'],
-                      ['month', 'Last 30 days'],
-                      ['year', 'This year'],
-                      ['all', 'All time'],
-                    ] as const
-                  ).map(([kind, label]) => (
-                    <MenuItem key={kind}>
+      <div className="@container">
+        <div
+          className={
+            chartMin
+              ? 'flex flex-col items-start gap-4 @min-[720px]:flex-row'
+              : 'grid items-stretch gap-4 @min-[720px]:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]'
+          }
+        >
+          <div className={chartMin ? 'w-full @min-[720px]:max-w-[26rem] @min-[720px]:flex-[0_0_26rem]' : 'flex h-full min-h-0 flex-col'}>
+            <ActivityBars
+              variant="premium"
+              minimized={chartMin}
+              onToggleMinimize={() => setChartMin((value) => !value)}
+              title="Booking activity"
+              subtitle={`New bookings · ${chartCaption(windowKind)}`}
+              points={activityPoints(chartStats)}
+              loading={chartBusy}
+              menu={
+                <Menu as="div" className="relative shrink-0">
+                  <MenuButton className="inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-600 ring-1 ring-zinc-200 hover:bg-zinc-50 dark:bg-zinc-900 dark:text-zinc-300 dark:ring-zinc-700">
+                    {chartChipLabel(windowKind, range ? formatRangeLabel(range.start, range.end) : undefined)}
+                    <ChevronDownIcon className="size-3.5 text-zinc-400" />
+                  </MenuButton>
+                  <MenuItems
+                    anchor="bottom end"
+                    className="z-20 w-40 rounded-xl bg-white p-1 shadow-lg ring-1 ring-zinc-200 [--anchor-gap:6px] focus:outline-none dark:bg-zinc-900 dark:ring-zinc-700"
+                  >
+                    <MenuItem>
                       <button
                         type="button"
-                        onClick={() => {
-                          if (kind === 'all') {
-                            router.replace('/')
-                            return
-                          }
-                          openRange(presets[kind].start, presets[kind].end)
-                        }}
+                        onClick={() => openRange(last7.start, last7.end)}
                         className="block w-full rounded-lg px-3 py-2 text-left text-sm text-zinc-700 data-focus:bg-zinc-100 dark:text-zinc-200 dark:data-focus:bg-zinc-800"
                       >
-                        {label}
+                        Last 7 days
                       </button>
                     </MenuItem>
-                  ))}
-                </MenuItems>
-              </Menu>
-            }
-          />
-        </div>
-        <div className="h-full">
-          <CompletionGauge stats={statsView} loading={statsBusy} />
+                    <MenuItem>
+                      <button
+                        type="button"
+                        onClick={() => openRange(last30.start, last30.end)}
+                        className="block w-full rounded-lg px-3 py-2 text-left text-sm text-zinc-700 data-focus:bg-zinc-100 dark:text-zinc-200 dark:data-focus:bg-zinc-800"
+                      >
+                        Last 30 days
+                      </button>
+                    </MenuItem>
+                    <MenuItem>
+                      <button
+                        type="button"
+                        onClick={() => router.replace('/')}
+                        className="block w-full rounded-lg px-3 py-2 text-left text-sm text-zinc-700 data-focus:bg-zinc-100 dark:text-zinc-200 dark:data-focus:bg-zinc-800"
+                      >
+                        All time
+                      </button>
+                    </MenuItem>
+                  </MenuItems>
+                </Menu>
+              }
+            />
+          </div>
+          <div className={chartMin ? 'min-w-0 @min-[720px]:flex-1' : 'h-full'}>
+            <BookingListCard
+              bookings={bookingsQuery.data ?? []}
+              tz={tenantTz}
+              loading={bookingsQuery.loading}
+              pageFind={pageFind}
+              minimized={listMin}
+              onToggle={() => setListMin((value) => !value)}
+            />
+          </div>
         </div>
       </div>
 
-      {/* Next appointment + upcoming list */}
       <div className="grid grid-cols-1 items-stretch gap-4 lg:grid-cols-3">
-        <div className="h-full">
-          <NextAppointmentCard
-            booking={sortedUpcoming[0] ?? null}
-            tz={tenantTz}
-            loading={upcomingLoading}
-          />
-        </div>
-        <div className="h-full lg:col-span-2">
-          <UpcomingList
-            bookings={sortedUpcoming.filter((booking) => {
-              const needle = pageFind.trim().toLowerCase()
-              if (!needle) return true
-              return `${booking.customer_name ?? ''} ${booking.service_type ?? ''}`.toLowerCase().includes(needle)
-            })}
-            tz={tenantTz}
-            loading={upcomingLoading}
-          />
-        </div>
+        <CompletionGauge stats={statsView} loading={statsBusy} />
+        <SocialAccountCard channel="facebook" account={pickChannel(channelsQuery.data, 'facebook')} />
+        <SocialAccountCard channel="instagram" account={pickChannel(channelsQuery.data, 'instagram')} />
       </div>
     </PageShell>
   )

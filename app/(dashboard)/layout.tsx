@@ -92,7 +92,7 @@ export default function DashboardLayout({
             loading={brandLoading || adminLoading}
             logoUrl={brandAssetUrl(brand?.logo_url)}
             name={brand?.company_name || organization?.name || 'Client'}
-            subtitle="Client dashboard"
+            subtitle="Client portal"
             collapsed={collapsed}
             onToggle={() => {
               setCollapsed((value) => {

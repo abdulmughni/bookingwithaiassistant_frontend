@@ -107,7 +107,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     (pathname.startsWith('/admin/plans') ||
       pathname.startsWith('/admin/requests') ||
       pathname.startsWith('/admin/agencies'))
-  const portalName = isAgency ? brand?.company_name || 'Agency' : 'Admin Console'
+  const portalName = isAgency ? brand?.company_name || 'Agency' : 'Admin portal'
 
   useEffect(() => {
     if (isLoaded && !userId) {
@@ -183,7 +183,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <PortalSidebarShell>
             <PortalSidebarBrand
               name="Beyonds Logic"
-              subtitle="Admin Console"
+              subtitle="Admin portal"
               mark="B"
               collapsed={adminCollapsed}
               onToggle={() => {
@@ -215,7 +215,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 subtitle={''}
                 compact={adminCollapsed}
                 menuTitle={portalName}
-                menuLines={[{ label: 'Portal', value: 'Admin Console' }]}
+                menuLines={[{ label: 'Portal', value: 'Admin portal' }]}
               />
             </div>
           </PortalSidebarShell>
@@ -260,7 +260,7 @@ function AgencySidebarBrand({
       {collapsed ? null : (
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-semibold text-zinc-950">{name}</span>
-          <span className="block truncate text-[11px] text-zinc-400">Agency dashboard</span>
+          <span className="block truncate text-[11px] text-zinc-400">Agency portal</span>
         </span>
       )}
       <button
