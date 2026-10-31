@@ -17,6 +17,7 @@ import {
 import { PageHeader, PageShell, SkeletonBlock, dashCardClass } from '@/components/dashboard-ui'
 import { ConfirmActionDialog } from '@/components/admin/confirm-action-dialog'
 import { PlanFormDialog } from '@/components/admin/plan-form-dialog'
+import { PlanPriceCalculator } from '@/components/admin/plan-price-calculator'
 import { priceLabel, validityLabel } from '@/components/admin/shared'
 import { api, ApiError } from '@/lib/api'
 import { useApiData, useApiToken } from '@/lib/hooks'
@@ -32,6 +33,7 @@ export default function AdminPlansPage() {
   )
 
   const [showCreate, setShowCreate] = useState(false)
+  const [seed, setSeed] = useState<PlanWriteBody | null>(null)
   const [editing, setEditing] = useState<AdminPlan | null>(null)
   const [deleting, setDeleting] = useState<AdminPlan | null>(null)
 
@@ -85,13 +87,27 @@ export default function AdminPlansPage() {
     <PageShell>
       <PageHeader
         title="Plans"
-        description="Manage the prepaid credit packs clients can be assigned. Each pack grants messages and call minutes usable within its validity window."
+        description="Platform packs of call minutes and messages. Agencies price and give their own packs to their clients on Plans & billing. This page is the catalog you control."
       >
-        <Button color="brand" onClick={() => setShowCreate(true)}>
+        <Button
+          color="brand"
+          onClick={() => {
+            setSeed(null)
+            setShowCreate(true)
+          }}
+        >
           <PlusIcon />
           New plan
         </Button>
       </PageHeader>
+
+      <PlanPriceCalculator
+        audience="admin"
+        onUse={(body) => {
+          setSeed(body)
+          setShowCreate(true)
+        }}
+      />
 
       {error && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-800/60 dark:bg-red-900/20 dark:text-red-200">
@@ -195,7 +211,15 @@ export default function AdminPlansPage() {
       {loading && <SkeletonBlock className="h-2 w-0" />}
 
       {/* Create */}
-      <PlanFormDialog open={showCreate} onClose={() => setShowCreate(false)} onSubmit={handleCreate} />
+      <PlanFormDialog
+        open={showCreate}
+        onClose={() => {
+          setShowCreate(false)
+          setSeed(null)
+        }}
+        seed={seed}
+        onSubmit={handleCreate}
+      />
 
       {/* Edit */}
       <PlanFormDialog

@@ -154,8 +154,8 @@ export function AgencyHome() {
           label: 'Estimated job value',
           value: `$${Math.round(range ? (activityQuery.data?.estimated_value ?? 0) : (activityQuery.data?.estimated_value_total ?? 0)).toLocaleString()}`,
           trend: (range ? (activityQuery.data?.estimated_value ?? 0) : (activityQuery.data?.estimated_value_total ?? 0)) > 0
-            ? 'Recorded on bookings'
-            : 'No estimate on bookings yet',
+            ? 'On client bookings, not pack fees'
+            : 'No job estimate on client bookings yet',
         },
       ]
   const icons = [UsersIcon, CalendarDaysIcon, PhoneIcon, EnvelopeIcon, BanknotesIcon]
@@ -283,11 +283,11 @@ export function AgencyHome() {
           </div>
         </div>
         <div>
-          <h1 className="text-[1.7rem] font-semibold tracking-tight text-zinc-950 sm:text-3xl">
+          <h1 className="portal-title text-[1.7rem] font-semibold tracking-tight sm:text-3xl">
             Welcome back
             {welcomeName ? `, ${welcomeName}` : ''} <span aria-hidden>👋</span>
           </h1>
-          <p className="mt-1 text-sm text-zinc-500">
+          <p className="portal-subtitle mt-1 text-sm">
             Here&apos;s an overview of your clients, bookings, and AI performance.
           </p>
         </div>
@@ -444,7 +444,7 @@ export function AgencyHome() {
                 <th className="px-2 py-2 font-medium">Bookings</th>
                 <th className="px-2 py-2 font-medium">Calls</th>
                 <th className="px-2 py-2 font-medium">Messages</th>
-                {demo ? <th className="px-2 py-2 font-medium">Revenue</th> : null}
+                {demo ? <th className="px-2 py-2 font-medium" title="Sample estimate on that client's jobs, not pack fees">Job value</th> : null}
                 <th className="py-2 font-medium">Status</th>
                 {demo ? <th className="py-2 font-medium">Trend</th> : null}
               </tr>

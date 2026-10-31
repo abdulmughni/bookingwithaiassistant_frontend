@@ -157,9 +157,14 @@ function CompletionGauge({
   const confirmed = stats?.confirmed_bookings ?? 0
   const cancelled = stats?.cancelled_bookings ?? 0
   const pct = total > 0 ? Math.round((completed / total) * 100) : 0
-  const radius = 46
-  const circumference = 2 * Math.PI * radius
-  const dash = (pct / 100) * circumference
+  const other = Math.max(0, total - completed - confirmed - cancelled)
+  const shares = [
+    { key: 'done', label: 'Done', value: completed, bar: 'bg-emerald-500' },
+    { key: 'open', label: 'Open', value: confirmed, bar: 'bg-blue-500' },
+    { key: 'cancelled', label: 'Cancelled', value: cancelled, bar: 'bg-zinc-300 dark:bg-zinc-500' },
+    ...(other > 0 ? [{ key: 'other', label: 'Other', value: other, bar: 'bg-amber-400' }] : []),
+  ]
+  const shareTotal = shares.reduce((sum, part) => sum + part.value, 0) || 1
 
   return (
     <Link
@@ -178,39 +183,37 @@ function CompletionGauge({
         <div className="mt-6 h-40 animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-800" />
       ) : (
         <>
-          <div className="relative mx-auto mt-4 size-36">
-            <svg viewBox="0 0 120 120" className="size-36 -rotate-90">
-              <circle cx="60" cy="60" r={radius} fill="none" className="stroke-zinc-100 dark:stroke-zinc-800" strokeWidth="10" />
-              <circle
-                cx="60"
-                cy="60"
-                r={radius}
-                fill="none"
-                stroke="url(#completionRing)"
-                strokeWidth="10"
-                strokeLinecap="round"
-                strokeDasharray={`${dash} ${circumference}`}
-                className="transition-all duration-700"
-              />
-              <defs>
-                <linearGradient id="completionRing" x1="0" y1="0" x2="1" y2="1">
-                  <stop offset="0%" stopColor="#6ee7b7" />
-                  <stop offset="100%" stopColor="#059669" />
-                </linearGradient>
-              </defs>
-            </svg>
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <p className="text-3xl font-semibold tracking-tight text-zinc-950 dark:text-white">{pct}%</p>
-              <p className="text-[11px] text-zinc-400">completed</p>
-            </div>
+          <div className="mt-5 flex items-end justify-between gap-3">
+            <p className="text-5xl font-semibold tracking-tight text-zinc-950 tabular-nums dark:text-white">
+              {pct}
+              <span className="text-2xl font-medium text-zinc-400">%</span>
+            </p>
+            <p className="pb-1 text-right text-sm text-zinc-600 dark:text-zinc-300">
+              {completed} of {total}
+              <span className="block text-xs text-zinc-500">bookings finished</span>
+            </p>
           </div>
-          <p className="mt-3 text-center text-sm text-zinc-600 dark:text-zinc-300">
-            {completed} of {total} bookings finished
-          </p>
-          <div className="mt-auto grid grid-cols-3 gap-2 pt-4">
-            <GaugeStat color="bg-emerald-500" label="Done" value={completed} />
-            <GaugeStat color="bg-blue-500" label="Open" value={confirmed} />
-            <GaugeStat color="bg-zinc-300 dark:bg-zinc-600" label="Cancelled" value={cancelled} />
+          <div className="mt-4 flex h-3.5 gap-0.5" aria-hidden>
+            {shareTotal > 0 && shares.some((part) => part.value > 0) ? (
+              shares.map((part) =>
+                part.value > 0 ? (
+                  <span
+                    key={part.key}
+                    className={clsx('h-full min-w-1.5 rounded-full', part.bar)}
+                    style={{ flexGrow: part.value, flexBasis: 0 }}
+                    title={`${part.label} ${part.value}`}
+                  />
+                ) : null,
+              )
+            ) : (
+              <span className="h-full flex-1 rounded-full bg-zinc-100 dark:bg-zinc-800" />
+            )}
+          </div>
+          <p className="mt-2 text-xs text-zinc-500">Share of your bookings</p>
+          <div className={`mt-auto grid gap-2 pt-4 ${shares.length > 3 ? 'grid-cols-4' : 'grid-cols-3'}`}>
+            {shares.map((part) => (
+              <GaugeStat key={part.key} color={part.bar} label={part.label} value={part.value} />
+            ))}
           </div>
         </>
       )}
@@ -424,6 +427,46 @@ function channelStatus(account: ChannelAccount | null) {
   return { label: 'Pending', className: 'bg-amber-50 text-amber-800 dark:bg-amber-500/10 dark:text-amber-200' }
 }
 
+function PagePhoto({
+  account,
+  channel,
+}: {
+  account: ChannelAccount
+  channel: 'facebook' | 'instagram'
+}) {
+  const graphPhoto = account.account_id
+    ? `https://graph.facebook.com/${encodeURIComponent(account.account_id)}/picture?type=large`
+    : ''
+  const [source, setSource] = useState<'stored' | 'graph' | 'none'>(
+    account.picture_url ? 'stored' : graphPhoto ? 'graph' : 'none',
+  )
+  const src = source === 'stored' ? account.picture_url || '' : source === 'graph' ? graphPhoto : ''
+
+  return (
+    <span className="relative shrink-0">
+      {src ? (
+        // eslint-disable-next-line @next/next/no-img-element -- Meta page photos are on a CDN
+        <img
+          src={src}
+          alt=""
+          referrerPolicy="no-referrer"
+          onError={() => setSource((current) => (current === 'stored' && graphPhoto ? 'graph' : 'none'))}
+          className="size-14 rounded-full object-cover shadow-sm ring-2 ring-white dark:ring-zinc-800"
+        />
+      ) : (
+        <span className="flex size-14 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-zinc-200 dark:bg-zinc-950 dark:ring-zinc-700">
+          <ChannelIcon channel={channel} className="size-7" colored />
+        </span>
+      )}
+      {src ? (
+        <span className="absolute -bottom-0.5 -right-0.5 flex size-6 items-center justify-center rounded-full bg-white shadow-md ring-1 ring-zinc-200 dark:bg-zinc-900 dark:ring-zinc-600">
+          <ChannelIcon channel={channel} className="size-3.5" colored />
+        </span>
+      ) : null}
+    </span>
+  )
+}
+
 function SocialAccountCard({
   channel,
   account,
@@ -434,7 +477,6 @@ function SocialAccountCard({
   bookings: number
 }) {
   const title = channel === 'facebook' ? 'Facebook' : 'Instagram'
-  const [pictureFailed, setPictureFailed] = useState(false)
   const status = channelStatus(account)
   const connected = Boolean(account)
   const wash = channel === 'facebook'
@@ -449,9 +491,13 @@ function SocialAccountCard({
       <span className={`absolute inset-x-0 top-0 h-1 ${bar}`} />
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-zinc-200 dark:bg-zinc-950 dark:ring-zinc-700">
-            <ChannelIcon channel={channel} className="size-6" colored />
-          </span>
+          {connected && account ? (
+            <PagePhoto account={account} channel={channel} />
+          ) : (
+            <span className="flex size-14 shrink-0 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-zinc-200 dark:bg-zinc-950 dark:ring-zinc-700">
+              <ChannelIcon channel={channel} className="size-7" colored />
+            </span>
+          )}
           <div className="min-w-0">
             <h2 className="text-base font-semibold text-zinc-950 dark:text-white">{title}</h2>
             <p className="truncate text-xs text-zinc-500">{connected ? 'Page connected' : 'Not linked yet'}</p>
@@ -463,25 +509,9 @@ function SocialAccountCard({
       </div>
       {connected && account ? (
         <div className="mt-4 flex flex-1 flex-col">
-          <div className="flex items-center gap-3">
-            {account.picture_url && !pictureFailed ? (
-              // eslint-disable-next-line @next/next/no-img-element -- Meta CDN profile URLs
-              <img
-                src={account.picture_url}
-                alt=""
-                referrerPolicy="no-referrer"
-                onError={() => setPictureFailed(true)}
-                className="size-10 rounded-full object-cover ring-2 ring-white"
-              />
-            ) : (
-              <span className="flex size-10 items-center justify-center rounded-full bg-white text-sm font-semibold text-zinc-500 ring-1 ring-zinc-200">
-                {title.slice(0, 1)}
-              </span>
-            )}
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-zinc-950 dark:text-white">{account.label || title}</p>
-              <p className="truncate text-xs text-zinc-500">{account.connection_message || 'Ready for new messages'}</p>
-            </div>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-zinc-950 dark:text-white">{account.label || title}</p>
+            <p className="truncate text-xs text-zinc-500">{account.connection_message || 'Ready for new messages'}</p>
           </div>
           <div className="mt-4 grid grid-cols-2 gap-2">
             <div className="rounded-xl bg-white/80 px-3 py-2 ring-1 ring-zinc-200/80 dark:bg-zinc-950/40 dark:ring-zinc-700">
@@ -690,10 +720,10 @@ function DashboardPageInner() {
           </div>
         </div>
         <div>
-          <h1 className="truncate text-[1.7rem] font-semibold tracking-tight text-zinc-950 sm:text-3xl">
+          <h1 className="portal-title truncate text-[1.7rem] font-semibold tracking-tight sm:text-3xl">
             Welcome back, {businessName} <span aria-hidden>👋</span>
           </h1>
-          <p className="mt-1 text-sm text-zinc-500">Here is your booking activity at a glance.</p>
+          <p className="portal-subtitle mt-1 text-sm">Here is your booking activity at a glance.</p>
         </div>
       </div>
 

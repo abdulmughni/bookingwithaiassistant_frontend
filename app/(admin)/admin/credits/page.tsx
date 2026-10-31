@@ -21,6 +21,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/table'
+import { PlanPriceCalculator } from '@/components/admin/plan-price-calculator'
 import { PageHeader, PageShell, SkeletonBlock, dashCardClass } from '@/components/dashboard-ui'
 import { ApiError, api } from '@/lib/api'
 import { useApiData, useApiToken, useIsAdmin } from '@/lib/hooks'
@@ -92,8 +93,8 @@ function CreditsBody() {
   return (
     <PageShell>
       <PageHeader
-        title="Plans & credits"
-        description="Create prepaid packs for your clients. You only see the plans you create."
+        title="Plans & billing"
+        description="Packs you sell to your clients. A pack is a price, call minutes, and messages. It is not the money those clients earn from jobs."
       >
         {isAgencyStaff ? null : (
           <Button
@@ -109,8 +110,15 @@ function CreditsBody() {
         )}
       </PageHeader>
 
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Step n="1" title="Price a pack" detail="Set minutes, messages, and what the client pays." />
+        <Step n="2" title="Save the pack" detail="It appears in the list below. You can edit it later." />
+        <Step n="3" title="Give it to a client" detail="Assign the pack, or add extra minutes and messages." />
+      </div>
+
       {isAgencyStaff ? null : (
-        <PlanCalculator
+        <PlanPriceCalculator
+          audience="agency"
           onUse={(body) => {
             setSeed(body)
             setShowCreate(true)
@@ -120,6 +128,10 @@ function CreditsBody() {
 
       {plans.error ? <p className="text-sm text-red-600">{plans.error}</p> : null}
       <div className={dashCardClass}>
+        <div className="px-5 pt-5">
+          <h2 className="text-base font-semibold text-zinc-950 dark:text-white">Packs you sell</h2>
+          <p className="mt-1 text-sm text-zinc-500">The price is what the client pays you for those minutes and messages.</p>
+        </div>
         <div className="px-2 sm:px-4">
           <Table dense>
             <TableHead>
@@ -197,6 +209,10 @@ function CreditsBody() {
       {!clients.loading && (clients.data?.length ?? 0) === 0 ? (
         <p className="text-sm text-zinc-500">No clients yet.</p>
       ) : null}
+      <div>
+        <h2 className="text-base font-semibold text-zinc-950 dark:text-white">Your clients</h2>
+        <p className="mt-1 text-sm text-zinc-500">Give a saved pack to a client, or add extra minutes and messages to the pack they already have.</p>
+      </div>
       <div className="space-y-3">
         {(clients.data ?? []).map((client) => (
           <article key={client.id} className={`${dashCardClass} p-5`}>
@@ -216,9 +232,9 @@ function CreditsBody() {
               <StatusBadge status={client.account_status} />
             </div>
             <p className="mt-3 text-sm text-zinc-700 dark:text-zinc-300">
-              Minutes {client.usage.call_minutes_used} / {client.usage.call_minutes_quota || '—'}
+              Call minutes used {client.usage.call_minutes_used} / {client.usage.call_minutes_quota || '—'}
               {' · '}
-              Messages {client.usage.messages_used}
+              Messages used {client.usage.messages_used}
               {client.plan?.messages_unlimited ? ' · unlimited' : ` / ${client.usage.messages_quota || '—'}`}
             </p>
             {isAgencyStaff ? null : (
@@ -260,97 +276,14 @@ function CreditsBody() {
   )
 }
 
-function PlanCalculator({ onUse }: { onUse: (body: PlanWriteBody) => void }) {
-  const [minutes, setMinutes] = useState('300')
-  const [messages, setMessages] = useState('3000')
-  const [minuteCost, setMinuteCost] = useState('0.10')
-  const [messageCost, setMessageCost] = useState('0')
-  const [markup, setMarkup] = useState('100')
-  const mins = Math.max(0, Number(minutes) || 0)
-  const msgs = Math.max(0, Number(messages) || 0)
-  const perMinute = Math.max(0, Number(minuteCost) || 0)
-  const perMessage = Math.max(0, Number(messageCost) || 0)
-  const mark = Math.max(0, Number(markup) || 0)
-  const cost = mins * perMinute + msgs * perMessage
-  const price = cost * (1 + mark / 100)
-  const profit = price - cost
-  const eachMinute = mins > 0 ? price / mins : 0
-
+function Step({ n, title, detail }: { n: string; title: string; detail: string }) {
   return (
-    <section className={`${dashCardClass} space-y-4 p-5`}>
-      <div>
-        <h2 className="text-sm font-semibold text-zinc-950 dark:text-white">Price calculator</h2>
-        <p className="mt-1 text-sm text-zinc-500">
-          Type what a minute and a message cost you. The suggested price adds your markup. You can still change the price before saving.
-        </p>
-      </div>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <label className="text-sm">
-          <span className="text-zinc-500">Call minutes</span>
-          <Input className="mt-1" inputMode="numeric" value={minutes} onChange={(event) => setMinutes(event.target.value)} />
-        </label>
-        <label className="text-sm">
-          <span className="text-zinc-500">Messages</span>
-          <Input className="mt-1" inputMode="numeric" value={messages} onChange={(event) => setMessages(event.target.value)} />
-        </label>
-        <label className="text-sm">
-          <span className="text-zinc-500">Your cost per minute</span>
-          <Input className="mt-1" inputMode="decimal" value={minuteCost} onChange={(event) => setMinuteCost(event.target.value)} />
-        </label>
-        <label className="text-sm">
-          <span className="text-zinc-500">Your cost per message</span>
-          <Input className="mt-1" inputMode="decimal" value={messageCost} onChange={(event) => setMessageCost(event.target.value)} />
-        </label>
-        <label className="text-sm">
-          <span className="text-zinc-500">Markup %</span>
-          <Input className="mt-1" inputMode="decimal" value={markup} onChange={(event) => setMarkup(event.target.value)} />
-        </label>
-      </div>
-      <div className="grid gap-3 sm:grid-cols-4">
-        <Result label="Your cost" value={money(cost)} />
-        <Result label="Suggested price" value={money(price)} />
-        <Result label="Profit" value={money(profit)} />
-        <Result label="Price per included minute" value={mins > 0 ? money(eachMinute) : '—'} />
-      </div>
-      <Button
-        outline
-        onClick={() =>
-          onUse({
-            name: '',
-            monthly_price_cents: Math.round(price * 100),
-            currency: 'USD',
-            messages_quota: Math.round(msgs),
-            call_minutes_quota: Math.round(mins),
-            validity_days: 180,
-            features: [],
-            best_for: '',
-            approx_calls: '',
-            spam_calls_label: 'Free, no minutes',
-            extra_minute_cents: Math.round(perMinute * (1 + mark / 100) * 100),
-            messages_unlimited: false,
-            is_featured: false,
-            sort_order: 0,
-            is_active: true,
-          })
-        }
-      >
-        Use this price
-      </Button>
-    </section>
-  )
-}
-
-function Result({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <p className="text-xs text-zinc-500">{label}</p>
-      <p className="text-lg font-semibold tabular-nums text-zinc-950 dark:text-white">{value}</p>
+    <div className={`${dashCardClass} p-4`}>
+      <p className="text-xs font-semibold text-blue-600">Step {n}</p>
+      <p className="mt-1 text-sm font-semibold text-zinc-950 dark:text-white">{title}</p>
+      <p className="mt-1 text-sm text-zinc-500">{detail}</p>
     </div>
   )
-}
-
-function money(amount: number) {
-  return `$${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
 function PackActions({
@@ -410,23 +343,26 @@ function PackActions({
   }
 
   return (
-    <div className="mt-4 flex flex-wrap items-end gap-2">
-      <Select aria-label="Credit pack" value={planId} onChange={(event) => setPlanId(event.target.value)}>
-        <option value="">Choose a pack</option>
-        {plans.map((plan) => (
-          <option key={plan.id} value={plan.id}>
-            {plan.name}
-          </option>
-        ))}
-      </Select>
-      <Button outline disabled={busy || !planId} onClick={() => void assign()}>
-        Assign pack
-      </Button>
-      <Input className="max-w-28" inputMode="numeric" placeholder="Minutes" value={minutes} onChange={(event) => setMinutes(event.target.value)} />
-      <Input className="max-w-28" inputMode="numeric" placeholder="Messages" value={messages} onChange={(event) => setMessages(event.target.value)} />
-      <Button outline disabled={busy} onClick={() => void add()}>
-        Add credits
-      </Button>
+    <div className="mt-4 space-y-2">
+      <p className="text-xs font-medium text-zinc-500">Give this client a pack, or add extra minutes and messages.</p>
+      <div className="flex flex-wrap items-end gap-2">
+        <Select aria-label="Pack" className="min-w-40" value={planId} onChange={(event) => setPlanId(event.target.value)}>
+          <option value="">Choose a pack</option>
+          {plans.map((plan) => (
+            <option key={plan.id} value={plan.id}>
+              {plan.name}
+            </option>
+          ))}
+        </Select>
+        <Button outline disabled={busy || !planId} onClick={() => void assign()}>
+          Give this pack
+        </Button>
+        <Input className="max-w-32" inputMode="numeric" placeholder="Extra minutes" aria-label="Extra minutes" value={minutes} onChange={(event) => setMinutes(event.target.value)} />
+        <Input className="max-w-32" inputMode="numeric" placeholder="Extra messages" aria-label="Extra messages" value={messages} onChange={(event) => setMessages(event.target.value)} />
+        <Button outline disabled={busy} onClick={() => void add()}>
+          Add to this client
+        </Button>
+      </div>
     </div>
   )
 }
