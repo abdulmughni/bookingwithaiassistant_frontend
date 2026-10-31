@@ -183,7 +183,7 @@ export function GoogleCalendarCard() {
             <CalendarDaysIcon className="size-6" />
           </span>
           <div>
-            <h2 className="text-[1.65rem] font-semibold tracking-tight text-zinc-950">Google Calendar</h2>
+            <h2 className="text-[1.65rem] font-semibold tracking-tight text-zinc-950 dark:text-white">Google Calendar</h2>
             <p className="mt-1 max-w-xl text-sm text-zinc-500">
               Connect your Google Calendar to automatically sync your client bookings and keep your schedule up to date.
             </p>
@@ -193,7 +193,7 @@ export function GoogleCalendarCard() {
           href="https://support.google.com/calendar"
           target="_blank"
           rel="noreferrer"
-          className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-3.5 py-1.5 text-sm font-medium text-zinc-600 shadow-sm hover:bg-zinc-50"
+          className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-3.5 py-1.5 text-sm font-medium text-zinc-600 shadow-sm hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
         >
           <InformationCircleIcon className="size-4" />
           Learn more
@@ -202,30 +202,30 @@ export function GoogleCalendarCard() {
       </div>
 
       <div className="grid items-stretch gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(20rem,0.8fr)]">
-        <section className="relative overflow-hidden rounded-[2rem] bg-[#eef4ff] px-6 py-7 shadow-sm ring-1 ring-blue-100 sm:px-8 sm:py-8">
-          <div className="pointer-events-none absolute -right-16 top-8 size-72 rounded-full bg-[#dbe7ff]" />
-          <div className="pointer-events-none absolute bottom-6 right-24 size-40 rounded-full bg-[#e7eeff]" />
+        <section className="relative overflow-hidden rounded-[2rem] bg-[#eef4ff] px-6 py-7 shadow-sm ring-1 ring-blue-100 dark:bg-zinc-900 dark:ring-zinc-700 sm:px-8 sm:py-8">
+          <div className="pointer-events-none absolute -right-16 top-8 size-72 rounded-full bg-[#dbe7ff] dark:bg-blue-500/10" />
+          <div className="pointer-events-none absolute bottom-6 right-24 size-40 rounded-full bg-[#e7eeff] dark:bg-blue-400/10" />
           <div className="relative grid items-center gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(16rem,18rem)]">
             <div>
-              <span className="inline-flex rounded-full bg-[#dbe8ff] px-3 py-1 text-[11px] font-semibold tracking-wide text-[#1a73e8]">
+              <span className="inline-flex rounded-full bg-[#dbe8ff] px-3 py-1 text-[11px] font-semibold tracking-wide text-[#1a73e8] dark:bg-blue-500/15 dark:text-blue-200">
                 Stay Organized
               </span>
-              <h3 className="mt-4 max-w-md text-[1.85rem] font-semibold leading-[1.15] tracking-tight text-zinc-950 sm:text-[2.15rem]">
+              <h3 className="mt-4 max-w-md text-[1.85rem] font-semibold leading-[1.15] tracking-tight text-zinc-950 dark:text-white sm:text-[2.15rem]">
                 Sync Your Bookings with
-                <span className="mt-1 block text-[#1a73e8]">Google Calendar</span>
+                <span className="mt-1 block text-[#1a73e8] dark:text-blue-300">Google Calendar</span>
               </h3>
-              <p className="mt-3 max-w-md text-sm leading-6 text-zinc-600">
+              <p className="mt-3 max-w-md text-sm leading-6 text-zinc-600 dark:text-zinc-300">
                 Automatically add, update, and remove your client bookings in Google Calendar. Save time and never miss an appointment.
               </p>
               <ul className="mt-7 space-y-4">
                 {features.map((item) => (
                   <li key={item.title} className="flex gap-3">
-                    <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-white text-[#1a73e8] shadow-sm ring-1 ring-blue-100">
+                    <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-white text-[#1a73e8] shadow-sm ring-1 ring-blue-100 dark:bg-zinc-800 dark:text-blue-300 dark:ring-zinc-600">
                       <item.icon className="size-[18px]" />
                     </span>
                     <span>
-                      <span className="block text-sm font-semibold text-zinc-900">{item.title}</span>
-                      <span className="mt-0.5 block text-sm text-zinc-500">{item.text}</span>
+                      <span className="block text-sm font-semibold text-zinc-900 dark:text-white">{item.title}</span>
+                      <span className="mt-0.5 block text-sm text-zinc-500 dark:text-zinc-400">{item.text}</span>
                     </span>
                   </li>
                 ))}
@@ -237,9 +237,9 @@ export function GoogleCalendarCard() {
 
         <section
           id="google-calendar-connection"
-          className="rounded-[2rem] bg-white p-6 shadow-sm ring-1 ring-zinc-200/80 sm:p-7"
+          className="rounded-[2rem] bg-white p-6 shadow-sm ring-1 ring-zinc-200/80 dark:bg-zinc-900 dark:ring-zinc-700 sm:p-7"
         >
-          <h3 className="text-lg font-semibold text-zinc-950">Google Calendar Connection</h3>
+          <h3 className="text-lg font-semibold text-zinc-950 dark:text-white">Google Calendar Connection</h3>
           <p className="mt-1 text-sm text-zinc-500">
             Link your Google account to start syncing bookings.
           </p>
@@ -253,14 +253,14 @@ export function GoogleCalendarCard() {
             </div>
           ) : connected ? (
             <div className="mt-5 space-y-5">
-              <div className="flex items-center justify-between gap-3 rounded-2xl bg-[#edf8f0] px-4 py-3.5">
+              <div className="flex items-center justify-between gap-3 rounded-2xl bg-[#edf8f0] px-4 py-3.5 dark:bg-emerald-950/50">
                 <div className="flex min-w-0 items-center gap-3">
                   <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#22c55e] text-white shadow-sm">
                     <CheckIcon className="size-5" />
                   </span>
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-[#15803d]">Connected</p>
-                    <p className="truncate text-sm text-[#3d8f5a]">{status?.email}</p>
+                    <p className="text-sm font-semibold text-[#15803d] dark:text-emerald-200">Connected</p>
+                    <p className="truncate text-sm text-[#3d8f5a] dark:text-emerald-300/80">{status?.email}</p>
                   </div>
                 </div>
                 <Button
@@ -281,7 +281,7 @@ export function GoogleCalendarCard() {
                     <UserIcon className="size-4" />
                     Google Account
                   </dt>
-                  <dd className="truncate font-medium text-zinc-700">{status?.email}</dd>
+                  <dd className="truncate font-medium text-zinc-700 dark:text-zinc-200">{status?.email}</dd>
                 </div>
                 {connectedOn && (
                   <div className="flex items-center justify-between gap-3 py-3.5">
@@ -289,14 +289,14 @@ export function GoogleCalendarCard() {
                       <CalendarDaysIcon className="size-4" />
                       Connected On
                     </dt>
-                    <dd className="font-medium text-zinc-700">{connectedOn}</dd>
+                    <dd className="font-medium text-zinc-700 dark:text-zinc-200">{connectedOn}</dd>
                   </div>
                 )}
               </dl>
 
               <div className="flex flex-col gap-3 border-t border-zinc-100 pt-5 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-zinc-900">Sync Existing Bookings</p>
+                  <p className="text-sm font-semibold text-zinc-900 dark:text-white">Sync Existing Bookings</p>
                   <p className="mt-1 text-sm text-zinc-500">
                     Add all your upcoming confirmed bookings to your Google Calendar.
                   </p>
@@ -313,7 +313,7 @@ export function GoogleCalendarCard() {
                 </Button>
               </div>
 
-              <p className="flex gap-2.5 rounded-2xl bg-[#eef5ff] px-3.5 py-3 text-sm leading-5 text-[#1d4ed8]">
+              <p className="flex gap-2.5 rounded-2xl bg-[#eef5ff] px-3.5 py-3 text-sm leading-5 text-[#1d4ed8] dark:bg-blue-950/40 dark:text-blue-200">
                 <InformationCircleIcon className="mt-0.5 size-4 shrink-0" />
                 Only upcoming confirmed bookings will be synced. Existing calendar events will not be modified.
               </p>
@@ -322,8 +322,8 @@ export function GoogleCalendarCard() {
                 <p
                   className={`flex gap-2.5 rounded-2xl px-3.5 py-3 text-sm leading-5 ${
                     notice.tone === 'ok'
-                      ? 'bg-[#edf8f0] text-[#15803d]'
-                      : 'bg-red-50 text-red-800'
+                      ? 'bg-[#edf8f0] text-[#15803d] dark:bg-emerald-950/40 dark:text-emerald-200'
+                      : 'bg-red-50 text-red-800 dark:bg-red-950/40 dark:text-red-200'
                   }`}
                 >
                   {notice.tone === 'ok' ? (
@@ -334,7 +334,7 @@ export function GoogleCalendarCard() {
                   {notice.text}
                 </p>
               ) : (
-                <p className="flex gap-2.5 rounded-2xl bg-[#edf8f0] px-3.5 py-3 text-sm leading-5 text-[#15803d]">
+                <p className="flex gap-2.5 rounded-2xl bg-[#edf8f0] px-3.5 py-3 text-sm leading-5 text-[#15803d] dark:bg-emerald-950/40 dark:text-emerald-200">
                   <CheckCircleIcon className="mt-0.5 size-5 shrink-0 text-[#22c55e]" />
                   <span>
                     <span className="font-semibold">Everything is working correctly!</span>{' '}
@@ -345,8 +345,8 @@ export function GoogleCalendarCard() {
             </div>
           ) : (
             <div className="mt-5 space-y-5">
-              <div className="rounded-2xl bg-zinc-50 px-4 py-4 ring-1 ring-zinc-200">
-                <p className="text-sm font-semibold text-zinc-800">
+              <div className="rounded-2xl bg-zinc-50 px-4 py-4 ring-1 ring-zinc-200 dark:bg-black/30 dark:ring-white/10">
+                <p className="text-sm font-semibold text-zinc-800 dark:text-white">
                   {status?.needs_reconnect ? 'Reconnect required' : 'Not connected'}
                 </p>
                 <p className="mt-1 text-sm text-zinc-500">
@@ -365,7 +365,7 @@ export function GoogleCalendarCard() {
                 <CalendarDaysIcon data-slot="icon" />
                 {busy === 'connect' ? 'Opening Google…' : 'Connect Google Calendar'}
               </Button>
-              <p className="flex gap-2.5 rounded-2xl bg-[#eef5ff] px-3.5 py-3 text-sm leading-5 text-[#1d4ed8]">
+              <p className="flex gap-2.5 rounded-2xl bg-[#eef5ff] px-3.5 py-3 text-sm leading-5 text-[#1d4ed8] dark:bg-blue-950/40 dark:text-blue-200">
                 <InformationCircleIcon className="mt-0.5 size-4 shrink-0" />
                 Only upcoming confirmed bookings will be synced. Existing calendar events will not be modified.
               </p>
@@ -373,8 +373,8 @@ export function GoogleCalendarCard() {
                 <p
                   className={`flex gap-2.5 rounded-2xl px-3.5 py-3 text-sm leading-5 ${
                     notice.tone === 'ok'
-                      ? 'bg-[#edf8f0] text-[#15803d]'
-                      : 'bg-red-50 text-red-800'
+                      ? 'bg-[#edf8f0] text-[#15803d] dark:bg-emerald-950/40 dark:text-emerald-200'
+                      : 'bg-red-50 text-red-800 dark:bg-red-950/40 dark:text-red-200'
                   }`}
                 >
                   <InformationCircleIcon className="mt-0.5 size-4 shrink-0" />

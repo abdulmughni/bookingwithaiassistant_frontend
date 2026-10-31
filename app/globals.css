@@ -1014,3 +1014,36 @@ html.dark[data-agency-theme] .hover\:bg-blue-100:hover {
   background-color: var(--color-brand-50) !important;
   color: color-mix(in srgb, var(--brand-primary) 40%, white) !important;
 }
+
+/* Native fields follow the page. A light select or autofill wash was sitting on dark cards. */
+html.dark { color-scheme: dark; }
+html.dark [data-slot="control"]::before { display: none !important; }
+html.dark input:-webkit-autofill,
+html.dark select:-webkit-autofill,
+html.dark textarea:-webkit-autofill {
+  -webkit-text-fill-color: #f4f4f5 !important;
+  caret-color: #f4f4f5;
+  box-shadow: 0 0 0 1000px #1c1e24 inset !important;
+}
+input[type="color"] {
+  -webkit-appearance: none;
+  appearance: none;
+  padding: 0;
+  overflow: hidden;
+}
+input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+input[type="color"]::-webkit-color-swatch,
+input[type="color"]::-moz-color-swatch {
+  border: none;
+  border-radius: 0.45rem;
+}
+
+.theme-hero {
+  background: linear-gradient(135deg, var(--brand-primary), var(--brand-accent));
+  color: var(--brand-button-text, #fff);
+}
+html.dark .theme-hero {
+  background: color-mix(in srgb, var(--brand-primary) 24%, #16181e);
+  color: #fafafa;
+  border-color: color-mix(in srgb, var(--brand-primary) 42%, #3f3f46) !important;
+}

@@ -78,7 +78,7 @@ function barColor(state: QuotaState): string {
     case 'no_plan':
       return 'bg-zinc-400'
     default:
-      return 'bg-brand-500'
+      return 'bg-blue-600'
   }
 }
 
@@ -91,7 +91,7 @@ function trackColor(state: QuotaState): string {
     case 'warning':
       return 'bg-amber-100 dark:bg-amber-950/40'
     default:
-      return 'bg-brand-100 dark:bg-brand-950/40'
+      return 'bg-zinc-200 dark:bg-white/15'
   }
 }
 

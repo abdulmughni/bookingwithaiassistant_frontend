@@ -91,7 +91,7 @@ function TeamBody() {
           </ul>
         )}
         {isAgencyStaff ? null : (
-          <div className="mt-4 flex flex-wrap items-end gap-2">
+          <div className="mt-4 flex flex-wrap items-end gap-2 rounded-xl bg-zinc-50 p-3 ring-1 ring-zinc-200 dark:bg-black/30 dark:ring-white/10">
             <Input
               className="max-w-sm"
               type="email"

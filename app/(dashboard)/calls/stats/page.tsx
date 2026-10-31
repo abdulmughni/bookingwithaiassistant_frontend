@@ -357,8 +357,8 @@ function PeriodToggle({
           className={clsx(
             'rounded-lg px-3 py-1.5 text-sm font-medium transition',
             value === opt.id
-              ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900'
-              : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white',
+              ? 'bg-zinc-900 text-white dark:bg-[var(--brand-primary)] dark:text-[var(--brand-button-text,#fff)]'
+              : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-white',
           )}
         >
           {opt.label}
@@ -388,12 +388,12 @@ function MoneyHero({
       className={clsx(
         'relative overflow-hidden rounded-2xl border p-6 shadow-sm',
         highlight
-          ? 'border-transparent bg-linear-to-br from-brand-500 to-brand-700 text-white shadow-lg shadow-brand-500/20'
+          ? 'theme-hero border border-transparent shadow-sm'
           : 'border-zinc-200/80 bg-white dark:border-zinc-700/80 dark:bg-zinc-900',
       )}
     >
       <div className="flex items-start justify-between gap-3">
-        <p className={clsx('text-sm font-medium', highlight ? 'text-brand-50' : 'text-zinc-500')}>
+        <p className={clsx('text-sm font-medium', highlight ? 'text-white/80' : 'text-zinc-500')}>
           {label}
         </p>
         <span
@@ -413,7 +413,7 @@ function MoneyHero({
       >
         {value}
       </p>
-      <p className={clsx('mt-2 text-sm font-medium', highlight ? 'text-brand-50/90' : tone)}>
+      <p className={clsx('mt-2 text-sm font-medium', highlight ? 'text-white/75' : tone)}>
         {hint}
       </p>
     </div>

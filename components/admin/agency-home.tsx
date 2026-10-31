@@ -262,11 +262,11 @@ export function AgencyHome() {
           <button
             type="button"
             onClick={() => setDemo(!demo)}
-            className="inline-flex h-11 items-center gap-2 rounded-full bg-white px-4 text-sm font-medium text-zinc-600 shadow-sm ring-1 ring-zinc-200"
+            className="inline-flex h-11 items-center gap-2 rounded-full bg-white px-4 text-sm font-medium text-zinc-600 shadow-sm ring-1 ring-zinc-200 dark:bg-zinc-900 dark:text-zinc-100 dark:ring-zinc-600"
           >
             <span>{demo ? 'Demo data on' : 'Demo data off'}</span>
-            <span className={`relative h-5 w-9 rounded-full ${demo ? 'bg-blue-600' : 'bg-zinc-300'}`}>
-              <span className={`absolute top-0.5 size-4 rounded-full bg-[var(--brand-button-text,#fff)] shadow-sm transition ${demo ? 'left-4' : 'left-0.5'}`} />
+            <span className={`relative h-5 w-9 rounded-full ${demo ? 'bg-blue-600' : 'bg-zinc-300 dark:bg-zinc-600'}`}>
+              <span className={`absolute top-0.5 size-4 rounded-full bg-[#fff] shadow-sm transition ${demo ? 'left-4' : 'left-0.5'}`} />
             </span>
           </button>
           {isAgencyStaff || !tenantId ? null : (

@@ -162,7 +162,7 @@ function VoiceJsonTab({ tenantId }: { tenantId: string }) {
         value={jsonText}
         placeholder="Click Load from Vapi to show this assistant’s settings."
         spellCheck={false}
-        className="mt-4 h-[32rem] w-full resize-y rounded-xl border border-zinc-200 bg-zinc-50 p-4 font-mono text-xs leading-5 text-zinc-900 outline-none dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+        className="mt-4 h-[32rem] w-full resize-y rounded-xl border border-zinc-200 bg-zinc-50 p-4 font-mono text-xs leading-5 text-zinc-900 outline-none dark:border-white/15 dark:bg-black/40 dark:text-zinc-100"
       />
     </section>
   )
@@ -530,9 +530,9 @@ function SuperAdminClientDetail() {
         </div>
       </header>
 
-      <div className="rounded-2xl border border-zinc-200/80 bg-white px-4 shadow-sm dark:border-zinc-700/80 dark:bg-zinc-900/80 sm:px-6">
+      <div className={`${dashCardClass} overflow-hidden`}>
         <nav
-          className="-mb-px flex gap-6 overflow-x-auto border-b border-zinc-200/80 pt-2 dark:border-zinc-700/80"
+          className="flex gap-6 overflow-x-auto border-b border-zinc-200/80 px-4 pt-2 dark:border-zinc-700/80 sm:px-6"
           aria-label="Client detail tabs"
         >
           <button
@@ -578,7 +578,7 @@ function SuperAdminClientDetail() {
             Knowledge documents
           </button>
         </nav>
-      </div>
+        <div className="space-y-6 p-4 sm:p-6">
 
       {activeTab === 'prompts' && (
         <PromptConfigPanel key={`prompts-${tenantId}`} api={promptsApi} />
@@ -991,6 +991,8 @@ function SuperAdminClientDetail() {
       ) : null}
         </>
       )}
+        </div>
+      </div>
 
       {/* Dialogs */}
       <ConfirmActionDialog

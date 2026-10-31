@@ -28,6 +28,8 @@ function BrandPreview({
   logoUrl: string | null
 }) {
   return (
+    <div className="rounded-2xl bg-zinc-100 p-3 ring-1 ring-zinc-200 dark:bg-black/40 dark:ring-white/10">
+      <p className="mb-2 px-1 text-xs font-medium text-zinc-500">Preview of the colors on the left</p>
     <div
       className="overflow-hidden rounded-2xl border shadow-sm"
       style={{ background: colors.page_background, borderColor: colors.border, color: colors.main_text }}
@@ -83,6 +85,7 @@ function BrandPreview({
         </div>
       </div>
     </div>
+    </div>
   )
 }
 
@@ -106,7 +109,7 @@ function AppearanceMode() {
             onClick={() => setColorMode(id)}
             className={
               mode === id
-                ? 'rounded-full bg-white px-4 py-1.5 text-sm font-medium text-zinc-950 shadow-sm dark:bg-zinc-950 dark:text-white'
+                ? 'rounded-full bg-zinc-900 px-4 py-1.5 text-sm font-medium text-white shadow-sm dark:bg-zinc-600'
                 : 'rounded-full px-4 py-1.5 text-sm text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-100'
             }
           >
@@ -256,8 +259,8 @@ export function AgencyBrandForm({
                 onClick={() => setColors(preset.colors)}
                 className={
                   selected
-                    ? 'inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-sm font-medium text-zinc-950 ring-2 ring-brand-600'
-                    : 'inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-sm text-zinc-700 ring-1 ring-zinc-200 hover:bg-zinc-50'
+                    ? 'inline-flex items-center gap-2 rounded-full bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white ring-2 ring-[var(--brand-primary)] dark:bg-zinc-700'
+                    : 'inline-flex items-center gap-2 rounded-full bg-zinc-100 px-3 py-1.5 text-sm text-zinc-700 ring-1 ring-zinc-200 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-200 dark:ring-zinc-600 dark:hover:bg-zinc-700'
                 }
               >
                 <span className="flex gap-0.5">
@@ -284,7 +287,7 @@ export function AgencyBrandForm({
                   aria-label={row.label}
                   value={picker}
                   onChange={(e) => setColor(row.key, e.target.value)}
-                  className="size-9 cursor-pointer rounded-md border border-zinc-200 bg-white"
+                  className="size-9 shrink-0 cursor-pointer rounded-lg border border-zinc-300 bg-transparent p-0 dark:border-zinc-500"
                 />
                 <span className="w-36 text-sm text-zinc-700 dark:text-zinc-300">{row.label}</span>
                 <Input
