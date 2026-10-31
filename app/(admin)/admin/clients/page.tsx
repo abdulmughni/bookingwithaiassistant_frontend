@@ -90,7 +90,7 @@ function ClientsPageInner() {
         title={isAgency ? 'My Clients' : 'Clients'}
         description={
           isAgency
-            ? 'Invite a client, then open them for usage, bookings, and company details. AI setup stays with the platform.'
+            ? 'Invite a client, then open them for usage, bookings, and company details.'
             : 'Health-sorted client list. Click a row for funnel, bookings, and usage detail.'
         }
       >
