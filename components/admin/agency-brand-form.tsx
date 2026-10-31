@@ -20,6 +20,77 @@ import { useColorMode } from '@/lib/color-mode'
 import { readConsoleTheme, writeConsoleTheme } from '@/lib/console-theme'
 import { useApiToken } from '@/lib/hooks'
 
+function darkShell(colors: BrandThemeColors): BrandThemeColors {
+  return {
+    ...colors,
+    page_background: '#101218',
+    card_background: '#1c1e24',
+    soft_background: '#262830',
+    main_text: '#fafafa',
+    subtext: '#a1a1aa',
+    border: '#3f3f46',
+  }
+}
+
+function PreviewFrame({
+  title,
+  colors,
+  logoUrl,
+}: {
+  title: string
+  colors: BrandThemeColors
+  logoUrl: string | null
+}) {
+  return (
+    <div>
+      <p className="mb-2 px-1 text-xs font-medium text-zinc-500">{title}</p>
+      <div
+        className="overflow-hidden rounded-2xl border shadow-sm"
+        style={{ background: colors.page_background, borderColor: colors.border, color: colors.main_text }}
+      >
+        <div className="border-b px-4 py-3" style={{ borderColor: colors.border }}>
+          <p className="text-xs font-medium" style={{ color: colors.subtext }}>
+            Live preview
+          </p>
+        </div>
+        <div className="flex gap-3 p-3">
+          <div className="flex w-16 shrink-0 flex-col gap-3 rounded-xl p-2" style={{ background: colors.soft_background }}>
+            {logoUrl ? (
+              <BrandLogo src={logoUrl} alt="" height={24} className="max-w-12" />
+            ) : (
+              <div className="h-6 w-10 rounded" style={{ background: colors.primary }} />
+            )}
+            <div className="space-y-1.5">
+              <div className="h-1.5 rounded-full" style={{ background: colors.primary }} />
+              <div className="h-1.5 w-4/5 rounded-full" style={{ background: colors.border }} />
+              <div className="h-1.5 w-3/5 rounded-full" style={{ background: colors.border }} />
+            </div>
+          </div>
+          <div className="min-w-0 flex-1 space-y-2">
+            <div className="rounded-xl border p-3" style={{ background: colors.card_background, borderColor: colors.border }}>
+              <p className="text-sm font-semibold">Today&apos;s jobs</p>
+              <p className="mt-1 text-xs" style={{ color: colors.subtext }}>
+                Updates as you change a color.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <span className="rounded-lg px-2.5 py-1 text-xs font-semibold" style={{ background: colors.primary, color: colors.button_text }}>
+                  Primary
+                </span>
+                <span className="rounded-lg px-2.5 py-1 text-xs font-semibold" style={{ background: colors.accent, color: colors.button_text }}>
+                  Accent
+                </span>
+              </div>
+            </div>
+            <div className="rounded-xl px-3 py-2 text-xs" style={{ background: colors.soft_background, color: colors.subtext }}>
+              Soft panel
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function BrandPreview({
   colors,
   logoUrl,
@@ -28,63 +99,9 @@ function BrandPreview({
   logoUrl: string | null
 }) {
   return (
-    <div className="rounded-2xl bg-zinc-100 p-3 ring-1 ring-zinc-200 dark:bg-black/40 dark:ring-white/10">
-      <p className="mb-2 px-1 text-xs font-medium text-zinc-500">Preview of the colors on the left</p>
-    <div
-      className="overflow-hidden rounded-2xl border shadow-sm"
-      style={{ background: colors.page_background, borderColor: colors.border, color: colors.main_text }}
-    >
-      <div className="border-b px-4 py-3" style={{ borderColor: colors.border }}>
-        <p className="text-xs font-medium" style={{ color: colors.subtext }}>
-          Live preview
-        </p>
-      </div>
-      <div className="flex gap-3 p-3">
-        <div
-          className="flex w-20 shrink-0 flex-col gap-3 rounded-xl p-2"
-          style={{ background: colors.soft_background }}
-        >
-          {logoUrl ? (
-            <BrandLogo src={logoUrl} alt="" height={24} className="max-w-16" />
-          ) : (
-            <div className="h-6 w-10 rounded" style={{ background: colors.primary }} />
-          )}
-          <div className="space-y-1.5">
-            <div className="h-1.5 rounded-full" style={{ background: colors.primary }} />
-            <div className="h-1.5 w-4/5 rounded-full" style={{ background: colors.border }} />
-            <div className="h-1.5 w-3/5 rounded-full" style={{ background: colors.border }} />
-          </div>
-        </div>
-        <div className="min-w-0 flex-1 space-y-2">
-          <div
-            className="rounded-xl border p-3"
-            style={{ background: colors.card_background, borderColor: colors.border }}
-          >
-            <p className="text-sm font-semibold">Today&apos;s jobs</p>
-            <p className="mt-1 text-xs" style={{ color: colors.subtext }}>
-              Cards, text, and buttons use the colors on the left.
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <span
-                className="rounded-lg px-2.5 py-1 text-xs font-semibold"
-                style={{ background: colors.primary, color: colors.button_text }}
-              >
-                Primary
-              </span>
-              <span
-                className="rounded-lg px-2.5 py-1 text-xs font-semibold"
-                style={{ background: colors.accent, color: colors.button_text }}
-              >
-                Accent
-              </span>
-            </div>
-          </div>
-          <div className="rounded-xl px-3 py-2 text-xs" style={{ background: colors.soft_background, color: colors.subtext }}>
-            Soft panel
-          </div>
-        </div>
-      </div>
-    </div>
+    <div className="space-y-4 rounded-2xl bg-zinc-100 p-3 ring-1 ring-zinc-200 dark:bg-black/40 dark:ring-white/10">
+      <PreviewFrame title="Light" colors={colors} logoUrl={logoUrl} />
+      <PreviewFrame title="Dark" colors={darkShell(colors)} logoUrl={logoUrl} />
     </div>
   )
 }
@@ -275,7 +292,7 @@ export function AgencyBrandForm({
         </div>
       </div>
 
-      <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_300px]">
+      <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="space-y-3">
           {THEME_ROWS.map((row) => {
             const value = colors[row.key]

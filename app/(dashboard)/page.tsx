@@ -36,6 +36,7 @@ import {
   shiftDateKey,
 } from '@/lib/report-range'
 import type { TenantStats, Booking, ChannelAccount } from '@/lib/types'
+import { Cell, Pie, PieChart, ResponsiveContainer } from 'recharts'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -164,7 +165,14 @@ function CompletionGauge({
     { key: 'cancelled', label: 'Cancelled', value: cancelled, bar: 'bg-zinc-300 dark:bg-zinc-500' },
     ...(other > 0 ? [{ key: 'other', label: 'Other', value: other, bar: 'bg-amber-400' }] : []),
   ]
-  const shareTotal = shares.reduce((sum, part) => sum + part.value, 0) || 1
+  const chart = shares
+    .filter((part) => part.value > 0)
+    .map((part) => ({
+      name: part.label,
+      value: part.value,
+      color: part.key === 'done' ? '#10b981' : part.key === 'open' ? '#38bdf8' : part.key === 'cancelled' ? '#a1a1aa' : '#fbbf24',
+    }))
+  const ring = chart.length > 0 ? chart : [{ name: 'None', value: 1, color: '#3f3f46' }]
 
   return (
     <Link
@@ -183,53 +191,42 @@ function CompletionGauge({
         <div className="mt-6 h-40 animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-800" />
       ) : (
         <>
-          <div className="mt-5 flex items-end justify-between gap-3">
-            <p className="text-5xl font-semibold tracking-tight text-zinc-950 tabular-nums dark:text-white">
-              {pct}
-              <span className="text-2xl font-medium text-zinc-400">%</span>
-            </p>
-            <p className="pb-1 text-right text-sm text-zinc-600 dark:text-zinc-300">
-              {completed} of {total}
-              <span className="block text-xs text-zinc-500">bookings finished</span>
-            </p>
-          </div>
-          <div className="mt-4 flex h-3.5 gap-0.5" aria-hidden>
-            {shareTotal > 0 && shares.some((part) => part.value > 0) ? (
-              shares.map((part) =>
-                part.value > 0 ? (
-                  <span
-                    key={part.key}
-                    className={clsx('h-full min-w-1.5 rounded-full', part.bar)}
-                    style={{ flexGrow: part.value, flexBasis: 0 }}
-                    title={`${part.label} ${part.value}`}
-                  />
-                ) : null,
-              )
-            ) : (
-              <span className="h-full flex-1 rounded-full bg-zinc-100 dark:bg-zinc-800" />
-            )}
-          </div>
-          <p className="mt-2 text-xs text-zinc-500">Share of your bookings</p>
-          <div className={`mt-auto grid gap-2 pt-4 ${shares.length > 3 ? 'grid-cols-4' : 'grid-cols-3'}`}>
-            {shares.map((part) => (
-              <GaugeStat key={part.key} color={part.bar} label={part.label} value={part.value} />
-            ))}
+          <div className="mt-4 grid grid-cols-[9.5rem_minmax(0,1fr)] items-center gap-2">
+            <div className="relative h-36">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={ring} dataKey="value" nameKey="name" innerRadius={42} outerRadius={62} paddingAngle={chart.length > 1 ? 3 : 0} stroke="none">
+                    {ring.map((part) => (
+                      <Cell key={part.name} fill={part.color} />
+                    ))}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                <span className="text-2xl font-semibold tabular-nums text-zinc-950 dark:text-white">{pct}%</span>
+                <span className="text-[10px] text-zinc-500">done</span>
+              </div>
+            </div>
+            <div>
+              <p className="text-sm text-zinc-600 dark:text-zinc-300">
+                {completed} of {total} bookings finished
+              </p>
+              <ul className="mt-2 space-y-1.5">
+                {shares.map((part) => (
+                  <li key={part.key} className="flex items-center justify-between gap-2 text-xs text-zinc-500">
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className={clsx('size-2 rounded-full', part.bar)} />
+                      {part.label}
+                    </span>
+                    <span className="font-medium tabular-nums text-zinc-800 dark:text-zinc-100">{part.value}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
         </>
       )}
     </Link>
-  )
-}
-
-function GaugeStat({ color, label, value }: { color: string; label: string; value: number }) {
-  return (
-    <div className="rounded-xl bg-zinc-50 px-2 py-2 text-center dark:bg-zinc-800/60">
-      <p className="text-sm font-semibold tabular-nums text-zinc-900 dark:text-white">{value}</p>
-      <p className="mt-0.5 flex items-center justify-center gap-1 text-[11px] text-zinc-500">
-        <span className={clsx('size-1.5 rounded-full', color)} />
-        {label}
-      </p>
-    </div>
   )
 }
 
@@ -479,10 +476,8 @@ function SocialAccountCard({
   const title = channel === 'facebook' ? 'Facebook' : 'Instagram'
   const status = channelStatus(account)
   const connected = Boolean(account)
-  const wash = channel === 'facebook'
-    ? 'from-blue-50/90 via-white to-white dark:from-blue-950/40 dark:via-zinc-900 dark:to-zinc-900'
-    : 'from-fuchsia-50/90 via-white to-amber-50/40 dark:from-fuchsia-950/30 dark:via-zinc-900 dark:to-zinc-900'
-  const bar = channel === 'facebook' ? 'bg-blue-500' : 'bg-gradient-to-r from-fuchsia-500 via-rose-500 to-amber-400'
+  const wash = 'from-fuchsia-50/90 via-white to-amber-50/40 dark:from-fuchsia-950/30 dark:via-zinc-900 dark:to-zinc-900'
+  const bar = 'bg-gradient-to-r from-fuchsia-500 via-rose-500 to-amber-400'
   return (
     <Link
       href="/accounts"

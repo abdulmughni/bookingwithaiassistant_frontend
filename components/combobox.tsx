@@ -134,7 +134,7 @@ export function ComboboxOption<T>({
     'flex min-w-0 items-center',
     // Icons
     '*:data-[slot=icon]:size-5 *:data-[slot=icon]:shrink-0 sm:*:data-[slot=icon]:size-4',
-    '*:data-[slot=icon]:text-zinc-500 group-data-focus/option:*:data-[slot=icon]:text-white dark:*:data-[slot=icon]:text-zinc-400',
+    '*:data-[slot=icon]:text-zinc-500 dark:*:data-[slot=icon]:text-zinc-400 dark:group-data-focus/option:*:data-[slot=icon]:text-white',
     'forced-colors:*:data-[slot=icon]:text-[CanvasText] forced-colors:group-data-focus/option:*:data-[slot=icon]:text-[Canvas]',
     // Avatars
     '*:data-[slot=avatar]:-mx-0.5 *:data-[slot=avatar]:size-6 sm:*:data-[slot=avatar]:size-5'
@@ -149,7 +149,7 @@ export function ComboboxOption<T>({
         // Typography
         'text-base/6 text-zinc-950 sm:text-sm/6 dark:text-white forced-colors:text-[CanvasText]',
         // Focus
-        'outline-hidden data-focus:bg-blue-500 data-focus:text-white',
+        'outline-hidden data-focus:bg-zinc-100 data-focus:text-zinc-950 dark:data-focus:bg-zinc-700 dark:data-focus:text-white',
         // Forced colors mode
         'forced-color-adjust-none forced-colors:data-focus:bg-[Highlight] forced-colors:data-focus:text-[HighlightText]',
         // Disabled
@@ -179,7 +179,7 @@ export function ComboboxDescription({ className, children, ...props }: React.Com
       {...props}
       className={clsx(
         className,
-        'flex flex-1 overflow-hidden text-zinc-500 group-data-focus/option:text-white before:w-2 before:min-w-0 before:shrink dark:text-zinc-400'
+        'flex flex-1 overflow-hidden text-zinc-500 before:w-2 before:min-w-0 before:shrink group-data-focus/option:text-zinc-700 dark:text-zinc-400 dark:group-data-focus/option:text-white'
       )}
     >
       <span className="flex-1 truncate">{children}</span>
