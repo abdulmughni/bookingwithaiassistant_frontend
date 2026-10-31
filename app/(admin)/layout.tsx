@@ -31,16 +31,8 @@ import { AccountMenu } from '@/components/account-menu'
 import { AgencyNotificationBell } from '@/components/admin/agency-notification-bell'
 
 import { Navbar, NavbarSpacer } from '@/components/navbar'
-import {
-  Sidebar,
-  SidebarBody,
-  SidebarFooter,
-  SidebarHeader,
-  SidebarItem,
-  SidebarLabel,
-  SidebarSection,
-  SidebarSpacer,
-} from '@/components/sidebar'
+import { Sidebar, SidebarBody, SidebarSpacer } from '@/components/sidebar'
+import { PortalNavLink, PortalProfileCard, PortalSidebarBrand, PortalSidebarShell } from '@/components/portal-sidebar'
 import { SidebarLayout } from '@/components/sidebar-layout'
 import { BrandLogo } from '@/components/brand-logo'
 import { BrandTheme } from '@/components/brand-theme'
@@ -96,9 +88,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [view, setView] = useState<string | null>(null)
   const [section, setSection] = useState<string | null>(null)
   const [collapsed, setCollapsed] = useState(false)
+  const [adminCollapsed, setAdminCollapsed] = useState(false)
   useEffect(() => {
-    if (!isAgency) return
-    setCollapsed(window.localStorage.getItem('agency-sidebar-collapsed') === '1')
+    if (isAgency) {
+      setCollapsed(window.localStorage.getItem('agency-sidebar-collapsed') === '1')
+      return
+    }
+    setAdminCollapsed(window.localStorage.getItem('admin-sidebar-collapsed') === '1')
   }, [isAgency])
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -111,7 +107,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     (pathname.startsWith('/admin/plans') ||
       pathname.startsWith('/admin/requests') ||
       pathname.startsWith('/admin/agencies'))
-  const nav = isAgency ? agencyNav : superAdminNav
   const portalName = isAgency ? brand?.company_name || 'Agency' : 'Admin Console'
 
   useEffect(() => {
@@ -140,8 +135,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <SidebarLayout
-      sidebarCollapsed={isAgency && collapsed}
-      sidebarCard={isAgency}
+      sidebarCollapsed={isAgency ? collapsed : adminCollapsed}
+      sidebarCard
       navbar={
         <Navbar>
           <NavbarSpacer />
@@ -185,37 +180,45 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </div>
           </Sidebar>
         ) : (
-        <Sidebar>
-          <SidebarHeader>
-            <div className="flex min-w-0 flex-col gap-0 px-2 py-0.5">
-              <BrandLogo height={31} priority className="max-w-44.5" />
-              <p className="truncate pl-[25px] text-[10px] font-medium leading-tight text-zinc-500 dark:text-zinc-400">
-                Admin Console
-              </p>
+          <PortalSidebarShell>
+            <PortalSidebarBrand
+              name="Beyonds Logic"
+              subtitle="Admin Console"
+              mark="B"
+              collapsed={adminCollapsed}
+              onToggle={() => {
+                setAdminCollapsed((value) => {
+                  const next = !value
+                  window.localStorage.setItem('admin-sidebar-collapsed', next ? '1' : '0')
+                  return next
+                })
+              }}
+            />
+            <SidebarBody className={clsx('agency-scroll', adminCollapsed ? 'px-2' : 'px-3')}>
+              <nav className={clsx('flex flex-col', adminCollapsed ? 'items-center gap-1' : 'gap-0.5')}>
+                {superAdminNav.map((item) => (
+                  <PortalNavLink
+                    key={item.href}
+                    href={item.href}
+                    label={item.label}
+                    icon={item.icon}
+                    collapsed={adminCollapsed}
+                    current={item.exact ? pathname === item.href : pathname.startsWith(item.href)}
+                  />
+                ))}
+              </nav>
+              <SidebarSpacer />
+            </SidebarBody>
+            <div className={clsx('mt-auto', adminCollapsed ? 'px-2 pb-3' : 'px-3 pb-3')}>
+              <PortalProfileCard
+                title={portalName}
+                subtitle={''}
+                compact={adminCollapsed}
+                menuTitle={portalName}
+                menuLines={[{ label: 'Portal', value: 'Admin Console' }]}
+              />
             </div>
-          </SidebarHeader>
-
-          <SidebarBody>
-            <SidebarSection>
-              {nav.map((item) => (
-                <SidebarItem
-                  key={item.href}
-                  href={item.href}
-                  current={item.exact ? pathname === item.href : pathname.startsWith(item.href)}
-                >
-                  <item.icon data-slot="icon" />
-                  <SidebarLabel>{item.label}</SidebarLabel>
-                </SidebarItem>
-              ))}
-            </SidebarSection>
-
-            <SidebarSpacer />
-          </SidebarBody>
-
-          <SidebarFooter>
-            <AccountMenu portalName={portalName} />
-          </SidebarFooter>
-        </Sidebar>
+          </PortalSidebarShell>
         )
       }
     >
@@ -451,7 +454,7 @@ function AgencyProfileCard({
           'flex items-center text-left transition duration-200 hover:-translate-y-0.5 hover:shadow-md',
           compact
             ? 'size-10 justify-center rounded-full'
-            : 'w-full gap-2.5 rounded-2xl bg-white p-2.5 shadow-sm ring-1 ring-zinc-200/80',
+            : 'agency-plan w-full gap-2.5 rounded-2xl p-3 shadow-sm ring-1 ring-zinc-200/80',
         )}
       >
         {avatar}

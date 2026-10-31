@@ -5,8 +5,8 @@ import Link from 'next/link'
 import clsx from 'clsx'
 import {
   ArrowPathIcon,
-  ArrowUpRightIcon,
   ChatBubbleLeftRightIcon,
+  CreditCardIcon,
   PhoneIcon,
   SparklesIcon,
 } from '@heroicons/react/20/solid'
@@ -95,9 +95,21 @@ function trackColor(state: QuotaState): string {
   }
 }
 
-export function SidebarUsageCard() {
+export function SidebarUsageCard({ compact = false }: { compact?: boolean }) {
   const { data, loading, refetch } = useSubscription()
   const [refreshing, setRefreshing] = useState(false)
+
+  if (compact) {
+    return (
+      <Link
+        href="/plans"
+        title="Your plan"
+        className="mx-auto mb-2 flex size-10 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 ring-1 ring-blue-100 transition duration-200 hover:scale-105 hover:bg-blue-100"
+      >
+        <CreditCardIcon className="size-5" />
+      </Link>
+    )
+  }
 
   const handleRefresh = async () => {
     if (refreshing) return
@@ -136,7 +148,7 @@ function PlanCardShell({
   return (
     <div
       className={clsx(
-        'mx-1 mb-1 overflow-hidden rounded-2xl border border-zinc-200/90 bg-white shadow-sm dark:border-zinc-700/80 dark:bg-zinc-900/90',
+        'agency-plan mb-3 overflow-hidden rounded-2xl shadow-sm ring-1 ring-zinc-200/80',
         className,
       )}
     >
@@ -163,7 +175,7 @@ function PlanCardSkeleton() {
 
 function NoPlanCard() {
   return (
-    <Link href="/plans" className="group mx-1 mb-1 block">
+    <Link href="/plans" className="group mb-3 block">
       <PlanCardShell className="border-dashed border-brand-300/90 bg-linear-to-br from-brand-50/90 to-white transition hover:border-brand-400 hover:shadow-md dark:border-brand-700/50 dark:from-brand-950/40 dark:to-zinc-900/90 dark:hover:border-brand-600">
         <div className="p-3.5">
           <div className="flex items-start gap-3">
@@ -182,9 +194,9 @@ function NoPlanCard() {
               </p>
             </div>
           </div>
-          <span className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl bg-brand-600 py-2 text-xs font-semibold text-white transition group-hover:bg-brand-700">
+          <span className="mt-3 flex w-full items-center justify-center gap-1 rounded-xl bg-blue-600 px-3 py-2.5 text-xs font-semibold text-white shadow-sm shadow-blue-600/20 transition group-hover:bg-blue-700">
             View plans
-            <ArrowUpRightIcon className="size-3.5" />
+            <span aria-hidden>→</span>
           </span>
         </div>
       </PlanCardShell>
@@ -318,17 +330,10 @@ function ActivePlanCard({
 
         <Link
           href="/plans"
-          className={clsx(
-            'mt-2.5 inline-flex items-center gap-1 text-xs font-medium transition',
-            expired || blocked || over
-              ? 'text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300'
-              : warning
-                ? 'text-amber-700 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300'
-                : 'text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300',
-          )}
+          className="mt-3 flex w-full items-center justify-center gap-1 rounded-xl bg-blue-600 px-3 py-2.5 text-xs font-semibold text-white shadow-sm shadow-blue-600/20 transition duration-200 hover:bg-blue-700"
         >
           Manage plan
-          <ArrowUpRightIcon className="size-3" />
+          <span aria-hidden>→</span>
         </Link>
       </div>
     </PlanCardShell>

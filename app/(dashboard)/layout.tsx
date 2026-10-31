@@ -1,20 +1,12 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
-import { useAuth, useOrganization } from '@clerk/nextjs'
+import { useAuth, useOrganization, useUser } from '@clerk/nextjs'
+import clsx from 'clsx'
 import { SidebarLayout } from '@/components/sidebar-layout'
-import {
-  Sidebar,
-  SidebarBody,
-  SidebarFooter,
-  SidebarHeader,
-  SidebarItem,
-  SidebarLabel,
-  SidebarNavGroup,
-  SidebarSection,
-  SidebarSpacer,
-} from '@/components/sidebar'
+import { SidebarBody, SidebarSpacer } from '@/components/sidebar'
+import { PortalNavGroup, PortalNavLink, PortalProfileCard, PortalSidebarBrand, PortalSidebarShell } from '@/components/portal-sidebar'
 import { Navbar, NavbarSpacer } from '@/components/navbar'
 import { isNavGroupCurrent, isNavHrefCurrent, mainNavItems } from '@/lib/navigation'
 import { AccountMenu } from '@/components/account-menu'
@@ -32,7 +24,6 @@ import { JobberReconnectBanner } from '@/components/jobber-reconnect-banner'
 import { ClientOpsBanners } from '@/components/client-ops-banners'
 import { NotificationBell } from '@/components/notification-bell'
 import { RealtimeProvider } from '@/lib/realtime'
-import { ShellBrand } from '@/components/brand-logo'
 import { BrandTheme } from '@/components/brand-theme'
 import { CURRENT_THEME } from '@/lib/brand-presets'
 import { brandAssetUrl } from '@/lib/brand'
@@ -45,7 +36,12 @@ export default function DashboardLayout({
   const pathname = usePathname()
   const router = useRouter()
   const { organization } = useOrganization()
+  const { user } = useUser()
   const { actor } = useAuth()
+  const [collapsed, setCollapsed] = useState(false)
+  useEffect(() => {
+    setCollapsed(window.localStorage.getItem('client-sidebar-collapsed') === '1')
+  }, [])
   const { isAdmin, isAgency, loading: adminLoading } = useIsAdmin()
   const { brand, loading: brandLoading } = useAgencyBrand(!adminLoading && !isAdmin && !isAgency)
 
@@ -78,6 +74,8 @@ export default function DashboardLayout({
       <RealtimeProvider>
       <BrandTheme theme={brand?.theme ?? CURRENT_THEME} />
       <SidebarLayout
+      sidebarCard
+      sidebarCollapsed={collapsed}
       contentViewportLocked={fullBleedPage}
       desktopHeader={pathname === '/' ? null : <NotificationBell />}
       navbar={
@@ -89,70 +87,72 @@ export default function DashboardLayout({
         </Navbar>
       }
       sidebar={
-        <Sidebar>
-          <SidebarHeader>
-            <div className="flex min-w-0 flex-col gap-0 px-2 py-0.5">
-              <ShellBrand
-                loading={brandLoading || adminLoading}
-                logoUrl={brandAssetUrl(brand?.logo_url)}
-                name={brand?.company_name || organization?.name}
-              />
-              <p className="truncate pl-1 text-[11px] text-zinc-400">Client dashboard</p>
-            </div>
-          </SidebarHeader>
-
-          <SidebarBody>
-            <SidebarSection>
+        <PortalSidebarShell>
+          <PortalSidebarBrand
+            loading={brandLoading || adminLoading}
+            logoUrl={brandAssetUrl(brand?.logo_url)}
+            name={brand?.company_name || organization?.name || 'Client'}
+            subtitle="Client dashboard"
+            collapsed={collapsed}
+            onToggle={() => {
+              setCollapsed((value) => {
+                const next = !value
+                window.localStorage.setItem('client-sidebar-collapsed', next ? '1' : '0')
+                return next
+              })
+            }}
+          />
+          <SidebarBody className={clsx('agency-scroll', collapsed ? 'px-2' : 'px-3')}>
+            <nav className={clsx('flex flex-col', collapsed ? 'items-center gap-1' : 'gap-0.5')}>
               {mainNavItems.map((item) => {
                 if (item.type === 'group') {
-                  const groupActive = isNavGroupCurrent(item, pathname)
                   return (
-                    <SidebarNavGroup
+                    <PortalNavGroup
                       key={item.label}
                       label={item.label}
                       icon={item.icon}
-                      active={groupActive}
-                      pill
+                      href={item.children[0]?.href ?? '/'}
+                      current={isNavGroupCurrent(item, pathname)}
+                      collapsed={collapsed}
                     >
                       {item.children.map((child) => (
-                        <SidebarItem
+                        <PortalNavLink
                           key={child.href}
                           href={child.href}
-                          pill
+                          label={child.label}
+                          icon={child.icon ?? item.icon}
+                          collapsed={false}
                           current={isNavHrefCurrent(child.href, pathname)}
-                        >
-                          {child.icon ? <child.icon data-slot="icon" /> : null}
-                          <SidebarLabel>{child.label}</SidebarLabel>
-                        </SidebarItem>
+                        />
                       ))}
-                    </SidebarNavGroup>
+                    </PortalNavGroup>
                   )
                 }
-
                 return (
-                  <SidebarItem
+                  <PortalNavLink
                     key={item.href}
                     href={item.href}
-                    pill
+                    label={item.label}
+                    icon={item.icon}
+                    collapsed={collapsed}
                     current={isNavHrefCurrent(item.href, pathname)}
-                  >
-                    <item.icon data-slot="icon" />
-                    <SidebarLabel>{item.label}</SidebarLabel>
-                  </SidebarItem>
+                  />
                 )
               })}
-            </SidebarSection>
-
+            </nav>
             <SidebarSpacer />
-
-            {/* Support menu item intentionally hidden for now */}
           </SidebarBody>
-
-          <SidebarFooter>
-            <SidebarUsageCard />
-            <AccountMenu portalName={organization?.name || brand?.company_name || 'Client'} />
-          </SidebarFooter>
-        </Sidebar>
+          <div className={clsx('mt-auto', collapsed ? 'px-2 pb-3' : 'px-3 pb-3')}>
+            <SidebarUsageCard compact={collapsed} />
+            <PortalProfileCard
+              title={organization?.name || brand?.company_name || 'Client'}
+              subtitle={user?.primaryEmailAddress?.emailAddress ?? ''}
+              compact={collapsed}
+              menuTitle={organization?.name || brand?.company_name || 'Client'}
+              menuLines={[{ label: 'Workspace', value: organization?.name || brand?.company_name || 'Client' }]}
+            />
+          </div>
+        </PortalSidebarShell>
       }
     >
       {fullBleedPage ? (
