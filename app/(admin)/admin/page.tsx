@@ -272,6 +272,7 @@ function SuperAdminOverview() {
   const [dismissed, setDismissed] = useState<Set<string>>(() => new Set())
   const [signupFind, setSignupFind] = useState('')
   const [requestFind, setRequestFind] = useState('')
+  const [pageFind, setPageFind] = useState('')
   const overview = useApiData((token) => api.admin.overview(token), [])
   const dashboard = useApiData(
     (token) =>
@@ -298,13 +299,18 @@ function SuperAdminOverview() {
 
   return (
     <PageShell>
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-sm text-zinc-500">Welcome back,</p>
-          <h1 className="mt-0.5 text-3xl font-semibold tracking-tight text-zinc-950">Admin Console</h1>
-          <p className="mt-1 text-sm text-zinc-500">Here&apos;s what&apos;s happening across your platform today.</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-col gap-5">
+        <div className="flex w-full flex-wrap items-center gap-3">
+          <label className="relative w-full max-w-[50%]">
+            <MagnifyingGlassIcon className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
+            <input
+              value={pageFind}
+              onChange={(event) => setPageFind(event.target.value)}
+              placeholder="Search clients, bookings, requests..."
+              className="h-11 w-full rounded-full border border-zinc-200/80 bg-white pr-4 pl-11 text-sm text-zinc-700 shadow-sm outline-none placeholder:text-zinc-400 focus:ring-2 focus:ring-blue-200"
+            />
+          </label>
+          <div className="ml-auto flex flex-wrap items-center gap-2">
           <div className="relative">
             <button
               type="button"
@@ -352,10 +358,14 @@ function SuperAdminOverview() {
               </div>
             ) : null}
           </div>
-          <Button color="brand" onClick={refresh}>
-            <ArrowPathIcon data-slot="icon" />
+          <button
+            type="button"
+            onClick={refresh}
+            className="inline-flex h-11 items-center gap-1.5 rounded-full bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+          >
+            <ArrowPathIcon className="size-4" />
             Refresh Data
-          </Button>
+          </button>
           <div className="relative">
             <button
               type="button"
@@ -407,6 +417,13 @@ function SuperAdminOverview() {
             ) : null}
           </div>
         </div>
+        </div>
+        <div>
+          <h1 className="text-[1.7rem] font-semibold tracking-tight text-zinc-950 sm:text-3xl">
+            Welcome back, Admin Console <span aria-hidden>👋</span>
+          </h1>
+          <p className="mt-1 text-sm text-zinc-500">Here&apos;s what&apos;s happening across your platform today.</p>
+        </div>
       </div>
 
       {overview.error ? <p className="text-sm text-red-600">{overview.error}</p> : null}
@@ -454,7 +471,7 @@ function SuperAdminOverview() {
             </Link>
           </div>
           <CardFind value={signupFind} placeholder="Search sign-ups" onChange={setSignupFind} />
-          <div className="agency-scroll mt-3 h-80 overflow-auto overscroll-contain">
+          <div className="scroll-hide mt-3 max-h-[18.25rem] overflow-auto overscroll-contain">
             <div className="grid min-w-[36rem] grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_auto_auto_auto] gap-3 pb-2 text-[11px] font-medium tracking-wide text-zinc-400 uppercase">
               <span>Client</span>
               <span>Agency</span>
@@ -468,9 +485,12 @@ function SuperAdminOverview() {
               ) : null}
               {(overview.data?.recent_tenants ?? [])
                 .filter((tenant) => {
-                  const needle = signupFind.trim().toLowerCase()
-                  if (!needle) return true
-                  return `${tenant.name} ${tenant.parent_name ?? ''}`.toLowerCase().includes(needle)
+                  const blob = `${tenant.name} ${tenant.parent_name ?? ''}`.toLowerCase()
+                  const card = signupFind.trim().toLowerCase()
+                  const page = pageFind.trim().toLowerCase()
+                  if (card && !blob.includes(card)) return false
+                  if (page && !blob.includes(page)) return false
+                  return true
                 })
                 .map((tenant) => (
               <li key={tenant.id} className="grid grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_auto_auto_auto] items-center gap-3 py-3">
@@ -523,12 +543,15 @@ function SuperAdminOverview() {
               <p className="mt-4 text-sm text-zinc-500">No open requests. All caught up.</p>
             </div>
           ) : (
-            <ul className="agency-scroll mt-1 h-80 divide-y divide-zinc-100 overflow-y-auto overscroll-contain">
+            <ul className="scroll-hide mt-1 max-h-[18.25rem] divide-y divide-zinc-100 overflow-y-auto overscroll-contain">
               {(overview.data?.recent_requests ?? [])
                 .filter((request) => {
-                  const needle = requestFind.trim().toLowerCase()
-                  if (!needle) return true
-                  return `${request.tenant_name ?? ''} ${request.requested_plan_id ?? ''} ${request.message ?? ''}`.toLowerCase().includes(needle)
+                  const blob = `${request.tenant_name ?? ''} ${request.requested_plan_id ?? ''} ${request.message ?? ''}`.toLowerCase()
+                  const card = requestFind.trim().toLowerCase()
+                  const page = pageFind.trim().toLowerCase()
+                  if (card && !blob.includes(card)) return false
+                  if (page && !blob.includes(page)) return false
+                  return true
                 })
                 .map((request) => (
                 <li key={request.id} className="flex items-center justify-between gap-3 py-3.5">

@@ -172,7 +172,7 @@ export function AgencyHome() {
     <PageShell>
       <div className="flex flex-col gap-5">
         <div className="flex w-full flex-wrap items-center gap-3">
-          <label className="relative min-w-[220px] flex-1">
+          <label className="relative w-full max-w-[50%]">
             <MagnifyingGlassIcon className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
             <input
               value={query}
@@ -184,7 +184,7 @@ export function AgencyHome() {
               ⌘ K
             </span>
           </label>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="ml-auto flex flex-wrap items-center gap-2">
           <div className="relative">
             <button
               type="button"

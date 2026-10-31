@@ -84,7 +84,7 @@ function typeMeta(type: string): { label: string; className: string } {
   }
 }
 
-export function NotificationBell({ className }: { className?: string }) {
+export function NotificationBell({ className, circle = false }: { className?: string; circle?: boolean }) {
   const router = useRouter()
   const tenantTz = useTenantTimezone()
   const {
@@ -120,7 +120,10 @@ export function NotificationBell({ className }: { className?: string }) {
   return (
     <Headless.Popover className={clsx('relative', className)}>
       <Headless.PopoverButton
-        className="relative flex size-10 items-center justify-center rounded-xl bg-zinc-50 text-zinc-600 shadow-sm ring-1 ring-zinc-200 transition hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 dark:bg-zinc-800 dark:text-zinc-200 dark:ring-zinc-700 dark:hover:bg-zinc-700"
+        className={clsx(
+          'relative flex size-11 items-center justify-center text-zinc-600 shadow-sm ring-1 ring-zinc-200 transition hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 dark:text-zinc-200 dark:ring-zinc-700',
+          circle ? 'rounded-full bg-white dark:bg-zinc-900' : 'rounded-xl bg-zinc-50 hover:bg-white dark:bg-zinc-800 dark:hover:bg-zinc-700',
+        )}
         aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
       >
         <BellIcon className="size-5" aria-hidden="true" />
