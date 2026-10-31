@@ -38,7 +38,6 @@ import { ConfirmActionDialog } from '@/components/admin/confirm-action-dialog'
 import { ClientLoginDialog } from '@/components/admin/client-login-dialog'
 import { VerifyIdentityDialog } from '@/components/admin/verify-identity-dialog'
 import { AgencyClientProfile } from '@/components/admin/agency-client-profile'
-import { SetupRequestCard } from '@/components/admin/setup-request-card'
 import { FunnelBlock, HealthDot } from '@/components/admin/ops'
 import { ConfirmDeleteDialog } from '@/components/confirm-delete-dialog'
 import {
@@ -603,8 +602,6 @@ function SuperAdminClientDetail() {
         period={funnelPeriod}
         onPeriodChange={setFunnelPeriod}
       />
-      <SetupRequestCard tenantId={tenantId} canRequest={false} canEdit />
-
       {/* AI channel toggles */}
       {(tenant.channel_accounts?.length ?? 0) > 0 && (
         <section className={`${dashCardClass} p-5`}>

@@ -629,27 +629,6 @@ export const api = {
         `/api/admin/agency/plans/${encodeURIComponent(planId)}`,
         { token, method: 'DELETE' },
       ),
-    listSetupRequests: (token: string) =>
-      request<import('./types').SetupRequest[]>('/api/admin/agency/setup-requests', { token }),
-    getSetupRequest: (token: string, tenantId: string) =>
-      request<import('./types').SetupRequest | null>(
-        `/api/admin/tenants/${encodeURIComponent(tenantId)}/setup-request`,
-        { token },
-      ),
-    requestSetup: (token: string, tenantId: string, note?: string) =>
-      request<import('./types').SetupRequest>(
-        `/api/admin/tenants/${encodeURIComponent(tenantId)}/setup-request`,
-        { token, method: 'POST', body: JSON.stringify({ note: note || null }) },
-      ),
-    updateSetupRequest: (
-      token: string,
-      tenantId: string,
-      data: { status?: string; setup_fee_cents?: number; note?: string },
-    ) =>
-      request<import('./types').SetupRequest>(
-        `/api/admin/tenants/${encodeURIComponent(tenantId)}/setup-request`,
-        { token, method: 'PATCH', body: JSON.stringify(data) },
-      ),
     listStaff: (token: string) =>
       request<import('./types').AgencyStaffList>('/api/admin/agency/staff', { token }),
     inviteStaff: (token: string, email: string) =>

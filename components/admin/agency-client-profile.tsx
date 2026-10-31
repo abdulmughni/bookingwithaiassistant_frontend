@@ -5,18 +5,16 @@ import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { toast } from 'sonner'
 
-import { SetupRequestCard } from '@/components/admin/setup-request-card'
 import { StatusBadge, UsageBar, formatDateTime, formatIndustryLabel } from '@/components/admin/shared'
 import { Button } from '@/components/button'
 import { PageShell, SkeletonBlock, dashCardClass } from '@/components/dashboard-ui'
 import { TenantConfigTab } from '@/app/(dashboard)/settings/page'
 import { ApiError, api } from '@/lib/api'
-import { useApiData, useApiToken, useIsAdmin } from '@/lib/hooks'
+import { useApiData, useApiToken } from '@/lib/hooks'
 
 export function AgencyClientProfile() {
   const params = useParams<{ id: string }>()
   const tenantId = decodeURIComponent(params.id)
-  const { isAgencyStaff } = useIsAdmin()
   const getToken = useApiToken()
   const detail = useApiData((token) => api.admin.getTenant(token, tenantId), [tenantId])
   const bookings = useApiData((token) => api.admin.listTenantBookings(token, tenantId), [tenantId])
@@ -86,8 +84,6 @@ export function AgencyClientProfile() {
           label={client.plan?.messages_unlimited ? 'Messages (unlimited)' : 'Messages'}
         />
       </section>
-
-      <SetupRequestCard tenantId={tenantId} canRequest={!isAgencyStaff} canEdit={false} />
 
       <section className={`${dashCardClass} p-5`}>
         <h2 className="text-sm font-semibold text-zinc-950 dark:text-white">Bookings</h2>

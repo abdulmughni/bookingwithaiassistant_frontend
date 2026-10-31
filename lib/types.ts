@@ -821,16 +821,6 @@ export interface AgencyActivity {
   estimated_value_total?: number
 }
 
-export interface SetupRequest {
-  tenant_id: string
-  agency_id: string
-  status: 'requested' | 'configuring' | 'testing' | 'ready'
-  setup_fee_cents: number | null
-  note: string | null
-  tenant_name: string | null
-  updated_at: string | null
-}
-
 export interface AgencyStaffMember {
   id: string
   email: string
