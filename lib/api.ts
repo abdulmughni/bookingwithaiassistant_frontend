@@ -564,25 +564,31 @@ export const api = {
     overviewDashboard: (
       token: string,
       query: {
-        start: string
-        end: string
-        funnelStart: string
-        funnelEnd: string
-        chartStart: string
-        chartEnd: string
+        start?: string
+        end?: string
+        funnelStart?: string
+        funnelEnd?: string
+        chartStart?: string
+        chartEnd?: string
       },
     ) => {
-      const qs = new URLSearchParams({
-        start: query.start,
-        end: query.end,
-        funnel_start: query.funnelStart,
-        funnel_end: query.funnelEnd,
-        chart_start: query.chartStart,
-        chart_end: query.chartEnd,
-      })
-      return request<import('./types').AdminDashboard>(`/api/admin/overview/dashboard?${qs}`, { token })
+      const qs = new URLSearchParams()
+      if (query.start && query.end) {
+        qs.set('start', query.start)
+        qs.set('end', query.end)
+      }
+      if (query.funnelStart && query.funnelEnd) {
+        qs.set('funnel_start', query.funnelStart)
+        qs.set('funnel_end', query.funnelEnd)
+      }
+      if (query.chartStart && query.chartEnd) {
+        qs.set('chart_start', query.chartStart)
+        qs.set('chart_end', query.chartEnd)
+      }
+      const q = qs.toString()
+      return request<import('./types').AdminDashboard>(`/api/admin/overview/dashboard${q ? `?${q}` : ''}`, { token })
     },
-    agencyActivity: (token: string, range: 7 | 30 | { start: string; end: string }) => {
+    agencyActivity: (token: string, range: number | { start: string; end: string }) => {
       const qs =
         typeof range === 'number'
           ? `days=${range}`

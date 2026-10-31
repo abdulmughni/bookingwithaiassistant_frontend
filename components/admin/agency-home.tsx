@@ -55,22 +55,18 @@ function localIso(date: Date) {
   return `${date.getFullYear()}-${month}-${day}`
 }
 
-function defaultRange() {
+type DateRange = { start: string; end: string }
+
+function chartPreset(kind: 'week' | 'month'): DateRange {
   const end = new Date()
   const start = new Date()
-  start.setDate(end.getDate() - 29)
+  start.setDate(end.getDate() - (kind === 'week' ? 6 : 29))
   return { start: localIso(start), end: localIso(end) }
 }
 
-function chartPreset(kind: 'week' | 'month' | 'year') {
-  const end = new Date()
-  const start = new Date()
-  if (kind === 'week') start.setDate(end.getDate() - 6)
-  else if (kind === 'month') start.setDate(end.getDate() - 29)
-  else {
-    start.setMonth(0, 1)
-  }
-  return { start: localIso(start), end: localIso(end) }
+function spanDays(start: string, end: string) {
+  const ms = new Date(`${end}T00:00:00`).getTime() - new Date(`${start}T00:00:00`).getTime()
+  return Math.round(ms / 86400000) + 1
 }
 
 function prettyRange(start: string, end: string) {
@@ -97,8 +93,8 @@ function inRange(iso: string | null | undefined, start: string, end: string) {
 
 export function AgencyHome() {
   const { user } = useUser()
-  const [range, setRange] = useState(defaultRange)
-  const [draft, setDraft] = useState(defaultRange)
+  const [range, setRange] = useState<DateRange | null>(null)
+  const [draft, setDraft] = useState<DateRange>({ start: '', end: '' })
   const [rangeOpen, setRangeOpen] = useState(false)
   const [inviteOpen, setInviteOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -114,8 +110,8 @@ export function AgencyHome() {
   const { tenantId, isAgencyStaff } = useIsAdmin()
   const clientsQuery = useApiData((token) => api.admin.listTenants(token), [])
   const activityQuery = useApiData(
-    (token) => api.admin.agencyActivity(token, { start: range.start, end: range.end }),
-    [range.start, range.end],
+    (token) => api.admin.agencyActivity(token, range ?? 366),
+    [range?.start ?? 'all', range?.end ?? 'all'],
   )
   const alertsQuery = useApiData((token) => api.admin.agencyAlerts(token), [])
   const clients = clientsQuery.data ?? []
@@ -135,18 +131,26 @@ export function AgencyHome() {
     )
   }
 
-  const bookings = series.reduce((sum, point) => sum + point.bookings, 0)
-  const minutes = series.reduce((sum, point) => sum + (point.call_minutes ?? 0), 0)
-  const messages = series.reduce((sum, point) => sum + point.messages, 0)
-  const clientsInRange = clients.filter((client) => inRange(client.created_at, range.start, range.end)).length
+  const bookings = range
+    ? series.reduce((sum, point) => sum + point.bookings, 0)
+    : clients.reduce((sum, client) => sum + (client.bookings_count ?? 0), 0)
+  const minutes = range
+    ? series.reduce((sum, point) => sum + (point.call_minutes ?? 0), 0)
+    : clients.reduce((sum, client) => sum + (client.usage?.call_minutes_used ?? 0), 0)
+  const messages = range
+    ? series.reduce((sum, point) => sum + point.messages, 0)
+    : clients.reduce((sum, client) => sum + (client.usage?.messages_used ?? 0), 0)
+  const clientsInRange = range
+    ? clients.filter((client) => inRange(client.created_at, range.start, range.end)).length
+    : clients.length
   const kpis = demo
     ? agencyDemo.kpis
     : [
-        { label: 'Total clients', value: clientsInRange.toLocaleString(), trend: '' },
-        { label: 'Total bookings', value: bookings.toLocaleString(), trend: '' },
-        { label: 'Call minutes', value: minutes.toLocaleString(), trend: '' },
-        { label: 'Messages', value: messages.toLocaleString(), trend: '' },
-        { label: 'Revenue this month', value: 'Not tracked', trend: '' },
+        { label: 'Total clients', value: clientsInRange.toLocaleString(), trend: range ? '' : 'All time' },
+        { label: 'Total bookings', value: bookings.toLocaleString(), trend: range ? '' : 'All time' },
+        { label: 'Call minutes', value: minutes.toLocaleString(), trend: range ? '' : 'All time' },
+        { label: 'Messages', value: messages.toLocaleString(), trend: range ? '' : 'All time' },
+        { label: 'Revenue this month', value: 'Not tracked', trend: range ? '' : 'All time' },
       ]
   const icons = [UsersIcon, CalendarDaysIcon, PhoneIcon, EnvelopeIcon, BanknotesIcon]
   const needle = query.trim().toLowerCase()
@@ -162,7 +166,7 @@ export function AgencyHome() {
     .sort((a, b) => (clientOrder === 'latest' ? b.created.localeCompare(a.created) : b.bookings - a.bookings))
   const signups = clients
     .filter((client) => !needle || client.name.toLowerCase().includes(needle))
-    .filter((client) => inRange(client.created_at, range.start, range.end))
+    .filter((client) => !range || inRange(client.created_at, range.start, range.end))
     .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
   const attention = clients
     .map((client) => ({ client, reason: attentionReason(client) }))
@@ -189,13 +193,13 @@ export function AgencyHome() {
             <button
               type="button"
               onClick={() => {
-                setDraft(range)
+                setDraft(range ?? { start: '', end: '' })
                 setRangeOpen((open) => !open)
               }}
               className="inline-flex h-11 items-center gap-2 rounded-full bg-white px-4 text-sm text-zinc-600 shadow-sm ring-1 ring-zinc-200"
             >
               <CalendarDaysIcon className="size-4 text-zinc-400" />
-              {prettyRange(range.start, range.end)}
+              {range ? prettyRange(range.start, range.end) : 'All time'}
               <ChevronDownIcon className="size-4 text-zinc-400" />
             </button>
             {rangeOpen ? (
@@ -218,18 +222,34 @@ export function AgencyHome() {
                     className="mt-1 w-full rounded-lg border border-zinc-200 px-2 py-1.5 text-sm text-zinc-800"
                   />
                 </label>
-                <Button
-                  color="brand"
-                  className="mt-3 w-full"
-                  onClick={() => {
-                    if (!draft.start || !draft.end) return
-                    const next = draft.start <= draft.end ? draft : { start: draft.end, end: draft.start }
-                    setRange(next)
-                    setRangeOpen(false)
-                  }}
-                >
-                  Apply
-                </Button>
+                <p className="mt-2 text-[11px] text-zinc-400">Up to two months.</p>
+                <div className="mt-3 flex gap-2">
+                  <Button
+                    color="brand"
+                    className="flex-1"
+                    onClick={() => {
+                      if (!draft.start || !draft.end) return
+                      const next = draft.start <= draft.end ? draft : { start: draft.end, end: draft.start }
+                      if (spanDays(next.start, next.end) > 62) {
+                        toast.error('Choose a range of two months or less.')
+                        return
+                      }
+                      setRange(next)
+                      setRangeOpen(false)
+                    }}
+                  >
+                    Apply
+                  </Button>
+                  <Button
+                    outline
+                    onClick={() => {
+                      setRange(null)
+                      setRangeOpen(false)
+                    }}
+                  >
+                    All time
+                  </Button>
+                </div>
               </div>
             ) : null}
           </div>
@@ -306,7 +326,7 @@ export function AgencyHome() {
               label={kpi.label.replace(/\b\w/g, (letter) => letter.toUpperCase())}
               value={kpi.value}
               trend={kpi.trend}
-              trendTone={kpi.trend ? (falling ? 'down' : 'up') : 'flat'}
+              trendTone={demo && kpi.trend ? (falling ? 'down' : 'up') : 'flat'}
               icon={<Icon className="size-5" />}
               tone={tones[index] ?? tones[0]}
               stroke={strokes[index] ?? strokes[0]}
@@ -344,12 +364,11 @@ export function AgencyHome() {
               <Menu as="div" className="relative shrink-0">
                 <MenuButton className="inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-600 ring-1 ring-zinc-200 hover:bg-zinc-50">
                   {(() => {
+                    if (!range) return 'All time'
                     const week = chartPreset('week')
                     const month = chartPreset('month')
-                    const year = chartPreset('year')
                     if (range.start === week.start && range.end === week.end) return 'Last 7 days'
                     if (range.start === month.start && range.end === month.end) return 'Last 30 days'
-                    if (range.start === year.start && range.end === year.end) return 'This year'
                     return prettyRange(range.start, range.end)
                   })()}
                   <ChevronDownIcon className="size-3.5 text-zinc-400" />
@@ -362,7 +381,6 @@ export function AgencyHome() {
                     [
                       ['week', 'Last 7 days'],
                       ['month', 'Last 30 days'],
-                      ['year', 'This year'],
                     ] as const
                   ).map(([kind, label]) => (
                     <MenuItem key={kind}>
@@ -375,6 +393,15 @@ export function AgencyHome() {
                       </button>
                     </MenuItem>
                   ))}
+                  <MenuItem>
+                    <button
+                      type="button"
+                      onClick={() => setRange(null)}
+                      className="block w-full rounded-lg px-3 py-2 text-left text-sm text-zinc-700 data-focus:bg-zinc-100"
+                    >
+                      All time
+                    </button>
+                  </MenuItem>
                 </MenuItems>
               </Menu>
             }

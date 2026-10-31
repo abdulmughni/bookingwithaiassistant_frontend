@@ -2,6 +2,8 @@
 
 import { useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
+import { useUser } from '@clerk/nextjs'
+import { toast } from 'sonner'
 import {
   ArrowPathIcon,
   BanknotesIcon,
@@ -51,11 +53,6 @@ function daysBack(count: number) {
   return { start: iso(start), end: iso(end) }
 }
 
-function thisMonth() {
-  const end = new Date()
-  return { start: iso(new Date(end.getFullYear(), end.getMonth(), 1)), end: iso(end) }
-}
-
 function pretty(value: string) {
   return new Date(`${value}T00:00:00`).toLocaleDateString('en-US', {
     month: 'short',
@@ -64,11 +61,18 @@ function pretty(value: string) {
   })
 }
 
-function periodLabel(range: { start: string; end: string }) {
+type DateRange = { start: string; end: string }
+
+function spanDays(start: string, end: string) {
+  const ms = new Date(`${end}T00:00:00`).getTime() - new Date(`${start}T00:00:00`).getTime()
+  return Math.round(ms / 86400000) + 1
+}
+
+function periodLabel(range: DateRange | null) {
+  if (!range) return 'All time'
   const options = [
     { label: 'Last 7 days', range: daysBack(7) },
     { label: 'Last 30 days', range: daysBack(30) },
-    { label: 'This month', range: thisMonth() },
   ]
   return options.find((option) => option.range.start === range.start && option.range.end === range.end)?.label ?? 'Custom'
 }
@@ -88,6 +92,7 @@ function MetricCard({
   stroke,
   href,
   money,
+  allTime = false,
 }: {
   label: string
   metric: DashboardMetric
@@ -96,11 +101,12 @@ function MetricCard({
   stroke: string
   href?: string
   money?: boolean
+  allTime?: boolean
 }) {
   const shown = money
     ? `$${Math.round(metric.value).toLocaleString()}`
     : Math.round(metric.value).toLocaleString()
-  const trend = metricTrend(metric)
+  const trend = allTime ? { text: 'All time', tone: 'flat' as const } : metricTrend(metric)
   return (
     <KpiStatCard
       label={label}
@@ -144,13 +150,13 @@ function PeriodMenu({
   value,
   onChange,
 }: {
-  value: { start: string; end: string }
-  onChange: (range: { start: string; end: string }) => void
+  value: DateRange | null
+  onChange: (range: DateRange | null) => void
 }) {
-  const options = [
+  const options: { label: string; range: DateRange | null }[] = [
     { label: 'Last 7 days', range: daysBack(7) },
     { label: 'Last 30 days', range: daysBack(30) },
-    { label: 'This month', range: thisMonth() },
+    { label: 'All time', range: null },
   ]
   return (
     <Dropdown>
@@ -172,7 +178,7 @@ function PeriodMenu({
   )
 }
 
-function FunnelPanel({ funnel, range, onChange }: { funnel: AdminFunnel; range: { start: string; end: string }; onChange: (range: { start: string; end: string }) => void }) {
+function FunnelPanel({ funnel, range, onChange }: { funnel: AdminFunnel; range: DateRange | null; onChange: (range: DateRange | null) => void }) {
   const steps = [
     { label: 'Total bookings', value: funnel.total_bookings ?? funnel.conversations, pct: null as number | null, tint: 'bg-blue-50 text-blue-700' },
     { label: 'From messages', value: funnel.message_bookings ?? funnel.booking_intent, pct: funnel.conv_to_intent_pct, tint: 'bg-emerald-50 text-emerald-700' },
@@ -182,7 +188,7 @@ function FunnelPanel({ funnel, range, onChange }: { funnel: AdminFunnel; range: 
   return (
     <section className={`${dashCardClass} flex h-full flex-col rounded-[18px] p-5`}>
       <div className="flex items-center justify-between gap-3">
-        <h3 className="text-base font-semibold text-zinc-950">Company funnel (this month)</h3>
+        <h3 className="text-base font-semibold text-zinc-950">Company funnel</h3>
         <PeriodMenu value={range} onChange={onChange} />
       </div>
       <div className="mt-4 grid items-center gap-6 xl:grid-cols-[1.15fr_0.85fr]">
@@ -248,8 +254,8 @@ function ActivityChart({
   onChange,
 }: {
   points: AdminDashboard['activity']
-  range: { start: string; end: string }
-  onChange: (range: { start: string; end: string }) => void
+  range: DateRange | null
+  onChange: (range: DateRange | null) => void
 }) {
   return (
     <ActivityBars
@@ -263,11 +269,11 @@ function ActivityChart({
 }
 
 function SuperAdminOverview() {
-  const [cardRange, setCardRange] = useState(daysBack(30))
-  const [draft, setDraft] = useState(daysBack(30))
+  const { user } = useUser()
+  const welcomeName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || ''
+  const [range, setRange] = useState<DateRange | null>(null)
+  const [draft, setDraft] = useState<DateRange>({ start: '', end: '' })
   const [rangeOpen, setRangeOpen] = useState(false)
-  const [funnelRange, setFunnelRange] = useState(daysBack(30))
-  const [chartRange, setChartRange] = useState(daysBack(30))
   const [bellOpen, setBellOpen] = useState(false)
   const [dismissed, setDismissed] = useState<Set<string>>(() => new Set())
   const [signupFind, setSignupFind] = useState('')
@@ -276,15 +282,20 @@ function SuperAdminOverview() {
   const overview = useApiData((token) => api.admin.overview(token), [])
   const dashboard = useApiData(
     (token) =>
-      api.admin.overviewDashboard(token, {
-        start: cardRange.start,
-        end: cardRange.end,
-        funnelStart: funnelRange.start,
-        funnelEnd: funnelRange.end,
-        chartStart: chartRange.start,
-        chartEnd: chartRange.end,
-      }),
-    [cardRange.start, cardRange.end, funnelRange.start, funnelRange.end, chartRange.start, chartRange.end],
+      api.admin.overviewDashboard(
+        token,
+        range
+          ? {
+              start: range.start,
+              end: range.end,
+              funnelStart: range.start,
+              funnelEnd: range.end,
+              chartStart: range.start,
+              chartEnd: range.end,
+            }
+          : {},
+      ),
+    [range?.start ?? '', range?.end ?? ''],
   )
   const alerts = useMemo(
     () => (overview.data?.alerts ?? []).filter((alert) => !dismissed.has(alertKey(alert))),
@@ -307,21 +318,24 @@ function SuperAdminOverview() {
               value={pageFind}
               onChange={(event) => setPageFind(event.target.value)}
               placeholder="Search clients, bookings, requests..."
-              className="h-11 w-full rounded-full border border-zinc-200/80 bg-white pr-4 pl-11 text-sm text-zinc-700 shadow-sm outline-none placeholder:text-zinc-400 focus:ring-2 focus:ring-blue-200"
+              className="h-11 w-full rounded-full border border-zinc-200/80 bg-white pr-16 pl-11 text-sm text-zinc-700 shadow-sm outline-none placeholder:text-zinc-400 focus:ring-2 focus:ring-blue-200"
             />
+            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded-md border border-zinc-200 bg-zinc-50 px-1.5 py-0.5 text-[11px] font-medium text-zinc-400">
+              ⌘ K
+            </span>
           </label>
           <div className="ml-auto flex flex-wrap items-center gap-2">
           <div className="relative">
             <button
               type="button"
               onClick={() => {
-                setDraft(cardRange)
+                setDraft(range ?? { start: '', end: '' })
                 setRangeOpen((open) => !open)
               }}
               className="inline-flex h-11 items-center gap-2 rounded-full bg-white px-4 text-sm text-zinc-600 shadow-sm ring-1 ring-zinc-200"
             >
               <CalendarDaysIcon className="size-4 text-zinc-400" />
-              {pretty(cardRange.start)} – {pretty(cardRange.end)}
+              {range ? `${pretty(range.start)} – ${pretty(range.end)}` : 'All time'}
               <ChevronDownIcon className="size-4 text-zinc-400" />
             </button>
             {rangeOpen ? (
@@ -344,17 +358,34 @@ function SuperAdminOverview() {
                     className="mt-1 w-full rounded-lg border border-zinc-200 px-2 py-1.5 text-sm"
                   />
                 </label>
-                <Button
-                  color="brand"
-                  className="mt-3 w-full"
-                  onClick={() => {
-                    if (!draft.start || !draft.end) return
-                    setCardRange(draft.start <= draft.end ? draft : { start: draft.end, end: draft.start })
-                    setRangeOpen(false)
-                  }}
-                >
-                  Apply
-                </Button>
+                <p className="mt-2 text-[11px] text-zinc-400">Up to two months.</p>
+                <div className="mt-3 flex gap-2">
+                  <Button
+                    color="brand"
+                    className="flex-1"
+                    onClick={() => {
+                      if (!draft.start || !draft.end) return
+                      const next = draft.start <= draft.end ? draft : { start: draft.end, end: draft.start }
+                      if (spanDays(next.start, next.end) > 62) {
+                        toast.error('Choose a range of two months or less.')
+                        return
+                      }
+                      setRange(next)
+                      setRangeOpen(false)
+                    }}
+                  >
+                    Apply
+                  </Button>
+                  <Button
+                    outline
+                    onClick={() => {
+                      setRange(null)
+                      setRangeOpen(false)
+                    }}
+                  >
+                    All time
+                  </Button>
+                </div>
               </div>
             ) : null}
           </div>
@@ -371,7 +402,7 @@ function SuperAdminOverview() {
               type="button"
               aria-label="Alerts"
               onClick={() => setBellOpen((open) => !open)}
-              className="relative flex size-11 items-center justify-center rounded-full bg-white text-zinc-600 shadow-sm ring-1 ring-zinc-200 hover:bg-zinc-50"
+              className="relative flex size-10 items-center justify-center rounded-full bg-white text-zinc-600 shadow-sm ring-1 ring-zinc-200 hover:bg-zinc-50"
             >
               <BellIcon className="size-5" />
               {alerts.length > 0 ? (
@@ -420,7 +451,7 @@ function SuperAdminOverview() {
         </div>
         <div>
           <h1 className="text-[1.7rem] font-semibold tracking-tight text-zinc-950 sm:text-3xl">
-            Welcome back, Admin Console <span aria-hidden>👋</span>
+            Welcome back{welcomeName ? `, ${welcomeName}` : ''} <span aria-hidden>👋</span>
           </h1>
           <p className="mt-1 text-sm text-zinc-500">Here&apos;s what&apos;s happening across your platform today.</p>
         </div>
@@ -441,22 +472,22 @@ function SuperAdminOverview() {
       ) : (
         <>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <MetricCard label="Total Clients" metric={stats.clients} href="/admin/clients" icon={<UsersIcon className="size-5" />} tone="bg-blue-100 text-blue-500" stroke="#60a5fa" />
-            <MetricCard label="Active" metric={stats.active} href="/admin/clients?status=active" icon={<CheckCircleIcon className="size-5" />} tone="bg-emerald-100 text-emerald-500" stroke="#34d399" />
-            <MetricCard label="Pending activation" metric={stats.pending} href="/admin/clients?status=pending" icon={<ClockIcon className="size-5" />} tone="bg-amber-100 text-amber-500" stroke="#fbbf24" />
-            <MetricCard label="Suspended" metric={stats.suspended} href="/admin/clients?status=suspended" icon={<PauseIcon className="size-5" />} tone="bg-rose-100 text-rose-500" stroke="#fb7185" />
+            <MetricCard allTime={!range} label="Total Clients" metric={stats.clients} href="/admin/clients" icon={<UsersIcon className="size-5" />} tone="bg-blue-100 text-blue-500" stroke="#60a5fa" />
+            <MetricCard allTime={!range} label="Active" metric={stats.active} href="/admin/clients?status=active" icon={<CheckCircleIcon className="size-5" />} tone="bg-emerald-100 text-emerald-500" stroke="#34d399" />
+            <MetricCard allTime={!range} label="Pending activation" metric={stats.pending} href="/admin/clients?status=pending" icon={<ClockIcon className="size-5" />} tone="bg-amber-100 text-amber-500" stroke="#fbbf24" />
+            <MetricCard allTime={!range} label="Suspended" metric={stats.suspended} href="/admin/clients?status=suspended" icon={<PauseIcon className="size-5" />} tone="bg-rose-100 text-rose-500" stroke="#fb7185" />
           </div>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-            <MetricCard label="Total Bookings" metric={stats.bookings} icon={<CalendarDaysIcon className="size-5" />} tone="bg-violet-100 text-violet-500" stroke="#a78bfa" />
-            <MetricCard label="Conversations" metric={stats.conversations} icon={<ChatBubbleLeftRightIcon className="size-5" />} tone="bg-sky-100 text-sky-500" stroke="#38bdf8" />
-            <MetricCard label="Calls" metric={stats.calls} icon={<PhoneIcon className="size-5" />} tone="bg-emerald-100 text-emerald-500" stroke="#34d399" />
-            <MetricCard label="Messages" metric={stats.messages} icon={<EnvelopeIcon className="size-5" />} tone="bg-orange-100 text-orange-500" stroke="#fb923c" />
-            <MetricCard label="$ recovered this month" metric={stats.recovered} money icon={<BanknotesIcon className="size-5" />} tone="bg-rose-100 text-rose-500" stroke="#fb7185" />
+            <MetricCard allTime={!range} label="Total Bookings" metric={stats.bookings} icon={<CalendarDaysIcon className="size-5" />} tone="bg-violet-100 text-violet-500" stroke="#a78bfa" />
+            <MetricCard allTime={!range} label="Conversations" metric={stats.conversations} icon={<ChatBubbleLeftRightIcon className="size-5" />} tone="bg-sky-100 text-sky-500" stroke="#38bdf8" />
+            <MetricCard allTime={!range} label="Calls" metric={stats.calls} icon={<PhoneIcon className="size-5" />} tone="bg-emerald-100 text-emerald-500" stroke="#34d399" />
+            <MetricCard allTime={!range} label="Messages" metric={stats.messages} icon={<EnvelopeIcon className="size-5" />} tone="bg-orange-100 text-orange-500" stroke="#fb923c" />
+            <MetricCard allTime={!range} label="$ recovered" metric={stats.recovered} money icon={<BanknotesIcon className="size-5" />} tone="bg-rose-100 text-rose-500" stroke="#fb7185" />
           </div>
           <div className="grid items-stretch gap-4 xl:grid-cols-2">
-            <FunnelPanel funnel={stats.funnel} range={funnelRange} onChange={setFunnelRange} />
+            <FunnelPanel funnel={stats.funnel} range={range} onChange={setRange} />
             <div className="flex h-full min-h-0 flex-col">
-              <ActivityChart points={stats.activity} range={chartRange} onChange={setChartRange} />
+              <ActivityChart points={stats.activity} range={range} onChange={setRange} />
             </div>
           </div>
         </>

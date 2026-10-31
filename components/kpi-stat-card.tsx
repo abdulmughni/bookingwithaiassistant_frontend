@@ -23,6 +23,23 @@ function smoothLine(points: { x: number; y: number }[]) {
   return path
 }
 
+/** Real counts, grouped so a long daily series draws as one smooth wave. */
+function wavePoints(values: number[]) {
+  const clean = values.filter((value) => Number.isFinite(value))
+  if (clean.length <= 16) return clean
+  const buckets = 12
+  const size = clean.length / buckets
+  const points: number[] = []
+  for (let index = 0; index < buckets; index += 1) {
+    const start = Math.floor(index * size)
+    const end = Math.max(start + 1, Math.floor((index + 1) * size))
+    let sum = 0
+    for (let cursor = start; cursor < end && cursor < clean.length; cursor += 1) sum += clean[cursor]
+    points.push(sum)
+  }
+  return points
+}
+
 export function AreaSparkline({
   values,
   color,
@@ -35,14 +52,15 @@ export function AreaSparkline({
   const width = compact ? 96 : 360
   const height = compact ? 32 : 84
   const gradientId = useId().replace(/:/g, '')
-  if (values.length < 2) return null
-  const max = Math.max(...values)
-  const min = Math.min(...values)
+  const series = wavePoints(values)
+  if (series.length < 2) return null
+  const max = Math.max(...series)
+  const min = Math.min(...series)
   const span = max - min || 1
-  const step = width / (values.length - 1)
+  const step = width / (series.length - 1)
   const top = compact ? 3 : 6
   const bottom = compact ? 3 : 1
-  const coords = values.map((value, index) => ({
+  const coords = series.map((value, index) => ({
     x: index * step,
     y: height - bottom - ((value - min) / span) * (height - top - bottom),
   }))
