@@ -823,7 +823,7 @@ export function TenantConfigTab({
     </form>
 
     {onWeeklyReportChange && (
-      <section className="mt-10 max-w-3xl border-t border-zinc-200 pt-8 dark:border-zinc-700">
+      <section className={`${dashCardClass} mt-10 max-w-3xl p-5`}>
         <Subheading>Weekly report</Subheading>
         <Text className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
           When this is on, this client gets an email every Monday with the last 7 days:
@@ -847,11 +847,11 @@ export function TenantConfigTab({
                 .finally(() => setReportSaving(false))
             }}
             className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
-              reportOn ? 'bg-brand-600' : 'bg-zinc-300 dark:bg-zinc-600'
+              reportOn ? 'bg-blue-600' : 'bg-zinc-300 dark:bg-zinc-600'
             } ${reportSaving ? 'opacity-60' : ''}`}
           >
             <span
-              className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+              className={`inline-block h-5 w-5 transform rounded-full bg-[#fff] shadow transition-transform ${
                 reportOn ? 'translate-x-5' : 'translate-x-0.5'
               }`}
             />
@@ -909,8 +909,8 @@ export default function SettingsPage() {
 
       <ReadOnlyBanner />
 
-      <div className="rounded-2xl border border-zinc-200/80 bg-white px-4 shadow-sm dark:border-zinc-700/80 dark:bg-zinc-900/80 sm:px-6">
-        <nav className="-mb-px flex gap-6 overflow-x-auto border-b border-zinc-200/80 pt-2 dark:border-zinc-700/80" aria-label="Settings tabs">
+      <div className={`${dashCardClass} overflow-hidden`}>
+        <nav className="flex gap-6 overflow-x-auto border-b border-zinc-200/80 px-4 pt-2 dark:border-zinc-700/80 sm:px-6" aria-label="Settings tabs">
           <button
             type="button"
             onClick={() => setActiveTab('appearance')}
@@ -933,12 +933,12 @@ export default function SettingsPage() {
             Tenant Configuration
           </button>
         </nav>
-      </div>
+        <div className="p-4 sm:p-6">
 
       {activeTab === 'appearance' && (
         <>
           <ProfilePhotoForm />
-          <section className={`${dashCardClass} p-5`}>
+          <section className="mt-6">
             <Subheading>Brand & White Label</Subheading>
             <p className="mt-1 mb-5 text-sm text-zinc-500">
               Light and dark mode, presets, and colors apply to your dashboard. The logo stays with your agency.
@@ -957,6 +957,8 @@ export default function SettingsPage() {
           )}
         </LockWhenReadOnly>
       )}
+        </div>
+      </div>
     </PageShell>
   )
 }

@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import { AgencyBrandForm } from '@/components/admin/agency-brand-form'
 import { Button } from '@/components/button'
 import { Input } from '@/components/input'
-import { PageHeader, PageShell, SkeletonBlock, dashCardClass } from '@/components/dashboard-ui'
+import { PageHeader, PageShell, SkeletonBlock, dashCardClass, settingsTabClass } from '@/components/dashboard-ui'
 import { ApiError, api } from '@/lib/api'
 import { useApiData, useApiToken, useIsAdmin } from '@/lib/hooks'
 
@@ -86,7 +86,8 @@ function SettingsBody() {
         title="Settings"
         description="Agency details now, and more sections here later."
       />
-      <div className="flex gap-1 border-b border-zinc-200">
+      <div className={`${dashCardClass} overflow-hidden`}>
+      <div className="flex gap-6 overflow-x-auto border-b border-zinc-200/80 px-4 pt-2 dark:border-zinc-700/80 sm:px-6">
         {(
           [
             ['general', 'General'],
@@ -97,18 +98,17 @@ function SettingsBody() {
             key={id}
             type="button"
             onClick={() => setTab(id)}
-            className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium ${
-              tab === id ? 'border-blue-600 text-blue-700' : 'border-transparent text-zinc-500 hover:text-zinc-800'
-            }`}
+            className={settingsTabClass(tab === id)}
           >
             {label}
           </button>
         ))}
       </div>
+      <div className="p-4 sm:p-6">
       {agency.loading ? <SkeletonBlock className="h-32" /> : null}
       {agency.error ? <p className="text-sm text-red-600">{agency.error}</p> : null}
       {tab === 'general' ? (
-        <section className={`${dashCardClass} max-w-xl space-y-4 p-5`}>
+        <section className="max-w-xl space-y-4">
           <label className="block text-sm">
             <span className="font-medium text-zinc-950 dark:text-white">Agency name</span>
             <Input className="mt-2" value={name} disabled={isAgencyStaff} onChange={(event) => setName(event.target.value)} />
@@ -123,7 +123,7 @@ function SettingsBody() {
           )}
         </section>
       ) : (
-        <section className={`${dashCardClass} p-5 sm:p-6`}>
+        <section>
           <h2 className="text-sm font-semibold text-zinc-950 dark:text-white">Brand & White Label</h2>
           <p className="mt-1 mb-4 text-sm text-zinc-500">
             Logo and colors appear on your screens and on your clients&apos; dashboards.
@@ -135,6 +135,8 @@ function SettingsBody() {
           ) : null}
         </section>
       )}
+      </div>
+      </div>
     </PageShell>
   )
 }

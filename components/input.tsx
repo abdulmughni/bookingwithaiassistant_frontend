@@ -76,7 +76,7 @@ export const Input = forwardRef(function Input(
           // Border
           'border border-zinc-950/10 data-hover:border-zinc-950/20 dark:border-white/10 dark:data-hover:border-white/20',
           // Background color
-          'bg-transparent dark:bg-white/5',
+          'bg-transparent dark:bg-zinc-950/70',
           // Hide default focus styles
           'focus:outline-hidden',
           // Invalid state

@@ -267,7 +267,7 @@ function AgencySidebarBrand({
         type="button"
         aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         onClick={onToggle}
-        className="inline-flex size-7 shrink-0 items-center justify-center rounded-lg text-zinc-400 transition duration-200 hover:bg-blue-50 hover:text-blue-600"
+        className="inline-flex size-7 shrink-0 items-center justify-center rounded-lg text-zinc-500 transition duration-200 hover:bg-zinc-100 hover:text-zinc-800 dark:text-zinc-200 dark:hover:bg-white/10 dark:hover:text-white"
       >
         {collapsed ? <ChevronDoubleRightIcon className="size-4" /> : <ChevronDoubleLeftIcon className="size-4" />}
       </button>
@@ -471,25 +471,25 @@ function AgencyProfileCard({
       <MenuItems
         transition
         anchor="top start"
-        className="z-50 w-72 origin-bottom rounded-2xl bg-white p-2 shadow-xl ring-1 ring-zinc-200 transition duration-200 ease-out [--anchor-gap:10px] focus:outline-none data-closed:scale-95 data-closed:opacity-0"
+        className="z-50 w-72 origin-bottom rounded-2xl bg-white p-2 shadow-xl ring-1 ring-zinc-200 transition duration-200 ease-out [--anchor-gap:10px] focus:outline-none data-closed:scale-95 data-closed:opacity-0 dark:bg-zinc-900 dark:ring-zinc-700"
       >
-        <div className="flex items-center gap-3 rounded-xl bg-blue-50/60 px-2.5 py-2.5">
+        <div className="flex items-center gap-3 rounded-xl bg-zinc-50 px-2.5 py-2.5 dark:bg-white/8">
           {avatar}
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-zinc-950">{name}</p>
+            <p className="truncate text-sm font-semibold text-zinc-950 dark:text-white">{name}</p>
             <p className="truncate text-xs text-zinc-500">{email}</p>
           </div>
         </div>
         <div className="mt-2 space-y-1 px-2.5 py-1 text-xs text-zinc-500">
-          <p><span className="font-medium text-zinc-700">Role</span> · {role}</p>
-          <p className="truncate"><span className="font-medium text-zinc-700">Agency</span> · {agencyName}</p>
+          <p><span className="font-medium text-zinc-700 dark:text-zinc-200">Role</span> · {role}</p>
+          <p className="truncate"><span className="font-medium text-zinc-700 dark:text-zinc-200">Agency</span> · {agencyName}</p>
         </div>
-        <div className="my-1 h-px bg-zinc-100" />
+        <div className="my-1 h-px bg-zinc-100 dark:bg-zinc-700" />
         <MenuItem>
           <button
             type="button"
             onClick={() => openUserProfile()}
-            className="block w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-zinc-700 data-focus:bg-blue-50 data-focus:text-blue-700"
+            className="block w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-zinc-700 data-focus:bg-zinc-100 dark:text-zinc-100 dark:data-focus:bg-white/10"
           >
             Manage account
           </button>
@@ -498,7 +498,7 @@ function AgencyProfileCard({
           <button
             type="button"
             onClick={() => void signOut()}
-            className="block w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-zinc-700 data-focus:bg-blue-50 data-focus:text-blue-700"
+            className="block w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-zinc-700 data-focus:bg-zinc-100 dark:text-zinc-100 dark:data-focus:bg-white/10"
           >
             Sign out
           </button>
@@ -539,10 +539,10 @@ function UsageMeter({
           {used.toLocaleString()} / {quota > 0 ? quota.toLocaleString() : '—'}
         </span>
       </div>
-      <div className="mt-1 h-2 overflow-hidden rounded-full bg-brand-100">
+      <div className="mt-1 h-2 overflow-hidden rounded-full bg-zinc-200 dark:bg-white/15">
         <div
-          className={`h-full rounded-full motion-safe:transition-[width] motion-safe:duration-500 ${warning ? 'bg-amber-500' : 'bg-brand-600'}`}
-          style={{ width: `${pct}%` }}
+          className={`h-full rounded-full motion-safe:transition-[width] motion-safe:duration-500 ${warning ? 'bg-amber-500' : 'bg-blue-600'}`}
+          style={{ width: `${Math.max(pct, pct > 0 ? 8 : 0)}%` }}
         />
       </div>
       <p className="mt-1 text-[10px] text-zinc-500">{quota > 0 ? `${remaining.toLocaleString()} remaining` : 'No pack assigned'}</p>

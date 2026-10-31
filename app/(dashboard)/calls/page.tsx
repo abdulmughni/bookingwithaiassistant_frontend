@@ -463,7 +463,7 @@ export default function CallsPage() {
           <Button
             plain
             type="button"
-            className={`px-3 py-1 text-xs ${viewMode === 'box' ? 'bg-zinc-100 dark:bg-zinc-800' : ''}`}
+            className={`rounded-md px-3 py-1 text-xs ${viewMode === 'box' ? 'bg-zinc-900 text-white shadow-sm dark:bg-zinc-600' : 'text-zinc-500 dark:text-zinc-300'}`}
             onClick={() => setViewMode('box')}
           >
             Box view
@@ -471,7 +471,7 @@ export default function CallsPage() {
           <Button
             plain
             type="button"
-            className={`px-3 py-1 text-xs ${viewMode === 'list' ? 'bg-zinc-100 dark:bg-zinc-800' : ''}`}
+            className={`rounded-md px-3 py-1 text-xs ${viewMode === 'list' ? 'bg-zinc-900 text-white shadow-sm dark:bg-zinc-600' : 'text-zinc-500 dark:text-zinc-300'}`}
             onClick={() => setViewMode('list')}
           >
             List view

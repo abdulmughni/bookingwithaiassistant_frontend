@@ -375,14 +375,14 @@ function BookingsPageInner() {
       <div className="inline-flex rounded-lg border border-zinc-200 bg-white p-1 dark:border-zinc-700 dark:bg-zinc-900">
         <Button
           plain
-          className={`px-3 py-1.5 text-sm ${pageTab === 'calendar' ? 'bg-zinc-100 dark:bg-zinc-800' : ''}`}
+          className={`rounded-md px-3 py-1.5 text-sm ${pageTab === 'calendar' ? 'bg-zinc-900 text-white shadow-sm dark:bg-zinc-600' : 'text-zinc-500 dark:text-zinc-300'}`}
           onClick={() => setPageTab('calendar')}
         >
           Calendar
         </Button>
         <Button
           plain
-          className={`px-3 py-1.5 text-sm ${pageTab === 'list' ? 'bg-zinc-100 dark:bg-zinc-800' : ''}`}
+          className={`rounded-md px-3 py-1.5 text-sm ${pageTab === 'list' ? 'bg-zinc-900 text-white shadow-sm dark:bg-zinc-600' : 'text-zinc-500 dark:text-zinc-300'}`}
           onClick={() => setPageTab('list')}
         >
           List
@@ -484,14 +484,14 @@ function BookingsPageInner() {
           <div className="ml-auto inline-flex rounded-lg border border-zinc-200 bg-white p-1 dark:border-zinc-700 dark:bg-zinc-900">
             <Button
               plain
-              className={`px-3 py-1 text-xs ${layoutMode === 'box' ? 'bg-zinc-100 dark:bg-zinc-800' : ''}`}
+              className={`rounded-md px-3 py-1 text-xs ${layoutMode === 'box' ? 'bg-zinc-900 text-white shadow-sm dark:bg-zinc-600' : 'text-zinc-500 dark:text-zinc-300'}`}
               onClick={() => setLayoutMode('box')}
             >
               Box view
             </Button>
             <Button
               plain
-              className={`px-3 py-1 text-xs ${layoutMode === 'list' ? 'bg-zinc-100 dark:bg-zinc-800' : ''}`}
+              className={`rounded-md px-3 py-1 text-xs ${layoutMode === 'list' ? 'bg-zinc-900 text-white shadow-sm dark:bg-zinc-600' : 'text-zinc-500 dark:text-zinc-300'}`}
               onClick={() => setLayoutMode('list')}
             >
               List view
