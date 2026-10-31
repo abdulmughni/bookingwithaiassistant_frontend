@@ -150,7 +150,13 @@ export function AgencyHome() {
         { label: 'Total bookings', value: bookings.toLocaleString(), trend: range ? '' : 'All time' },
         { label: 'Call minutes', value: minutes.toLocaleString(), trend: range ? '' : 'All time' },
         { label: 'Messages', value: messages.toLocaleString(), trend: range ? '' : 'All time' },
-        { label: 'Revenue this month', value: 'Not tracked', trend: range ? '' : 'All time' },
+        {
+          label: 'Estimated job value',
+          value: `$${Math.round(range ? (activityQuery.data?.estimated_value ?? 0) : (activityQuery.data?.estimated_value_total ?? 0)).toLocaleString()}`,
+          trend: (range ? (activityQuery.data?.estimated_value ?? 0) : (activityQuery.data?.estimated_value_total ?? 0)) > 0
+            ? 'Recorded on bookings'
+            : 'No estimate on bookings yet',
+        },
       ]
   const icons = [UsersIcon, CalendarDaysIcon, PhoneIcon, EnvelopeIcon, BanknotesIcon]
   const needle = query.trim().toLowerCase()
@@ -318,7 +324,7 @@ export function AgencyHome() {
                   ? cardSeries.map((point) => point.call_minutes ?? 0)
                   : index === 3
                     ? cardSeries.map((point) => point.messages)
-                    : []
+                    : cardSeries.map((point) => point.estimated_value ?? 0)
           const falling = spark.length > 1 && spark[spark.length - 1] < spark[0]
           return (
             <KpiStatCard
