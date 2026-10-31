@@ -10,7 +10,7 @@ import clsx from 'clsx'
 import {
   CalendarDaysIcon,
   CheckCircleIcon,
-  ClockIcon,
+  PhoneIcon,
   ChatBubbleLeftRightIcon,
   MagnifyingGlassIcon,
   XMarkIcon,
@@ -72,6 +72,7 @@ function KpiCard({
   stroke,
   series,
   delta,
+  href,
 }: {
   label: string
   value: number | string
@@ -81,6 +82,7 @@ function KpiCard({
   stroke: string
   series?: number[]
   delta?: number | null
+  href?: string
 }) {
   const trendTone = delta == null || delta === 0 ? 'flat' : delta > 0 ? 'up' : 'down'
   const trend = delta == null ? hint : delta === 0 ? 'No change' : `${Math.abs(delta)}% from last month`
@@ -94,6 +96,7 @@ function KpiCard({
       tone={tone}
       stroke={stroke}
       series={series ?? []}
+      href={href}
     />
   )
 }
@@ -151,89 +154,78 @@ function CompletionGauge({
 }) {
   const total = stats?.total_bookings ?? 0
   const completed = stats?.completed_bookings ?? 0
+  const confirmed = stats?.confirmed_bookings ?? 0
+  const cancelled = stats?.cancelled_bookings ?? 0
   const pct = total > 0 ? Math.round((completed / total) * 100) : 0
-
-  // Half-circle gauge geometry
-  const radius = 70
-  const circumference = Math.PI * radius // half circle
+  const radius = 46
+  const circumference = 2 * Math.PI * radius
   const dash = (pct / 100) * circumference
 
   return (
-    <section className={`${dashCardClass} flex h-full min-h-full flex-col rounded-[18px] p-5`}>
-        <h2 className="text-base font-semibold text-zinc-950 dark:text-white">Completion rate</h2>
+    <Link
+      href="/bookings?status=completed"
+      className={`${dashCardClass} flex h-full min-h-full flex-col rounded-[18px] p-5 transition hover:-translate-y-0.5 hover:shadow-md`}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-base font-semibold text-zinc-950 dark:text-white">Completion rate</h2>
+          <p className="mt-0.5 text-xs text-zinc-500">Jobs marked completed</p>
+        </div>
+        <span className="text-xs font-medium text-blue-600">View</span>
+      </div>
 
-        {loading ? (
-          <div className="mt-6 h-40 animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-800" />
-        ) : (
-          <>
-            <div className="relative mx-auto mt-4 w-full max-w-50">
-              <svg viewBox="0 0 180 100" className="w-full">
-                <path
-                  d="M 20 90 A 70 70 0 0 1 160 90"
-                  fill="none"
-                  className="stroke-zinc-100 dark:stroke-zinc-800"
-                  strokeWidth="16"
-                  strokeLinecap="round"
-                />
-                <path
-                  d="M 20 90 A 70 70 0 0 1 160 90"
-                  fill="none"
-                  stroke="url(#gaugeGradient)"
-                  strokeWidth="16"
-                  strokeLinecap="round"
-                  strokeDasharray={`${dash} ${circumference}`}
-                  className="transition-all duration-700"
-                />
-                <defs>
-                  <linearGradient id="gaugeGradient" x1="0" y1="0" x2="1" y2="0">
-                    <stop offset="0%" stopColor="#34d399" />
-                    <stop offset="100%" stopColor="#059669" />
-                  </linearGradient>
-                </defs>
-              </svg>
-              <div className="absolute inset-x-0 bottom-1 text-center">
-                <p className="text-3xl font-semibold tracking-tight text-zinc-950 dark:text-white">
-                  {pct}%
-                </p>
-                <p className="text-xs text-zinc-400 dark:text-zinc-500">completed</p>
-              </div>
-            </div>
-
-            <div className="mt-auto space-y-2 pt-4">
-              <GaugeLegend color="bg-emerald-500" label="Completed" value={completed} />
-              <GaugeLegend
-                color="bg-blue-500"
-                label="Upcoming"
-                value={stats?.upcoming_bookings ?? 0}
+      {loading ? (
+        <div className="mt-6 h-40 animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-800" />
+      ) : (
+        <>
+          <div className="relative mx-auto mt-4 size-36">
+            <svg viewBox="0 0 120 120" className="size-36 -rotate-90">
+              <circle cx="60" cy="60" r={radius} fill="none" className="stroke-zinc-100 dark:stroke-zinc-800" strokeWidth="10" />
+              <circle
+                cx="60"
+                cy="60"
+                r={radius}
+                fill="none"
+                stroke="url(#completionRing)"
+                strokeWidth="10"
+                strokeLinecap="round"
+                strokeDasharray={`${dash} ${circumference}`}
+                className="transition-all duration-700"
               />
-              <GaugeLegend
-                color="bg-zinc-300 dark:bg-zinc-600"
-                label="Cancelled"
-                value={stats?.cancelled_bookings ?? 0}
-              />
+              <defs>
+                <linearGradient id="completionRing" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stopColor="#6ee7b7" />
+                  <stop offset="100%" stopColor="#059669" />
+                </linearGradient>
+              </defs>
+            </svg>
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <p className="text-3xl font-semibold tracking-tight text-zinc-950 dark:text-white">{pct}%</p>
+              <p className="text-[11px] text-zinc-400">completed</p>
             </div>
-          </>
-        )}
-    </section>
+          </div>
+          <p className="mt-3 text-center text-sm text-zinc-600 dark:text-zinc-300">
+            {completed} of {total} bookings finished
+          </p>
+          <div className="mt-auto grid grid-cols-3 gap-2 pt-4">
+            <GaugeStat color="bg-emerald-500" label="Done" value={completed} />
+            <GaugeStat color="bg-blue-500" label="Open" value={confirmed} />
+            <GaugeStat color="bg-zinc-300 dark:bg-zinc-600" label="Cancelled" value={cancelled} />
+          </div>
+        </>
+      )}
+    </Link>
   )
 }
 
-function GaugeLegend({
-  color,
-  label,
-  value,
-}: {
-  color: string
-  label: string
-  value: number
-}) {
+function GaugeStat({ color, label, value }: { color: string; label: string; value: number }) {
   return (
-    <div className="flex items-center justify-between text-sm">
-      <span className="flex items-center gap-2 text-zinc-500 dark:text-zinc-400">
-        <span className={clsx('size-2.5 rounded-full', color)} />
+    <div className="rounded-xl bg-zinc-50 px-2 py-2 text-center dark:bg-zinc-800/60">
+      <p className="text-sm font-semibold tabular-nums text-zinc-900 dark:text-white">{value}</p>
+      <p className="mt-0.5 flex items-center justify-center gap-1 text-[11px] text-zinc-500">
+        <span className={clsx('size-1.5 rounded-full', color)} />
         {label}
-      </span>
-      <span className="font-medium text-zinc-700 dark:text-zinc-200">{value}</span>
+      </p>
     </div>
   )
 }
@@ -435,30 +427,34 @@ function channelStatus(account: ChannelAccount | null) {
 function SocialAccountCard({
   channel,
   account,
+  bookings,
 }: {
   channel: 'facebook' | 'instagram'
   account: ChannelAccount | null
+  bookings: number
 }) {
   const title = channel === 'facebook' ? 'Facebook' : 'Instagram'
+  const [pictureFailed, setPictureFailed] = useState(false)
   const status = channelStatus(account)
   const connected = Boolean(account)
+  const wash = channel === 'facebook'
+    ? 'from-blue-50/90 via-white to-white dark:from-blue-950/40 dark:via-zinc-900 dark:to-zinc-900'
+    : 'from-fuchsia-50/90 via-white to-amber-50/40 dark:from-fuchsia-950/30 dark:via-zinc-900 dark:to-zinc-900'
+  const bar = channel === 'facebook' ? 'bg-blue-500' : 'bg-gradient-to-r from-fuchsia-500 via-rose-500 to-amber-400'
   return (
-    <section className={`${dashCardClass} flex h-full flex-col rounded-[18px] p-5`}>
+    <Link
+      href="/accounts"
+      className={`${dashCardClass} relative flex h-full flex-col overflow-hidden rounded-[18px] bg-gradient-to-b p-5 transition hover:-translate-y-0.5 hover:shadow-md ${wash}`}
+    >
+      <span className={`absolute inset-x-0 top-0 h-1 ${bar}`} />
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <span
-            className={clsx(
-              'flex size-10 shrink-0 items-center justify-center rounded-full ring-1',
-              connected ? 'bg-white ring-zinc-200 dark:bg-zinc-900 dark:ring-zinc-700' : 'bg-zinc-50 ring-zinc-200 dark:bg-zinc-800 dark:ring-zinc-700',
-            )}
-          >
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-zinc-200 dark:bg-zinc-950 dark:ring-zinc-700">
             <ChannelIcon channel={channel} className="size-6" colored />
           </span>
           <div className="min-w-0">
             <h2 className="text-base font-semibold text-zinc-950 dark:text-white">{title}</h2>
-            <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">
-              {connected ? account?.label || 'Connected account' : 'Not linked yet'}
-            </p>
+            <p className="truncate text-xs text-zinc-500">{connected ? 'Page connected' : 'Not linked yet'}</p>
           </div>
         </div>
         <span className={clsx('shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium', status.className)}>
@@ -467,42 +463,53 @@ function SocialAccountCard({
       </div>
       {connected && account ? (
         <div className="mt-4 flex flex-1 flex-col">
-          <p className="text-sm text-zinc-600 dark:text-zinc-300">
-            {account.connection_message ||
-              (account.connection_status === 'verified'
-                ? 'Messages from this account can create bookings.'
-                : 'Finish setup on the accounts page.')}
-          </p>
-          <p className="mt-2 text-xs text-zinc-400">
-            {account.is_active ? 'Active' : 'Inactive'}
-            {account.last_verified_at ? ` · checked ${formatDateTime(account.last_verified_at)}` : ''}
-          </p>
-          <div className="mt-auto pt-4">
-            <Link href="/accounts" className="text-sm font-medium text-blue-600 hover:text-blue-700">
-              Manage
-            </Link>
+          <div className="flex items-center gap-3">
+            {account.picture_url && !pictureFailed ? (
+              // eslint-disable-next-line @next/next/no-img-element -- Meta CDN profile URLs
+              <img
+                src={account.picture_url}
+                alt=""
+                referrerPolicy="no-referrer"
+                onError={() => setPictureFailed(true)}
+                className="size-10 rounded-full object-cover ring-2 ring-white"
+              />
+            ) : (
+              <span className="flex size-10 items-center justify-center rounded-full bg-white text-sm font-semibold text-zinc-500 ring-1 ring-zinc-200">
+                {title.slice(0, 1)}
+              </span>
+            )}
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-zinc-950 dark:text-white">{account.label || title}</p>
+              <p className="truncate text-xs text-zinc-500">{account.connection_message || 'Ready for new messages'}</p>
+            </div>
           </div>
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <div className="rounded-xl bg-white/80 px-3 py-2 ring-1 ring-zinc-200/80 dark:bg-zinc-950/40 dark:ring-zinc-700">
+              <p className="text-lg font-semibold tabular-nums text-zinc-950 dark:text-white">{bookings}</p>
+              <p className="text-[11px] text-zinc-500">Bookings from here</p>
+            </div>
+            <div className="rounded-xl bg-white/80 px-3 py-2 ring-1 ring-zinc-200/80 dark:bg-zinc-950/40 dark:ring-zinc-700">
+              <p className="text-lg font-semibold text-zinc-950 dark:text-white">{account.ai_enabled === false ? 'Off' : 'On'}</p>
+              <p className="text-[11px] text-zinc-500">AI replies</p>
+            </div>
+          </div>
+          <p className="mt-auto pt-4 text-sm font-medium text-blue-600">Open accounts</p>
         </div>
       ) : (
         <div className="mt-4 flex flex-1 flex-col">
-          <div className="rounded-2xl border border-dashed border-zinc-200 bg-zinc-50/80 px-4 py-5 dark:border-zinc-700 dark:bg-zinc-800/40">
-            <p className="text-sm font-medium text-zinc-800 dark:text-zinc-100">
-              {channel === 'facebook' ? 'Connect Facebook Messenger' : 'Connect Instagram'}
-            </p>
-            <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-              {channel === 'facebook'
-                ? 'Page messages show up here once the account is connected.'
-                : 'Instagram messages show up here once the account is connected.'}
-            </p>
-          </div>
-          <div className="mt-auto pt-4">
-            <Button href="/accounts" color="brand">
-              Connect
-            </Button>
-          </div>
+          <p className="text-sm text-zinc-600 dark:text-zinc-300">
+            {channel === 'facebook'
+              ? 'Connect a Facebook Page so Messenger chats can turn into bookings.'
+              : 'Connect Instagram so direct messages can turn into bookings.'}
+          </p>
+          <ul className="mt-3 space-y-1.5 text-xs text-zinc-500">
+            <li>Messages land in Conversations</li>
+            <li>The assistant can book from the chat</li>
+          </ul>
+          <p className="mt-auto pt-4 text-sm font-semibold text-blue-600">Connect {title}</p>
         </div>
       )}
-    </section>
+    </Link>
   )
 }
 
@@ -710,6 +717,7 @@ function DashboardPageInner() {
               stroke="#60a5fa"
               series={statsView?.daily?.map((point) => point.count)}
               delta={percentChange(statsView?.total_bookings ?? 0, statsView?.previous_total_bookings)}
+              href="/bookings"
             />
             <KpiCard
               label="Completed"
@@ -720,16 +728,17 @@ function DashboardPageInner() {
               stroke="#34d399"
               series={statsView?.completed_daily?.map((point) => point.count)}
               delta={percentChange(statsView?.completed_bookings ?? 0, statsView?.previous_completed_bookings)}
+              href="/bookings?status=completed"
             />
             <KpiCard
-              label="Upcoming"
-              value={statsView?.upcoming_bookings ?? 0}
-              hint="Scheduled ahead"
-              icon={<ClockIcon className="size-5" />}
+              label="Calls"
+              value={statsView?.total_calls ?? statsView?.call_daily?.reduce((sum, point) => sum + point.count, 0) ?? 0}
+              hint="Handled by your assistant"
+              icon={<PhoneIcon className="size-5" />}
               tone="bg-violet-100 text-violet-500"
               stroke="#a78bfa"
-              series={statsView?.upcoming_daily?.map((point) => point.count)}
-              delta={percentChange(statsView?.upcoming_bookings ?? 0, statsView?.previous_upcoming_bookings)}
+              series={statsView?.call_daily?.map((point) => point.count)}
+              href="/calls"
             />
             <KpiCard
               label="Active conversations"
@@ -744,6 +753,7 @@ function DashboardPageInner() {
               stroke="#fb923c"
               series={statsView?.conversation_daily?.map((point) => point.count)}
               delta={percentChange(statsView?.active_conversations ?? 0, statsView?.previous_active_conversations)}
+              href="/conversations"
             />
           </>
         )}
@@ -823,8 +833,16 @@ function DashboardPageInner() {
 
       <div className="grid grid-cols-1 items-stretch gap-4 lg:grid-cols-3">
         <CompletionGauge stats={statsView} loading={statsBusy} />
-        <SocialAccountCard channel="facebook" account={pickChannel(channelsQuery.data, 'facebook')} />
-        <SocialAccountCard channel="instagram" account={pickChannel(channelsQuery.data, 'instagram')} />
+        <SocialAccountCard
+          channel="facebook"
+          account={pickChannel(channelsQuery.data, 'facebook')}
+          bookings={(bookingsQuery.data ?? []).filter((booking) => booking.source_channel === 'facebook').length}
+        />
+        <SocialAccountCard
+          channel="instagram"
+          account={pickChannel(channelsQuery.data, 'instagram')}
+          bookings={(bookingsQuery.data ?? []).filter((booking) => booking.source_channel === 'instagram').length}
+        />
       </div>
     </PageShell>
   )

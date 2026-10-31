@@ -71,6 +71,7 @@ export interface TenantStats {
   upcoming_bookings: number
   active_conversations: number
   total_channel_accounts: number
+  total_calls?: number
   /** Present when the dashboard asked for a start and end date. */
   daily?: { date: string; count: number }[]
   completed_daily?: { date: string; count: number }[]
@@ -791,6 +792,7 @@ export interface AgencyActivityPoint {
   calls: number
   messages: number
   call_minutes?: number
+  estimated_value?: number
 }
 
 export interface AgencyActivityClient {
@@ -813,6 +815,10 @@ export interface AgencyActivity {
   series: AgencyActivityPoint[]
   clients: AgencyActivityClient[]
   recent: AgencyActivityEvent[]
+  /** Estimated job value inside the activity window. */
+  estimated_value?: number
+  /** Estimated job value across every booking for this agency. */
+  estimated_value_total?: number
 }
 
 export interface SetupRequest {

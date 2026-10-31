@@ -16,6 +16,7 @@ import {
   ChatBubbleBottomCenterTextIcon,
   SpeakerWaveIcon,
   CalendarDaysIcon,
+  ArrowDownTrayIcon,
 } from '@heroicons/react/20/solid'
 import { Button } from '@/components/button'
 import { FilterPanel, PageHeader, PageShell } from '@/components/dashboard-ui'
@@ -54,6 +55,62 @@ function formatDuration(seconds: number | null): string {
   const m = Math.floor(seconds / 60)
   const s = seconds % 60
   return s === 0 ? `${m}m` : `${m}m ${s}s`
+}
+
+function recordingFilename(callId: string, blob: Blob): string {
+  const type = (blob.type || '').toLowerCase()
+  const ext = type.includes('mpeg') || type.includes('mp3') ? 'mp3' : 'wav'
+  return `call-${callId}.${ext}`
+}
+
+function CallRecordingPlayer({ callId }: { callId: string }) {
+  const getToken = useApiToken()
+  const [src, setSrc] = useState<string | null>(null)
+  const [filename, setFilename] = useState('call-recording.wav')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let objectUrl: string | null = null
+    let cancelled = false
+    setLoading(true)
+    setError(null)
+    setSrc(null)
+    ;(async () => {
+      try {
+        const token = await getToken()
+        const blob = await api.calls.recording(token, callId)
+        if (cancelled) return
+        objectUrl = URL.createObjectURL(blob)
+        setFilename(recordingFilename(callId, blob))
+        setSrc(objectUrl)
+      } catch (e) {
+        if (!cancelled) setError(e instanceof Error ? e.message : 'Recording could not be loaded')
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+  }, [callId, getToken])
+
+  if (loading) return <p className="text-sm text-zinc-500">Loading recording…</p>
+  if (error || !src) return <p className="text-sm text-red-600">{error || 'Recording could not be loaded'}</p>
+  return (
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+      <audio controls preload="metadata" src={src} className="h-11 w-full flex-1 accent-brand-600" />
+      <a
+        href={src}
+        download={filename}
+        className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold text-zinc-800 hover:bg-zinc-50"
+      >
+        <ArrowDownTrayIcon className="size-4" />
+        Download
+      </a>
+    </div>
+  )
 }
 
 function formatCost(cost: number | null): string {
@@ -640,17 +697,12 @@ export default function CallsPage() {
                         <div>
                           <h3 className="text-sm font-semibold text-zinc-950 dark:text-white">Recording</h3>
                           <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                            Play when the call has finished processing
+                            Loaded through your account so playback is not blocked
                           </p>
                         </div>
                       </div>
                       <div className="p-4 pt-3">
-                        <audio
-                          controls
-                          src={detail.recording_url}
-                          className="h-11 w-full accent-brand-600 dark:accent-brand-500"
-                          preload="none"
-                        />
+                        <CallRecordingPlayer callId={detail.id} />
                       </div>
                     </section>
                   )}

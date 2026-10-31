@@ -136,8 +136,9 @@ interface FormState {
   initialSlot?: string | null
 }
 
+const BOOKING_STATUSES = ['confirmed', 'rescheduled', 'completed', 'cancelled', 'no_show']
+
 function BookingsPageInner() {
-  const [statusFilter, setStatusFilter] = useState('')
   const [phoneSearch, setPhoneSearch] = useState('')
   const [scheduleDateFrom, setScheduleDateFrom] = useState('')
   const [scheduleDateTo, setScheduleDateTo] = useState('')
@@ -150,6 +151,16 @@ function BookingsPageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const deepLinkedRef = useRef<string | null>(null)
+  const statusFromUrl = searchParams.get('status') || ''
+  const statusFilter = BOOKING_STATUSES.includes(statusFromUrl) ? statusFromUrl : ''
+
+  const setStatusFilter = (value: string) => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (value) params.set('status', value)
+    else params.delete('status')
+    const q = params.toString()
+    router.replace(q ? `/bookings?${q}` : '/bookings', { scroll: false })
+  }
 
   const pageTab: PageTab =
     searchParams.get('view') === 'calendar' ? 'calendar' : 'list'
@@ -382,9 +393,7 @@ function BookingsPageInner() {
         <div className="w-40">
           <Select
             value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value)
-            }}
+            onChange={(e) => setStatusFilter(e.target.value)}
           >
             <option value="">All statuses</option>
             <option value="confirmed">Confirmed</option>

@@ -93,6 +93,7 @@ function MetricCard({
   href,
   money,
   allTime = false,
+  caption,
 }: {
   label: string
   metric: DashboardMetric
@@ -102,11 +103,16 @@ function MetricCard({
   href?: string
   money?: boolean
   allTime?: boolean
+  caption?: string
 }) {
   const shown = money
     ? `$${Math.round(metric.value).toLocaleString()}`
     : Math.round(metric.value).toLocaleString()
-  const trend = allTime ? { text: 'All time', tone: 'flat' as const } : metricTrend(metric)
+  const trend = caption
+    ? { text: caption, tone: 'flat' as const }
+    : allTime
+      ? { text: 'All time', tone: 'flat' as const }
+      : metricTrend(metric)
   return (
     <KpiStatCard
       label={label}
@@ -482,7 +488,16 @@ function SuperAdminOverview() {
             <MetricCard allTime={!range} label="Conversations" metric={stats.conversations} icon={<ChatBubbleLeftRightIcon className="size-5" />} tone="bg-sky-100 text-sky-500" stroke="#38bdf8" />
             <MetricCard allTime={!range} label="Calls" metric={stats.calls} icon={<PhoneIcon className="size-5" />} tone="bg-emerald-100 text-emerald-500" stroke="#34d399" />
             <MetricCard allTime={!range} label="Messages" metric={stats.messages} icon={<EnvelopeIcon className="size-5" />} tone="bg-orange-100 text-orange-500" stroke="#fb923c" />
-            <MetricCard allTime={!range} label="$ recovered" metric={stats.recovered} money icon={<BanknotesIcon className="size-5" />} tone="bg-rose-100 text-rose-500" stroke="#fb7185" />
+            <MetricCard
+              allTime={!range}
+              label="Estimated job value"
+              caption="Sum of estimates saved on bookings"
+              metric={stats.recovered}
+              money
+              icon={<BanknotesIcon className="size-5" />}
+              tone="bg-rose-100 text-rose-500"
+              stroke="#fb7185"
+            />
           </div>
           <div className="grid items-stretch gap-4 xl:grid-cols-2">
             <FunnelPanel funnel={stats.funnel} range={range} onChange={setRange} />
