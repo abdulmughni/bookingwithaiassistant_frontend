@@ -44,7 +44,7 @@ import { useAgencyBrand, useApiData, useIsAdmin } from '@/lib/hooks'
 import { api } from '@/lib/api'
 
 const superAdminNav = [
-  { label: 'Overview', href: '/admin', icon: ChartBarSquareIcon, exact: true },
+  { label: 'Dashboard', href: '/admin', icon: ChartBarSquareIcon, exact: true },
   { label: 'Agencies', href: '/admin/agencies', icon: BuildingOffice2Icon, exact: false },
   { label: 'Clients', href: '/admin/clients', icon: UsersIcon, exact: false },
   { label: 'Plans', href: '/admin/plans', icon: CreditCardIcon, exact: false },
@@ -53,7 +53,7 @@ const superAdminNav = [
 ]
 
 const agencyNav = [
-  { label: 'Home', href: '/admin', icon: HomeIcon, exact: true },
+  { label: 'Dashboard', href: '/admin', icon: HomeIcon, exact: true },
   { label: 'Clients', href: '/admin/clients', icon: UsersIcon, exact: false },
   { label: 'Bookings', href: '/admin/activity?view=bookings', icon: CalendarDaysIcon, exact: false, view: 'bookings' },
   { label: 'Conversations', href: '/admin/activity?view=conversations', icon: ChatBubbleLeftRightIcon, exact: false, view: 'conversations' },
@@ -61,7 +61,7 @@ const agencyNav = [
   { label: 'Messages', href: '/admin/activity?view=messages', icon: EnvelopeIcon, exact: false, view: 'messages' },
   { label: 'AI Assistants', href: '/admin/activity?view=assistants', icon: SparklesIcon, exact: false, view: 'assistants' },
   { label: 'Team Members', href: '/admin/team', icon: UserGroupIcon, exact: false },
-  { label: 'Billing & Plans', href: '/admin/credits', icon: CreditCardIcon, exact: false },
+  { label: 'Plans & billing', href: '/admin/credits', icon: CreditCardIcon, exact: false },
   { label: 'Settings', href: '/admin/settings', icon: Cog6ToothIcon, exact: true },
 ]
 

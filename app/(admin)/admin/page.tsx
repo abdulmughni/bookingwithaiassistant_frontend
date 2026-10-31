@@ -456,10 +456,10 @@ function SuperAdminOverview() {
         </div>
         </div>
         <div>
-          <h1 className="text-[1.7rem] font-semibold tracking-tight text-zinc-950 sm:text-3xl">
+          <h1 className="portal-title text-[1.7rem] font-semibold tracking-tight sm:text-3xl">
             Welcome back{welcomeName ? `, ${welcomeName}` : ''} <span aria-hidden>👋</span>
           </h1>
-          <p className="mt-1 text-sm text-zinc-500">Here&apos;s what&apos;s happening across your platform today.</p>
+          <p className="portal-subtitle mt-1 text-sm">Here&apos;s what&apos;s happening across your platform today.</p>
         </div>
       </div>
 
@@ -491,7 +491,7 @@ function SuperAdminOverview() {
             <MetricCard
               allTime={!range}
               label="Estimated job value"
-              caption="Sum of estimates saved on bookings"
+              caption="Estimates on client bookings, not plan fees"
               metric={stats.recovered}
               money
               icon={<BanknotesIcon className="size-5" />}

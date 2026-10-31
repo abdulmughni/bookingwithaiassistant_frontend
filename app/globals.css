@@ -944,13 +944,19 @@ html.dark[data-agency-theme] .bg-zinc-50\/90 {
   color: #f4f4f5;
 }
 html.dark[data-agency-theme] .agency-canvas {
-  background-color: color-mix(in srgb, var(--brand-page) 72%, #050608) !important;
+  background-color: #101218 !important;
   background-image:
-    radial-gradient(1100px 520px at 82% -12%, color-mix(in srgb, var(--brand-primary) 34%, transparent), transparent 62%),
-    radial-gradient(860px 460px at 0% 8%, color-mix(in srgb, var(--brand-accent) 28%, transparent), transparent 58%) !important;
+    radial-gradient(1100px 520px at 82% -12%, color-mix(in srgb, var(--brand-primary) 22%, transparent), transparent 62%),
+    radial-gradient(860px 460px at 0% 8%, color-mix(in srgb, var(--brand-accent) 16%, transparent), transparent 58%) !important;
   background-attachment: fixed;
   color: #f4f4f5;
 }
+.portal-title { color: #18181b; }
+.portal-subtitle { color: #71717a; }
+html[data-agency-theme]:not(.dark) .portal-title { color: var(--brand-text) !important; }
+html[data-agency-theme]:not(.dark) .portal-subtitle { color: var(--brand-subtext) !important; }
+html.dark .portal-title { color: #fafafa !important; }
+html.dark .portal-subtitle { color: #d4d4d8 !important; }
 html.dark[data-agency-theme] .agency-surface,
 html.dark[data-agency-theme] .bg-white,
 html.dark[data-agency-theme] .agency-plan {
