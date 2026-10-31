@@ -1,7 +1,8 @@
 'use client'
 
 import { Suspense, useEffect, useMemo, useState } from 'react'
-import { useAuth, useOrganization, useUser } from '@clerk/nextjs'
+import { useAuth, useOrganization } from '@clerk/nextjs'
+import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/react'
 import clsx from 'clsx'
@@ -11,6 +12,8 @@ import {
   CheckCircleIcon,
   ClockIcon,
   ChatBubbleLeftRightIcon,
+  MagnifyingGlassIcon,
+  XMarkIcon,
 } from '@heroicons/react/20/solid'
 import { ChevronDownIcon } from '@heroicons/react/16/solid'
 import { ActivityBars } from '@/components/activity-bars'
@@ -334,7 +337,12 @@ function UpcomingList({
   tz: string
   loading: boolean
 }) {
-  const items = (bookings ?? []).slice(0, 6)
+  const [find, setFind] = useState('')
+  const needle = find.trim().toLowerCase()
+  const items = (bookings ?? []).filter((booking) => {
+    if (!needle) return true
+    return `${booking.customer_name ?? ''} ${booking.service_type ?? ''}`.toLowerCase().includes(needle)
+  })
 
   return (
     <section className={`${dashCardClass} flex h-full flex-col rounded-[18px] p-5`}>
@@ -345,6 +353,25 @@ function UpcomingList({
             <ArrowUpRightIcon data-slot="icon" />
           </Button>
         </div>
+        <label className="group relative mt-2.5 block">
+          <MagnifyingGlassIcon className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-zinc-400 transition group-focus-within:text-blue-500" />
+          <input
+            value={find}
+            onChange={(event) => setFind(event.target.value)}
+            placeholder="Search appointments"
+            className="h-8 w-full rounded-lg bg-zinc-100/60 pr-7 pl-8 text-[13px] text-zinc-700 outline-none transition placeholder:text-zinc-400 focus:bg-zinc-100"
+          />
+          {find ? (
+            <button
+              type="button"
+              aria-label="Clear search"
+              onClick={() => setFind('')}
+              className="absolute top-1/2 right-1.5 inline-flex size-5 -translate-y-1/2 items-center justify-center rounded-full text-zinc-400 transition hover:bg-white hover:text-zinc-700"
+            >
+              <XMarkIcon className="size-3.5" />
+            </button>
+          ) : null}
+        </label>
 
         {loading ? (
           <div className="mt-4 space-y-3">
@@ -356,7 +383,7 @@ function UpcomingList({
             ))}
           </div>
         ) : items.length > 0 ? (
-          <ul className="mt-4 divide-y divide-zinc-950/5 dark:divide-white/5">
+          <ul className="scroll-hide mt-3 max-h-[18.25rem] divide-y divide-zinc-950/5 overflow-y-auto overscroll-contain dark:divide-white/5">
             {items.map((b, i) => (
               <li key={b.id}>
                 <a
@@ -404,7 +431,6 @@ function UpcomingList({
 // ---------------------------------------------------------------------------
 
 function DashboardPageInner() {
-  const { user } = useUser()
   const { organization } = useOrganization()
   const { orgId } = useAuth()
   const router = useRouter()
@@ -443,6 +469,7 @@ function DashboardPageInner() {
   const [draftStart, setDraftStart] = useState(range?.start ?? '')
   const [draftEnd, setDraftEnd] = useState(range?.end ?? '')
   const [rangeOpen, setRangeOpen] = useState(false)
+  const [pageFind, setPageFind] = useState('')
   useEffect(() => {
     setDraftStart(range?.start ?? '')
     setDraftEnd(range?.end ?? '')
@@ -499,13 +526,18 @@ function DashboardPageInner() {
 
   return (
     <PageShell>
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <p className="text-sm text-zinc-500">Welcome back{user?.firstName ? `, ${user.firstName}` : ''}</p>
-          <h1 className="mt-0.5 truncate text-3xl font-semibold tracking-tight text-zinc-950 dark:text-white">{businessName}</h1>
-          <p className="mt-1 text-sm text-zinc-500">Here is your booking activity at a glance.</p>
-        </div>
-        <div className="flex shrink-0 flex-nowrap items-center gap-2">
+      <div className="flex flex-col gap-5">
+        <div className="flex w-full flex-wrap items-center gap-3">
+          <label className="relative w-full max-w-[50%]">
+            <MagnifyingGlassIcon className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
+            <input
+              value={pageFind}
+              onChange={(event) => setPageFind(event.target.value)}
+              placeholder="Search appointments..."
+              className="h-11 w-full rounded-full border border-zinc-200/80 bg-white pr-4 pl-11 text-sm text-zinc-700 shadow-sm outline-none placeholder:text-zinc-400 focus:ring-2 focus:ring-blue-200"
+            />
+          </label>
+          <div className="ml-auto flex flex-wrap items-center gap-2">
           <div className="inline-flex h-11 items-center rounded-full bg-white p-1 shadow-sm ring-1 ring-zinc-200">
             {(
               [
@@ -590,13 +622,20 @@ function DashboardPageInner() {
               </div>
             ) : null}
           </div>
-          <Button href="/conversations" outline>
+          <Link href="/conversations" className="inline-flex h-11 items-center rounded-full bg-white px-4 text-sm font-semibold text-zinc-700 shadow-sm ring-1 ring-zinc-200">
             Conversations
-          </Button>
-          <Button href="/bookings" color="brand">
+          </Link>
+          <Link href="/bookings" className="inline-flex h-11 items-center rounded-full bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700">
             View bookings
-          </Button>
-          <NotificationBell />
+          </Link>
+          <NotificationBell circle />
+          </div>
+        </div>
+        <div>
+          <h1 className="truncate text-[1.7rem] font-semibold tracking-tight text-zinc-950 sm:text-3xl">
+            Welcome back, {businessName} <span aria-hidden>👋</span>
+          </h1>
+          <p className="mt-1 text-sm text-zinc-500">Here is your booking activity at a glance.</p>
         </div>
       </div>
 
@@ -723,7 +762,11 @@ function DashboardPageInner() {
         </div>
         <div className="h-full lg:col-span-2">
           <UpcomingList
-            bookings={sortedUpcoming}
+            bookings={sortedUpcoming.filter((booking) => {
+              const needle = pageFind.trim().toLowerCase()
+              if (!needle) return true
+              return `${booking.customer_name ?? ''} ${booking.service_type ?? ''}`.toLowerCase().includes(needle)
+            })}
             tz={tenantTz}
             loading={upcomingLoading}
           />
