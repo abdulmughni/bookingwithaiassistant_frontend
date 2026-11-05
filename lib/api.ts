@@ -631,11 +631,11 @@ export const api = {
       ),
     listStaff: (token: string) =>
       request<import('./types').AgencyStaffList>('/api/admin/agency/staff', { token }),
-    inviteStaff: (token: string, email: string) =>
+    inviteStaff: (token: string, body: { email: string; name: string }) =>
       request<import('./types').AgencyStaffMember>('/api/admin/agency/staff', {
         token,
         method: 'POST',
-        body: JSON.stringify({ email }),
+        body: JSON.stringify(body),
       }),
     removeStaff: (token: string, staffId: string) =>
       request<void>(`/api/admin/agency/staff/${encodeURIComponent(staffId)}`, {

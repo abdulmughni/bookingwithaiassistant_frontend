@@ -422,10 +422,12 @@ function AgencyProfileCard({
   const { openUserProfile, signOut } = useClerk()
   if (!user) return null
   const email = user.primaryEmailAddress?.emailAddress ?? ''
-  const name = user.fullName || user.firstName || email || 'Account'
+  const personName = (user.fullName || user.firstName || '').trim()
+  const name = personName && personName.toLowerCase() !== email.toLowerCase() ? personName : ''
+  const title = name || email || 'Account'
   const role = staff ? 'Team member' : 'Agency owner'
-  const initials = name
-    .split(/\s+/)
+  const initials = (name || email || 'A')
+    .split(/[\s@._-]+/)
     .filter(Boolean)
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase() ?? '')
@@ -455,7 +457,7 @@ function AgencyProfileCard({
         {compact ? null : (
           <>
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-medium text-zinc-800">{email || name}</span>
+              <span className="block truncate text-sm font-medium text-zinc-800">{title}</span>
               <span className="block truncate text-[11px] text-zinc-400">{role}</span>
             </span>
             <span className="shrink-0 text-zinc-300" aria-hidden>›</span>
@@ -466,7 +468,7 @@ function AgencyProfileCard({
 
   return (
     <Menu as="div" className={clsx('relative', compact && 'flex justify-center')}>
-      {compact ? <Tip content={email || name}>{button}</Tip> : button}
+      {compact ? <Tip content={title}>{button}</Tip> : button}
       <MenuItems
         transition
         anchor="top start"
@@ -475,8 +477,8 @@ function AgencyProfileCard({
         <div className="flex items-center gap-3 rounded-xl bg-zinc-50 px-2.5 py-2.5 dark:bg-white/8">
           {avatar}
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-zinc-950 dark:text-white">{name}</p>
-            <p className="truncate text-xs text-zinc-500">{email}</p>
+            <p className="text-sm font-semibold break-all text-zinc-950 dark:text-white">{title}</p>
+            {name && email ? <p className="mt-0.5 text-xs break-all text-zinc-500">{email}</p> : null}
           </div>
         </div>
         <div className="mt-2 space-y-1 px-2.5 py-1 text-xs text-zinc-500">

@@ -141,10 +141,13 @@ function AppearanceMode() {
 export function AgencyBrandForm({
   agencyId,
   showLogo = true,
+  part = 'all',
   persist = 'account',
 }: {
   agencyId?: string
   showLogo?: boolean
+  /** Logo sits with the agency name. Colors stay on their own tab. */
+  part?: 'all' | 'logo' | 'colors'
   /** Browser keeps the admin console palette on this device. Account saves to the signed-in company. */
   persist?: 'account' | 'browser'
 }) {
@@ -235,11 +238,13 @@ export function AgencyBrandForm({
   }
 
   const preview = brandAssetUrl(logoUrl)
+  const showIdentity = showLogo && part !== 'colors'
+  const showPalette = part !== 'logo'
 
   return (
     <div className="space-y-6">
-      <AppearanceMode />
-      {showLogo ? <div className="flex flex-wrap items-center gap-4">
+      {showPalette ? <AppearanceMode /> : null}
+      {showIdentity ? <div className="flex flex-wrap items-center gap-4">
         <div className="flex size-16 items-center justify-center overflow-hidden rounded-xl border border-zinc-200 bg-white">
           {preview ? (
             <BrandLogo src={preview} alt="" height={48} className="max-h-12 max-w-14" />
@@ -261,6 +266,7 @@ export function AgencyBrandForm({
         </div>
       </div> : null}
 
+      {showPalette ? <>
       <div>
         <p className="text-sm font-medium text-zinc-950 dark:text-white">Presets</p>
         <p className="mt-0.5 text-xs text-zinc-500">
@@ -322,6 +328,7 @@ export function AgencyBrandForm({
         </div>
         <BrandPreview colors={colors} logoUrl={preview} />
       </div>
+      </> : null}
     </div>
   )
 }
