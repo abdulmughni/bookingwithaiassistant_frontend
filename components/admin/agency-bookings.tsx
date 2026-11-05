@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import Link from 'next/link'
 
 import { ChannelIcon, type SourceChannel } from '@/components/channel-icon'
+import { Dialog, DialogBody, DialogTitle } from '@/components/dialog'
 import { PageHeader, PageShell, SkeletonBlock, dashCardClass } from '@/components/dashboard-ui'
 import { Input } from '@/components/input'
 import { Select } from '@/components/select'
@@ -155,19 +156,17 @@ export function AgencyBookings() {
     <PageShell>
       <PageHeader
         title="Bookings"
-        description="Check each client in order: whether they are live, how much of their pack is left, where jobs came from, then the jobs themselves."
+        description="Each client’s latest jobs, and where they were booked."
       />
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Summary label="Clients in view" value={totals.clients} />
-        <Summary label="Bookings" value={totals.bookings} />
-        <Summary label="Still open" value={totals.open} />
-        <Summary label="Completed" value={totals.done} />
-      </div>
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Summary label="Facebook" value={totals.facebook} />
-        <Summary label="Instagram" value={totals.instagram} />
-        <Summary label="Phone calls" value={totals.call} />
+      <div className={`${dashCardClass} flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2.5`}>
+        <StripStat value={totals.bookings} label="Bookings" />
+        <StripStat value={totals.open} label="Open" />
+        <StripStat value={totals.done} label="Completed" />
+        <span className="hidden h-4 w-px bg-zinc-200 sm:block dark:bg-zinc-700" />
+        <StripStat value={totals.facebook} label="Facebook" />
+        <StripStat value={totals.instagram} label="Instagram" />
+        <StripStat value={totals.call} label="Phone" />
       </div>
 
       <div className={`${dashCardClass} grid gap-3 p-4 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)]`}>
@@ -213,12 +212,12 @@ export function AgencyBookings() {
   )
 }
 
-function Summary({ label, value }: { label: string; value: number }) {
+function StripStat({ value, label }: { value: number; label: string }) {
   return (
-    <div className={`${dashCardClass} px-4 py-3`}>
-      <p className="text-xs font-medium text-zinc-500">{label}</p>
-      <p className="mt-1 text-2xl font-semibold tabular-nums text-zinc-950 dark:text-white">{value}</p>
-    </div>
+    <p className="text-sm text-zinc-500">
+      <span className="mr-1.5 text-base font-semibold tabular-nums text-zinc-950 dark:text-white">{value}</span>
+      {label}
+    </p>
   )
 }
 
@@ -231,8 +230,8 @@ function ClientProgress({
   rows: Row[]
   recent: AgencyActivityClient | undefined
 }) {
-  const [open, setOpen] = useState(false)
-  const shown = open ? rows : rows.slice(0, 4)
+  const [allOpen, setAllOpen] = useState(false)
+  const shown = rows.slice(0, 4)
   const counts = {
     facebook: rows.filter((row) => row.source_channel.toLowerCase() === 'facebook').length,
     instagram: rows.filter((row) => row.source_channel.toLowerCase() === 'instagram').length,
@@ -240,7 +239,6 @@ function ClientProgress({
   }
   const usage = client.usage
   const minutesPct = usage && usage.call_minutes_quota > 0 ? Math.min(100, Math.round((usage.call_minutes_used / usage.call_minutes_quota) * 100)) : 0
-  const messagesPct = usage && usage.messages_quota > 0 ? Math.min(100, Math.round((usage.messages_used / usage.messages_quota) * 100)) : 0
 
   return (
     <section className={`${dashCardClass} overflow-hidden`}>
@@ -263,22 +261,23 @@ function ClientProgress({
         </Link>
       </div>
 
-      <div className="grid gap-3 px-5 py-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Fact label="Bookings" value={client.bookings_count} hint="All time" />
-        <Fact label="Conversations" value={client.conversations_count} hint="All time" />
-        <Fact label="Calls" value={recent?.calls ?? 0} hint="Last 30 days" />
-        <Fact label="Messages" value={recent?.messages ?? 0} hint="Last 30 days" />
-      </div>
-
-      <div className="grid gap-4 px-5 pb-4 md:grid-cols-2">
-        <Meter label="Call minutes" used={usage?.call_minutes_used ?? 0} quota={usage?.call_minutes_quota ?? 0} pct={minutesPct} tone={quotaTone(usage?.quota_state || 'no_plan')} />
-        <Meter label="Messages in the pack" used={usage?.messages_used ?? 0} quota={usage?.messages_quota ?? 0} pct={messagesPct} tone={quotaTone(usage?.quota_state || 'no_plan')} />
-      </div>
-
-      <div className="flex flex-wrap gap-2 px-5 pb-4 text-sm">
-        <SourceCount channel="facebook" label="Facebook" count={counts.facebook} />
-        <SourceCount channel="instagram" label="Instagram" count={counts.instagram} />
-        <SourceCount channel="call" label="Phone call" count={counts.call} />
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3 text-sm text-zinc-500">
+        <span><b className="font-semibold text-zinc-950 dark:text-white">{client.bookings_count}</b> bookings</span>
+        <span><b className="font-semibold text-zinc-950 dark:text-white">{client.conversations_count}</b> conversations</span>
+        <span><b className="font-semibold text-zinc-950 dark:text-white">{recent?.calls ?? 0}</b> calls</span>
+        <span><b className="font-semibold text-zinc-950 dark:text-white">{recent?.messages ?? 0}</b> messages</span>
+        <span className="inline-flex items-center gap-1"><ChannelIcon channel="facebook" className="size-3.5" colored /> {counts.facebook}</span>
+        <span className="inline-flex items-center gap-1"><ChannelIcon channel="instagram" className="size-3.5" colored /> {counts.instagram}</span>
+        <span className="inline-flex items-center gap-1"><ChannelIcon channel="call" className="size-3.5" colored /> {counts.call}</span>
+        <span className="min-w-36 flex-1">
+          <span className="mb-1 flex justify-between text-[11px]">
+            <span>Minutes</span>
+            <span className="tabular-nums">{usage?.call_minutes_used ?? 0}/{usage?.call_minutes_quota || '—'}</span>
+          </span>
+          <span className="block h-1.5 overflow-hidden rounded-full bg-zinc-200 dark:bg-white/15">
+            <span className={`block h-full rounded-full ${quotaTone(usage?.quota_state || 'no_plan')}`} style={{ width: `${minutesPct}%` }} />
+          </span>
+        </span>
       </div>
 
       {rows.length === 0 ? (
@@ -286,44 +285,59 @@ function ClientProgress({
       ) : (
         <div className="border-t border-zinc-100 dark:border-zinc-800">
           <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
-              <thead className="text-xs uppercase tracking-wide text-zinc-500">
-                <tr>
-                  <th className="px-5 py-2 font-medium">Customer</th>
-                  <th className="px-3 py-2 font-medium">Service</th>
-                  <th className="px-3 py-2 font-medium">When</th>
-                  <th className="px-3 py-2 font-medium">Status</th>
-                  <th className="px-5 py-2 font-medium">Booked from</th>
-                </tr>
-              </thead>
-              <tbody>
-                {shown.map((row) => (
-                  <tr key={row.id} className="border-t border-zinc-100 dark:border-zinc-800">
-                    <td className="px-5 py-3 font-medium text-zinc-950 dark:text-white">{row.customer_name || 'Unknown customer'}</td>
-                    <td className="px-3 py-3 text-zinc-600 dark:text-zinc-300">{row.service_type || '—'}</td>
-                    <td className="px-3 py-3 whitespace-nowrap text-zinc-600 dark:text-zinc-300">{whenLabel(row)}</td>
-                    <td className="px-3 py-3 text-zinc-600 dark:text-zinc-300">{statusName(row.status)}</td>
-                    <td className="px-5 py-3">
-                      <span className="inline-flex items-center gap-2 text-zinc-800 dark:text-zinc-100">
-                        <ChannelIcon channel={row.source_channel as SourceChannel} className="size-4" colored />
-                        {sourceName(row.source_channel)}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <BookingTable rows={shown} />
           </div>
           {rows.length > 4 ? (
             <div className="px-5 py-3">
-              <button type="button" className="text-sm font-medium text-blue-600" onClick={() => setOpen((value) => !value)}>
-                {open ? 'Show fewer' : `Show all ${rows.length}`}
+              <button type="button" className="text-sm font-medium text-blue-600" onClick={() => setAllOpen(true)}>
+                View all {rows.length}
               </button>
             </div>
           ) : null}
         </div>
       )}
+      <Dialog open={allOpen} onClose={setAllOpen} size="5xl">
+        <DialogTitle>{client.name}</DialogTitle>
+        <DialogBody>
+          <p className="text-sm text-zinc-500">{rows.length} bookings · {accountLabel(client.account_status)} · {client.plan?.name || 'No pack'}</p>
+          <div className="mt-4 max-h-[60vh] overflow-auto rounded-xl border border-zinc-200 dark:border-zinc-700">
+            <BookingTable rows={rows} />
+          </div>
+        </DialogBody>
+      </Dialog>
     </section>
+  )
+}
+
+function BookingTable({ rows }: { rows: Row[] }) {
+  return (
+    <table className="min-w-full text-left text-sm">
+      <thead className="sticky top-0 bg-zinc-50 text-xs uppercase tracking-wide text-zinc-500 dark:bg-zinc-800">
+        <tr>
+          <th className="px-4 py-2 font-medium">Customer</th>
+          <th className="px-3 py-2 font-medium">Service</th>
+          <th className="px-3 py-2 font-medium">When</th>
+          <th className="px-3 py-2 font-medium">Status</th>
+          <th className="px-4 py-2 font-medium">Booked from</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row) => (
+          <tr key={row.id} className="border-t border-zinc-100 dark:border-zinc-800">
+            <td className="px-4 py-3 font-medium text-zinc-950 dark:text-white">{row.customer_name || 'Unknown customer'}</td>
+            <td className="px-3 py-3 text-zinc-600 dark:text-zinc-300">{row.service_type || '—'}</td>
+            <td className="px-3 py-3 whitespace-nowrap text-zinc-600 dark:text-zinc-300">{whenLabel(row)}</td>
+            <td className="px-3 py-3 text-zinc-600 dark:text-zinc-300">{statusName(row.status)}</td>
+            <td className="px-4 py-3">
+              <span className="inline-flex items-center gap-2 text-zinc-800 dark:text-zinc-100">
+                <ChannelIcon channel={row.source_channel as SourceChannel} className="size-4" colored />
+                {sourceName(row.source_channel)}
+              </span>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   )
 }
 
@@ -335,50 +349,3 @@ function accountClass(status: string) {
   return `${base} bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300`
 }
 
-function Fact({ label, value, hint }: { label: string; value: number; hint: string }) {
-  return (
-    <div className="rounded-xl bg-zinc-50 px-3 py-2 dark:bg-white/5">
-      <p className="text-xs text-zinc-500">{label}</p>
-      <p className="text-lg font-semibold tabular-nums text-zinc-950 dark:text-white">{value.toLocaleString()}</p>
-      <p className="text-[11px] text-zinc-500">{hint}</p>
-    </div>
-  )
-}
-
-function Meter({
-  label,
-  used,
-  quota,
-  pct,
-  tone,
-}: {
-  label: string
-  used: number
-  quota: number
-  pct: number
-  tone: string
-}) {
-  return (
-    <div>
-      <div className="flex items-baseline justify-between gap-2 text-sm">
-        <span className="text-zinc-600 dark:text-zinc-300">{label}</span>
-        <span className="tabular-nums text-zinc-500">
-          {used.toLocaleString()} / {quota > 0 ? quota.toLocaleString() : '—'}
-        </span>
-      </div>
-      <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-zinc-200 dark:bg-white/15">
-        <div className={`h-full rounded-full ${tone}`} style={{ width: `${quota > 0 ? pct : 0}%` }} />
-      </div>
-    </div>
-  )
-}
-
-function SourceCount({ channel, label, count }: { channel: SourceChannel; label: string; count: number }) {
-  return (
-    <span className="inline-flex items-center gap-2 rounded-full bg-zinc-50 px-3 py-1 dark:bg-white/5">
-      <ChannelIcon channel={channel} className="size-4" colored />
-      <span className="text-zinc-700 dark:text-zinc-200">{label}</span>
-      <span className="font-semibold tabular-nums text-zinc-950 dark:text-white">{count}</span>
-    </span>
-  )
-}

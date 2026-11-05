@@ -4,9 +4,13 @@ import { Suspense, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
   ArrowPathIcon,
+  CheckIcon,
   ExclamationTriangleIcon,
+  NoSymbolIcon,
+  PencilSquareIcon,
   PlusIcon,
   SparklesIcon,
+  XMarkIcon,
 } from '@heroicons/react/24/outline'
 import { Button } from '@/components/button'
 import { PageHeader, PageShell, dashCardClass } from '@/components/dashboard-ui'
@@ -123,6 +127,41 @@ function ScheduledLine({
     return <span className="font-semibold text-amber-600 dark:text-amber-400">{text}</span>
   }
   return <span className="font-medium text-zinc-800 dark:text-zinc-200">{text}</span>
+}
+
+function RowAction({
+  label,
+  tone = 'zinc',
+  onClick,
+  children,
+}: {
+  label: string
+  tone?: 'zinc' | 'green' | 'amber' | 'red'
+  onClick: () => void
+  children: React.ReactNode
+}) {
+  const toneClass =
+    tone === 'green'
+      ? 'hover:bg-emerald-50 hover:text-emerald-700 dark:hover:bg-emerald-500/15 dark:hover:text-emerald-300'
+      : tone === 'amber'
+        ? 'hover:bg-amber-50 hover:text-amber-700 dark:hover:bg-amber-500/15 dark:hover:text-amber-300'
+        : tone === 'red'
+          ? 'hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-500/15 dark:hover:text-red-300'
+          : 'hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-white'
+  return (
+    <button
+      type="button"
+      title={label}
+      aria-label={label}
+      onClick={(event) => {
+        event.stopPropagation()
+        onClick()
+      }}
+      className={`inline-flex size-8 items-center justify-center rounded-lg text-zinc-500 transition dark:text-zinc-400 ${toneClass}`}
+    >
+      {children}
+    </button>
+  )
 }
 
 function FieldRow({ label, children }: { label: string; children: React.ReactNode }) {
@@ -649,7 +688,7 @@ function BookingsPageInner() {
                         <th className="w-[22%] px-3 py-3 font-semibold">Service</th>
                         <th className="w-[14%] px-3 py-3 font-semibold">Source</th>
                         <th className="w-[10%] px-3 py-3 font-semibold">Status</th>
-                        <th className="w-[16%] px-4 py-3 text-right font-semibold">Actions</th>
+                        <th className="w-36 px-3 py-3 text-right font-semibold">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -711,19 +750,24 @@ function BookingsPageInner() {
                                 {prettyStatus(booking.status)}
                               </Badge>
                             </td>
-                            <td className="px-4 py-3">
-                              <div className="flex flex-wrap items-center justify-end gap-1">
-                                <Button
-                                  plain
-                                  className="text-xs"
-                                  onClick={(e) => {
-                                    stopBubble(e)
-                                    openEdit(booking)
-                                  }}
-                                >
-                                  Edit
-                                </Button>
-                                {ACTIVE_STATUSES.has(booking.status) && renderActionButtons(booking)}
+                            <td className="px-3 py-3 text-right">
+                              <div className="inline-flex items-center justify-end gap-1 whitespace-nowrap">
+                                <RowAction label="Edit" onClick={() => openEdit(booking)}>
+                                  <PencilSquareIcon className="size-4" />
+                                </RowAction>
+                                {ACTIVE_STATUSES.has(booking.status) ? (
+                                  <>
+                                    <RowAction label="Complete" tone="green" onClick={() => openAction(booking, 'complete')}>
+                                      <CheckIcon className="size-4" />
+                                    </RowAction>
+                                    <RowAction label="No-show" tone="amber" onClick={() => openAction(booking, 'no-show')}>
+                                      <NoSymbolIcon className="size-4" />
+                                    </RowAction>
+                                    <RowAction label="Cancel" tone="red" onClick={() => openAction(booking, 'cancel')}>
+                                      <XMarkIcon className="size-4" />
+                                    </RowAction>
+                                  </>
+                                ) : null}
                               </div>
                             </td>
                           </tr>
