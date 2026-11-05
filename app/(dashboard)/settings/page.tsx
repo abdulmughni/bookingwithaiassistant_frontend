@@ -693,9 +693,9 @@ export function TenantConfigTab({
       </>
       )}
 
-      {showProfile ? <Divider /> : null}
+      {showProfile && showConfig ? <Divider /> : null}
 
-      {showProfile ? <section>
+      {showConfig ? <section>
         <Subheading>Services &amp; coverage</Subheading>
         <FieldGroup className="mt-4">
           <Field><TagInput label="Service types" description="Type and press comma or Enter to add each service." value={serviceTypes} onChange={setServiceTypes} placeholder="e.g. AC repair" /></Field>
@@ -707,7 +707,7 @@ export function TenantConfigTab({
         </FieldGroup>
       </section> : null}
 
-      {showProfile && showConfig ? <Divider /> : null}
+      {showConfig ? <Divider /> : null}
 
       {showConfig ? <section>
         <Subheading>Scheduling</Subheading>

@@ -53,11 +53,11 @@ function SettingsBody() {
   )
   const [name, setName] = useState('')
   const [busy, setBusy] = useState(false)
-  const [tab, setTab] = useState<'general' | 'brand'>('general')
+  const [tab, setTab] = useState<'agency' | 'colors'>('agency')
 
   useEffect(() => {
     const value = new URLSearchParams(window.location.search).get('tab')
-    if (value === 'brand') setTab('brand')
+    if (value === 'brand' || value === 'colors') setTab('colors')
   }, [])
 
   useEffect(() => {
@@ -84,14 +84,14 @@ function SettingsBody() {
     <PageShell>
       <PageHeader
         title="Settings"
-        description="Agency details now, and more sections here later."
+        description="The name and logo people see, and the colors used across the portal."
       />
       <div className={`${dashCardClass} overflow-hidden`}>
       <div className="flex gap-6 overflow-x-auto border-b border-zinc-200/80 px-4 pt-2 dark:border-zinc-700/80 sm:px-6">
         {(
           [
-            ['general', 'General'],
-            ['brand', 'Brand & White Label'],
+            ['agency', 'Agency'],
+            ['colors', 'Colors'],
           ] as const
         ).map(([id, label]) => (
           <button
@@ -105,10 +105,15 @@ function SettingsBody() {
         ))}
       </div>
       <div className="p-4 sm:p-6">
-      {agency.loading ? <SkeletonBlock className="h-32" /> : null}
       {agency.error ? <p className="text-sm text-red-600">{agency.error}</p> : null}
-      {tab === 'general' ? (
-        <section className="max-w-xl space-y-4">
+      {agency.loading && !agency.data ? <SkeletonBlock className="h-24" /> : tab === 'agency' ? (
+        <section className="max-w-xl space-y-6">
+          <div>
+            <h2 className="text-sm font-semibold text-zinc-950 dark:text-white">Name and logo</h2>
+            <p className="mt-1 text-sm text-zinc-500">
+              These sit together in the sidebar and on your clients&apos; screens.
+            </p>
+          </div>
           <label className="block text-sm">
             <span className="font-medium text-zinc-950 dark:text-white">Agency name</span>
             <Input className="mt-2" value={name} disabled={isAgencyStaff} onChange={(event) => setName(event.target.value)} />
@@ -116,22 +121,27 @@ function SettingsBody() {
           <p className="text-sm text-zinc-500">
             Signed in as {user?.primaryEmailAddress?.emailAddress ?? 'your account'}
           </p>
-          {isAgencyStaff ? null : (
-            <Button color="brand" disabled={busy || !name.trim()} onClick={() => void save()}>
-              {busy ? 'Saving…' : 'Save name'}
-            </Button>
+          {isAgencyStaff ? (
+            <p className="text-sm text-zinc-500">Only the agency owner can change the name and logo.</p>
+          ) : (
+            <>
+              <Button color="brand" disabled={busy || !name.trim()} onClick={() => void save()}>
+                {busy ? 'Saving…' : 'Save name'}
+              </Button>
+              {tenantId ? <AgencyBrandForm agencyId={tenantId} part="logo" /> : null}
+            </>
           )}
         </section>
       ) : (
         <section>
-          <h2 className="text-sm font-semibold text-zinc-950 dark:text-white">Brand & White Label</h2>
+          <h2 className="text-sm font-semibold text-zinc-950 dark:text-white">Colors</h2>
           <p className="mt-1 mb-4 text-sm text-zinc-500">
-            Logo and colors appear on your screens and on your clients&apos; dashboards.
+            Light or dark mode, presets, and the colors used on your screens and your clients&apos; dashboards.
           </p>
           {isAgencyStaff ? (
-            <p className="text-sm text-zinc-500">Only the agency owner can change the logo and colors.</p>
+            <p className="text-sm text-zinc-500">Only the agency owner can change the colors.</p>
           ) : tenantId ? (
-            <AgencyBrandForm agencyId={tenantId} />
+            <AgencyBrandForm agencyId={tenantId} part="colors" />
           ) : null}
         </section>
       )}

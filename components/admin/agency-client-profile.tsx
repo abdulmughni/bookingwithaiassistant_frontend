@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
+import { ArrowLeftIcon } from '@heroicons/react/20/solid'
 import { useParams } from 'next/navigation'
 import {
   CalendarDaysIcon,
@@ -33,7 +34,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'bookings', label: 'Bookings' },
   { id: 'conversations', label: 'Recent conversations' },
   { id: 'profile', label: 'Company profile' },
-  { id: 'configuration', label: 'Configuration' },
+  { id: 'configuration', label: 'Tenant configuration' },
 ]
 
 function prettyStatus(status: string) {
@@ -101,7 +102,11 @@ export function AgencyClientProfile() {
 
   return (
     <PageShell>
-      <Link href="/admin/clients" className="text-sm text-zinc-500 hover:text-zinc-800">
+      <Link
+        href="/admin/clients"
+        className="inline-flex w-fit items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 shadow-sm ring-1 ring-zinc-200 transition hover:bg-zinc-50 dark:bg-zinc-900 dark:text-zinc-200 dark:ring-zinc-700 dark:hover:bg-zinc-800"
+      >
+        <ArrowLeftIcon className="size-4" />
         All clients
       </Link>
       <div className="flex flex-wrap items-start justify-between gap-3">
