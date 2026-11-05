@@ -212,6 +212,20 @@ export function AgencyBookings() {
   )
 }
 
+function UsageBar({ label, value, pct, tone }: { label: string; value: string; pct: number; tone: string }) {
+  return (
+    <div className="min-w-0">
+      <p className="mb-1 flex justify-between gap-2 text-[11px]">
+        <span>{label}</span>
+        <span className="tabular-nums">{value}</span>
+      </p>
+      <span className="block h-1.5 overflow-hidden rounded-full bg-zinc-200 dark:bg-white/15">
+        <span className={`block h-full rounded-full ${tone}`} style={{ width: `${pct}%` }} />
+      </span>
+    </div>
+  )
+}
+
 function StripStat({ value, label }: { value: number; label: string }) {
   return (
     <p className="text-sm text-zinc-500">
@@ -238,7 +252,9 @@ function ClientProgress({
     call: rows.filter((row) => row.source_channel.toLowerCase() === 'call').length,
   }
   const usage = client.usage
+  const messagesUnlimited = Boolean(client.plan?.messages_unlimited)
   const minutesPct = usage && usage.call_minutes_quota > 0 ? Math.min(100, Math.round((usage.call_minutes_used / usage.call_minutes_quota) * 100)) : 0
+  const messagesPct = !messagesUnlimited && usage && usage.messages_quota > 0 ? Math.min(100, Math.round((usage.messages_used / usage.messages_quota) * 100)) : 0
 
   return (
     <section className={`${dashCardClass} overflow-hidden`}>
@@ -269,15 +285,20 @@ function ClientProgress({
         <span className="inline-flex items-center gap-1"><ChannelIcon channel="facebook" className="size-3.5" colored /> {counts.facebook}</span>
         <span className="inline-flex items-center gap-1"><ChannelIcon channel="instagram" className="size-3.5" colored /> {counts.instagram}</span>
         <span className="inline-flex items-center gap-1"><ChannelIcon channel="call" className="size-3.5" colored /> {counts.call}</span>
-        <span className="min-w-36 flex-1">
-          <span className="mb-1 flex justify-between text-[11px]">
-            <span>Minutes</span>
-            <span className="tabular-nums">{usage?.call_minutes_used ?? 0}/{usage?.call_minutes_quota || '—'}</span>
-          </span>
-          <span className="block h-1.5 overflow-hidden rounded-full bg-zinc-200 dark:bg-white/15">
-            <span className={`block h-full rounded-full ${quotaTone(usage?.quota_state || 'no_plan')}`} style={{ width: `${minutesPct}%` }} />
-          </span>
-        </span>
+        <div className="grid min-w-72 flex-1 grid-cols-2 gap-3">
+          <UsageBar
+            label="Minutes"
+            value={`${usage?.call_minutes_used ?? 0}/${usage?.call_minutes_quota || '—'}`}
+            pct={minutesPct}
+            tone={quotaTone(usage?.quota_state || 'no_plan')}
+          />
+          <UsageBar
+            label="Messages"
+            value={messagesUnlimited ? `${usage?.messages_used ?? 0}/Unlimited` : `${usage?.messages_used ?? 0}/${usage?.messages_quota || '—'}`}
+            pct={messagesPct}
+            tone={quotaTone(usage?.quota_state || 'no_plan')}
+          />
+        </div>
       </div>
 
       {rows.length === 0 ? (

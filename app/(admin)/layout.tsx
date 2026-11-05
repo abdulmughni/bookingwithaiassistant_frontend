@@ -2,6 +2,7 @@
 
 import clsx from 'clsx'
 import Link from 'next/link'
+import { Tip } from '@/components/tooltip'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState, type ReactNode } from 'react'
 import { useAuth, useClerk, useUser } from '@clerk/nextjs'
@@ -282,10 +283,9 @@ function AgencyNavLink({
   current: boolean
   collapsed: boolean
 }) {
-  return (
+  const link = (
     <Link
       href={href}
-      title={collapsed ? label : undefined}
       aria-current={current ? 'page' : undefined}
       className={clsx(
         'group flex items-center rounded-xl text-sm font-medium transition duration-200',
@@ -304,6 +304,8 @@ function AgencyNavLink({
       {collapsed ? null : <span className="truncate">{label}</span>}
     </Link>
   )
+  if (!collapsed) return link
+  return <Tip content={label}>{link}</Tip>
 }
 
 function AgencyPlanCard({ compact = false }: { compact?: boolean }) {
@@ -440,10 +442,8 @@ function AgencyProfileCard({
     </span>
   )
 
-  return (
-    <Menu as="div" className={clsx('relative', compact && 'flex justify-center')}>
+  const button = (
       <MenuButton
-        title={compact ? email || name : undefined}
         className={clsx(
           'flex items-center text-left transition duration-200 hover:-translate-y-0.5 hover:shadow-md',
           compact
@@ -462,6 +462,11 @@ function AgencyProfileCard({
           </>
         )}
       </MenuButton>
+  )
+
+  return (
+    <Menu as="div" className={clsx('relative', compact && 'flex justify-center')}>
+      {compact ? <Tip content={email || name}>{button}</Tip> : button}
       <MenuItems
         transition
         anchor="top start"

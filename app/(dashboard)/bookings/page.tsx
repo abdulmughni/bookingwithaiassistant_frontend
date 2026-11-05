@@ -4,7 +4,7 @@ import { Suspense, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
   ArrowPathIcon,
-  CheckIcon,
+  CheckCircleIcon,
   ExclamationTriangleIcon,
   NoSymbolIcon,
   PencilSquareIcon,
@@ -26,6 +26,7 @@ import { BookingDetailsDialog } from '@/components/booking-details-dialog'
 import { BookingFormDialog } from '@/components/booking-form-dialog'
 import { BookingsCalendar } from '@/components/bookings-calendar'
 import { HoverIconActions } from '@/components/hover-icon-actions'
+import { Tip } from '@/components/tooltip'
 import { SourceBadge } from '@/components/channel-icon'
 import { useApiData, useApiToken, useTenantTimezone } from '@/lib/hooks'
 import { api } from '@/lib/api'
@@ -142,25 +143,47 @@ function RowAction({
 }) {
   const toneClass =
     tone === 'green'
-      ? 'hover:bg-emerald-50 hover:text-emerald-700 dark:hover:bg-emerald-500/15 dark:hover:text-emerald-300'
+      ? 'text-emerald-600 dark:text-emerald-400'
       : tone === 'amber'
-        ? 'hover:bg-amber-50 hover:text-amber-700 dark:hover:bg-amber-500/15 dark:hover:text-amber-300'
+        ? 'text-amber-600 dark:text-amber-400'
         : tone === 'red'
-          ? 'hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-500/15 dark:hover:text-red-300'
-          : 'hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-white'
+          ? 'text-red-600 dark:text-red-400'
+          : 'text-zinc-700 dark:text-zinc-100'
   return (
-    <button
-      type="button"
-      title={label}
-      aria-label={label}
-      onClick={(event) => {
-        event.stopPropagation()
-        onClick()
-      }}
-      className={`inline-flex size-8 items-center justify-center rounded-lg text-zinc-500 transition dark:text-zinc-400 ${toneClass}`}
-    >
-      {children}
-    </button>
+    <Tip content={label}>
+      <button
+        type="button"
+        aria-label={label}
+        onClick={(event) => {
+          event.stopPropagation()
+          onClick()
+        }}
+        className={`inline-flex size-8 items-center justify-center rounded-md border border-zinc-200 bg-white shadow-sm transition hover:bg-zinc-50 dark:border-zinc-600 dark:hover:bg-white/10 ${toneClass}`}
+      >
+        {children}
+      </button>
+    </Tip>
+  )
+}
+
+function OneLine({ text }: { text: string }) {
+  const ref = useRef<HTMLSpanElement>(null)
+  const [overflows, setOverflows] = useState(false)
+  useEffect(() => {
+    const node = ref.current
+    if (!node) return
+    setOverflows(node.scrollWidth > node.clientWidth + 1)
+  }, [text])
+  const line = (
+    <span ref={ref} className="block w-full min-w-0 truncate text-right">
+      {text || '—'}
+    </span>
+  )
+  if (!text || !overflows) return line
+  return (
+    <Tip content={text} fill>
+      {line}
+    </Tip>
   )
 }
 
@@ -637,7 +660,9 @@ function BookingsPageInner() {
                           </div>
 
                           <div className="space-y-2.5 rounded-xl bg-zinc-50 px-3 py-3 dark:bg-zinc-800/70">
-                            <FieldRow label="Service">{booking.service_type}</FieldRow>
+                            <FieldRow label="Service">
+                              <OneLine text={booking.service_type} />
+                            </FieldRow>
                             <FieldRow label="Scheduled">
                               <ScheduledLine booking={booking} meta={meta} timeZone={tenantTz} />
                             </FieldRow>
@@ -688,7 +713,7 @@ function BookingsPageInner() {
                         <th className="w-[22%] px-3 py-3 font-semibold">Service</th>
                         <th className="w-[14%] px-3 py-3 font-semibold">Source</th>
                         <th className="w-[10%] px-3 py-3 font-semibold">Status</th>
-                        <th className="w-36 px-3 py-3 text-right font-semibold">Actions</th>
+                        <th className="w-40 px-3 py-3 text-right font-semibold">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -751,14 +776,14 @@ function BookingsPageInner() {
                               </Badge>
                             </td>
                             <td className="px-3 py-3 text-right">
-                              <div className="inline-flex items-center justify-end gap-1 whitespace-nowrap">
+                              <div className="inline-flex items-center justify-end gap-1.5 whitespace-nowrap">
                                 <RowAction label="Edit" onClick={() => openEdit(booking)}>
                                   <PencilSquareIcon className="size-4" />
                                 </RowAction>
                                 {ACTIVE_STATUSES.has(booking.status) ? (
                                   <>
                                     <RowAction label="Complete" tone="green" onClick={() => openAction(booking, 'complete')}>
-                                      <CheckIcon className="size-4" />
+                                      <CheckCircleIcon className="size-4" />
                                     </RowAction>
                                     <RowAction label="No-show" tone="amber" onClick={() => openAction(booking, 'no-show')}>
                                       <NoSymbolIcon className="size-4" />
