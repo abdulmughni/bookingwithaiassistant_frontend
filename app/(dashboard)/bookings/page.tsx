@@ -9,7 +9,7 @@ import {
   SparklesIcon,
 } from '@heroicons/react/24/outline'
 import { Button } from '@/components/button'
-import { FilterPanel, PageHeader, PageShell } from '@/components/dashboard-ui'
+import { PageHeader, PageShell, dashCardClass } from '@/components/dashboard-ui'
 import { Badge } from '@/components/badge'
 import { Input } from '@/components/input'
 import { Select } from '@/components/select'
@@ -138,33 +138,38 @@ function FieldRow({ label, children }: { label: string; children: React.ReactNod
   )
 }
 
-function SegmentButton({
-  active,
-  onClick,
-  children,
+function ViewSwitch({
+  value,
+  onChange,
 }: {
-  active: boolean
-  onClick: () => void
-  children: React.ReactNode
+  value: 'calendar' | 'box' | 'list'
+  onChange: (next: 'calendar' | 'box' | 'list') => void
 }) {
+  const options = [
+    { id: 'calendar' as const, label: 'Calendar' },
+    { id: 'box' as const, label: 'Box' },
+    { id: 'list' as const, label: 'List' },
+  ]
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded-md px-3 py-1.5 text-sm font-medium ${
-        active ? '' : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800'
-      }`}
-      style={
-        active
-          ? {
-              backgroundColor: 'color-mix(in srgb, var(--brand-primary, #2563eb) 16%, white)',
-              color: 'var(--brand-primary, #1d4ed8)',
-            }
-          : undefined
-      }
-    >
-      {children}
-    </button>
+    <div className="inline-flex rounded-xl bg-zinc-100 p-1 dark:bg-zinc-800" role="tablist" aria-label="Booking view">
+      {options.map((option) => {
+        const active = value === option.id
+        return (
+          <button
+            key={option.id}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            onClick={() => onChange(option.id)}
+            className={`rounded-lg px-3.5 py-2 text-sm font-semibold ${
+              active ? 'view-switch-on' : 'text-zinc-600 hover:text-zinc-950 dark:text-zinc-300 dark:hover:text-white'
+            }`}
+          >
+            {option.label}
+          </button>
+        )
+      })}
+    </div>
   )
 }
 
@@ -415,117 +420,109 @@ function BookingsPageInner() {
         </Button>
       </PageHeader>
 
-      <div className="inline-flex rounded-lg border border-zinc-200 bg-white p-1 dark:border-zinc-700 dark:bg-zinc-900">
-        <SegmentButton active={pageTab === 'calendar'} onClick={() => setPageTab('calendar')}>
-          Calendar
-        </SegmentButton>
-        <SegmentButton active={pageTab === 'list'} onClick={() => setPageTab('list')}>
-          List
-        </SegmentButton>
-      </div>
-
-      <FilterPanel>
-        <div className="w-40">
-          <Select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-          >
-            <option value="">All statuses</option>
-            <option value="confirmed">Confirmed</option>
-            <option value="rescheduled">Rescheduled</option>
-            <option value="completed">Completed</option>
-            <option value="cancelled">Cancelled</option>
-            <option value="no_show">No show</option>
-          </Select>
-        </div>
-        <div className="flex gap-2">
-          <Input
-            placeholder="Search by phone or name..."
-            value={phoneSearch}
-            onChange={(e) => setPhoneSearch(e.target.value)}
-          />
-        </div>
-        {pageTab === 'list' && (
-          <div className="flex flex-wrap items-end gap-2">
-            <div className="w-40">
-              <label className="mb-1 block text-xs font-medium text-zinc-500 dark:text-zinc-400">
-                Scheduled from
-              </label>
+      <section className={`${dashCardClass} p-4 sm:p-5`}>
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-end">
+          <div className={`grid flex-1 grid-cols-1 gap-3 sm:grid-cols-2 ${pageTab === 'list' ? 'lg:grid-cols-4' : ''}`}>
+            <label className="block min-w-0">
+              <span className="mb-1.5 block text-xs font-medium text-zinc-500">Status</span>
+              <Select aria-label="Status" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                <option value="">All statuses</option>
+                <option value="confirmed">Confirmed</option>
+                <option value="rescheduled">Rescheduled</option>
+                <option value="completed">Completed</option>
+                <option value="cancelled">Cancelled</option>
+                <option value="no_show">No show</option>
+              </Select>
+            </label>
+            <label className="block min-w-0">
+              <span className="mb-1.5 block text-xs font-medium text-zinc-500">Search</span>
               <Input
-                type="date"
-                value={scheduleDateFrom}
-                onChange={(e) => setScheduleDateFrom(e.target.value)}
-                title="Appointment on or after this date"
+                aria-label="Search bookings"
+                placeholder="Name or phone"
+                value={phoneSearch}
+                onChange={(e) => setPhoneSearch(e.target.value)}
               />
-            </div>
-            <div className="w-40">
-              <label className="mb-1 block text-xs font-medium text-zinc-500 dark:text-zinc-400">
-                Scheduled to
-              </label>
-              <Input
-                type="date"
-                value={scheduleDateTo}
-                onChange={(e) => setScheduleDateTo(e.target.value)}
-                title="Appointment on or before this date"
-              />
-            </div>
-            {(() => {
-              const today = dayKeyInTz(new Date(), tenantTz)
-              const isTodayActive = scheduleDateFrom === today && scheduleDateTo === today
-              return (
-                <Button
-                  plain
-                  aria-pressed={isTodayActive}
-                  title={
-                    isTodayActive
-                      ? 'Clear the today filter'
-                      : 'Show only bookings scheduled for today'
-                  }
-                  className={`text-xs ${
-                    isTodayActive
-                      ? 'bg-amber-100 text-amber-800 ring-1 ring-amber-300 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-500/40'
-                      : ''
-                  }`}
-                  onClick={() => {
-                    if (isTodayActive) {
-                      setScheduleDateFrom('')
-                      setScheduleDateTo('')
-                    } else {
-                      setScheduleDateFrom(today)
-                      setScheduleDateTo(today)
-                    }
-                  }}
-                >
-                  {isTodayActive ? 'Showing today ✓' : 'Today'}
-                </Button>
-              )
-            })()}
+            </label>
+            {pageTab === 'list' ? (
+              <>
+                <label className="block min-w-0">
+                  <span className="mb-1.5 block text-xs font-medium text-zinc-500">From</span>
+                  <Input
+                    type="date"
+                    aria-label="Scheduled from"
+                    value={scheduleDateFrom}
+                    onChange={(e) => setScheduleDateFrom(e.target.value)}
+                  />
+                </label>
+                <label className="block min-w-0">
+                  <span className="mb-1.5 block text-xs font-medium text-zinc-500">To</span>
+                  <Input
+                    type="date"
+                    aria-label="Scheduled to"
+                    value={scheduleDateTo}
+                    onChange={(e) => setScheduleDateTo(e.target.value)}
+                  />
+                </label>
+              </>
+            ) : null}
           </div>
-        )}
-        {hasActiveFilters && (
-          <Button
-            plain
-            onClick={() => {
-              setStatusFilter('')
-              setPhoneSearch('')
-              setScheduleDateFrom('')
-              setScheduleDateTo('')
-            }}
-          >
-            Clear filters
-          </Button>
-        )}
-        {pageTab === 'list' && (
-          <div className="ml-auto inline-flex rounded-lg border border-zinc-200 bg-white p-1 dark:border-zinc-700 dark:bg-zinc-900">
-            <SegmentButton active={layoutMode === 'box'} onClick={() => setLayoutMode('box')}>
-              Box view
-            </SegmentButton>
-            <SegmentButton active={layoutMode === 'list'} onClick={() => setLayoutMode('list')}>
-              List view
-            </SegmentButton>
+          <div className="flex flex-wrap items-center gap-2">
+            {pageTab === 'list'
+              ? (() => {
+                  const today = dayKeyInTz(new Date(), tenantTz)
+                  const isTodayActive = scheduleDateFrom === today && scheduleDateTo === today
+                  return (
+                    <button
+                      type="button"
+                      aria-pressed={isTodayActive}
+                      title={isTodayActive ? 'Clear the today filter' : 'Show bookings scheduled for today'}
+                      className={`h-10 rounded-xl px-3 text-sm font-semibold ${
+                        isTodayActive
+                          ? 'bg-amber-100 text-amber-800 ring-1 ring-amber-300 dark:bg-amber-500/15 dark:text-amber-200 dark:ring-amber-500/40'
+                          : 'bg-white text-zinc-700 ring-1 ring-zinc-200 hover:bg-zinc-50 dark:bg-zinc-900 dark:text-zinc-200 dark:ring-zinc-700'
+                      }`}
+                      onClick={() => {
+                        if (isTodayActive) {
+                          setScheduleDateFrom('')
+                          setScheduleDateTo('')
+                        } else {
+                          setScheduleDateFrom(today)
+                          setScheduleDateTo(today)
+                        }
+                      }}
+                    >
+                      Today
+                    </button>
+                  )
+                })()
+              : null}
+            {hasActiveFilters ? (
+              <button
+                type="button"
+                className="h-10 rounded-xl px-3 text-sm font-semibold text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                onClick={() => {
+                  setStatusFilter('')
+                  setPhoneSearch('')
+                  setScheduleDateFrom('')
+                  setScheduleDateTo('')
+                }}
+              >
+                Clear
+              </button>
+            ) : null}
+            <ViewSwitch
+              value={pageTab === 'calendar' ? 'calendar' : layoutMode}
+              onChange={(next) => {
+                if (next === 'calendar') setPageTab('calendar')
+                else {
+                  setPageTab('list')
+                  setLayoutMode(next)
+                }
+              }}
+            />
           </div>
-        )}
-      </FilterPanel>
+        </div>
+      </section>
 
       {pageTab === 'calendar' ? (
         loading ? (

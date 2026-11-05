@@ -77,7 +77,6 @@ export default function DashboardLayout({
       sidebarCard
       sidebarCollapsed={collapsed}
       contentViewportLocked={fullBleedPage}
-      desktopHeader={pathname === '/' ? null : <NotificationBell />}
       navbar={
         <Navbar>
           <NavbarSpacer />
