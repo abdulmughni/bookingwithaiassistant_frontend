@@ -3,6 +3,8 @@
 import clsx from 'clsx'
 import { useEffect, useState, type ReactNode } from 'react'
 import { ChevronUpIcon } from '@heroicons/react/20/solid'
+
+import { Tip } from '@/components/tooltip'
 import {
   Bar,
   BarChart,
@@ -215,14 +217,15 @@ export function CollapseControl({
   onClick: () => void
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={minimized ? `Restore ${label}` : `Minimize ${label}`}
-      title={minimized ? 'Expand' : 'Minimize'}
-      className="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-zinc-50 text-zinc-500 ring-1 ring-zinc-200/90 transition duration-200 hover:bg-blue-600 hover:text-white hover:ring-blue-600"
-    >
-      <ChevronUpIcon className={clsx('size-4 transition-transform duration-300', minimized && 'rotate-180')} />
-    </button>
+    <Tip content={minimized ? 'Expand' : 'Minimize'}>
+      <button
+        type="button"
+        onClick={onClick}
+        aria-label={minimized ? `Restore ${label}` : `Minimize ${label}`}
+        className="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-zinc-50 text-zinc-500 ring-1 ring-zinc-200/90 transition duration-200 hover:bg-blue-600 hover:text-white hover:ring-blue-600"
+      >
+        <ChevronUpIcon className={clsx('size-4 transition-transform duration-300', minimized && 'rotate-180')} />
+      </button>
+    </Tip>
   )
 }

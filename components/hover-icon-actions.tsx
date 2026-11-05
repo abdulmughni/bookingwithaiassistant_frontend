@@ -3,6 +3,8 @@
 import clsx from 'clsx'
 import { PencilSquareIcon, TrashIcon } from '@heroicons/react/24/outline'
 
+import { Tip } from '@/components/tooltip'
+
 /**
  * Floating white action chip — appears on parent `group` hover.
  * Place parent with `group relative` and put this in a corner.
@@ -38,9 +40,9 @@ export function HoverIconActions({
       aria-label="Quick actions"
     >
       {onEdit ? (
+        <Tip content={editLabel}>
         <button
           type="button"
-          title={editLabel}
           aria-label={editLabel}
           onClick={(e) => {
             e.stopPropagation()
@@ -51,11 +53,12 @@ export function HoverIconActions({
         >
           <PencilSquareIcon className="size-4" aria-hidden />
         </button>
+        </Tip>
       ) : null}
       {onDelete ? (
+        <Tip content={deleteLabel}>
         <button
           type="button"
-          title={deleteLabel}
           aria-label={deleteLabel}
           onClick={(e) => {
             e.stopPropagation()
@@ -66,6 +69,7 @@ export function HoverIconActions({
         >
           <TrashIcon className="size-4" aria-hidden />
         </button>
+        </Tip>
       ) : null}
     </div>
   )

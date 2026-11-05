@@ -1061,3 +1061,38 @@ html.dark[data-agency-theme] button.view-switch-on {
   color: #fff !important;
   box-shadow: none;
 }
+
+/* Hover labels. Brand colors, readable in light and dark. */
+.app-tip {
+  border-radius: 0.5rem;
+  background: var(--brand-card, #fff) !important;
+  color: var(--brand-text, #18181b) !important;
+  border: 1px solid color-mix(in srgb, var(--brand-primary, #3b59ff) 38%, var(--brand-border, #e4e4e7)) !important;
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--brand-text, #18181b) 14%, transparent);
+}
+.app-tip::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  background: inherit;
+  border: inherit;
+  transform: translateX(-50%) rotate(45deg);
+}
+.app-tip[data-side='top']::before {
+  bottom: -5px;
+  border-top: 0;
+  border-left: 0;
+}
+.app-tip[data-side='bottom']::before {
+  top: -5px;
+  border-bottom: 0;
+  border-right: 0;
+}
+html.dark .app-tip {
+  background: color-mix(in srgb, var(--brand-primary, #3b59ff) 16%, #1c1e24) !important;
+  color: #fafafa !important;
+  border-color: color-mix(in srgb, var(--brand-primary, #3b59ff) 48%, #3f3f46) !important;
+  box-shadow: 0 12px 28px rgb(0 0 0 / 0.45);
+}

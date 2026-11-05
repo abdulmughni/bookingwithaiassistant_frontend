@@ -9,6 +9,7 @@ import { Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/react'
 import { Sidebar } from '@/components/sidebar'
 import { BrandLogo } from '@/components/brand-logo'
 import { Link } from '@/components/link'
+import { Tip } from '@/components/tooltip'
 
 type HeroIcon = ComponentType<SVGProps<SVGSVGElement> & { title?: string; titleId?: string }>
 
@@ -78,10 +79,9 @@ export function PortalNavLink({
   current: boolean
   collapsed: boolean
 }) {
-  return (
+  const link = (
     <Link
       href={href}
-      title={collapsed ? label : undefined}
       aria-current={current ? 'page' : undefined}
       className={clsx(
         'group flex items-center rounded-xl text-sm font-medium transition duration-200',
@@ -98,6 +98,8 @@ export function PortalNavLink({
       {collapsed ? null : <span className="truncate">{label}</span>}
     </Link>
   )
+  if (!collapsed) return link
+  return <Tip content={label}>{link}</Tip>
 }
 
 export function PortalNavGroup({
@@ -184,10 +186,8 @@ export function PortalProfileCard({
     </span>
   )
 
-  return (
-    <Menu as="div" className={clsx('relative', compact && 'flex justify-center')}>
+  const button = (
       <MenuButton
-        title={compact ? title : undefined}
         className={clsx(
           'flex items-center text-left transition duration-200 hover:-translate-y-0.5 hover:shadow-md',
           compact
@@ -208,6 +208,11 @@ export function PortalProfileCard({
           </>
         )}
       </MenuButton>
+  )
+
+  return (
+    <Menu as="div" className={clsx('relative', compact && 'flex justify-center')}>
+      {compact ? <Tip content={title}>{button}</Tip> : button}
       <MenuItems
         transition
         anchor="top start"
