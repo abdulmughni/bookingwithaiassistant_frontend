@@ -126,7 +126,7 @@ function AppearanceMode() {
             onClick={() => setColorMode(id)}
             className={
               mode === id
-                ? 'rounded-full bg-zinc-900 px-4 py-1.5 text-sm font-medium text-white shadow-sm dark:bg-zinc-600'
+                ? 'segment-on rounded-full px-4 py-1.5 text-sm font-medium shadow-sm'
                 : 'rounded-full px-4 py-1.5 text-sm text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-100'
             }
           >
@@ -276,7 +276,7 @@ export function AgencyBrandForm({
                 onClick={() => setColors(preset.colors)}
                 className={
                   selected
-                    ? 'inline-flex items-center gap-2 rounded-full bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white ring-2 ring-[var(--brand-primary)] dark:bg-zinc-700'
+                    ? 'segment-on inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium ring-2 ring-[var(--brand-primary)]'
                     : 'inline-flex items-center gap-2 rounded-full bg-zinc-100 px-3 py-1.5 text-sm text-zinc-700 ring-1 ring-zinc-200 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-200 dark:ring-zinc-600 dark:hover:bg-zinc-700'
                 }
               >

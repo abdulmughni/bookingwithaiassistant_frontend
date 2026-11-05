@@ -1047,3 +1047,17 @@ html.dark .theme-hero {
   color: #fafafa;
   border-color: color-mix(in srgb, var(--brand-primary) 42%, #3f3f46) !important;
 }
+
+/* Selected side of a grouped toggle. Beats the theme rule that forces dark text on a black pill. */
+html[data-agency-theme]:not(.dark) button.segment-on,
+html[data-agency-theme]:not(.dark) button.view-switch-on {
+  background-color: #fff !important;
+  color: var(--brand-primary) !important;
+  box-shadow: 0 1px 2px rgb(24 24 27 / 0.08);
+}
+html.dark[data-agency-theme] button.segment-on,
+html.dark[data-agency-theme] button.view-switch-on {
+  background-color: color-mix(in srgb, var(--brand-primary) 28%, #3f3f46) !important;
+  color: #fff !important;
+  box-shadow: none;
+}

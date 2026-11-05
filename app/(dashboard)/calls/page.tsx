@@ -463,7 +463,7 @@ export default function CallsPage() {
           <Button
             plain
             type="button"
-            className={`rounded-md px-3 py-1 text-xs ${viewMode === 'box' ? 'bg-zinc-900 text-white shadow-sm dark:bg-zinc-600' : 'text-zinc-500 dark:text-zinc-300'}`}
+            className={`rounded-md px-3 py-1 text-xs ${viewMode === 'box' ? 'segment-on shadow-sm' : 'text-zinc-500 dark:text-zinc-300'}`}
             onClick={() => setViewMode('box')}
           >
             Box view
@@ -471,7 +471,7 @@ export default function CallsPage() {
           <Button
             plain
             type="button"
-            className={`rounded-md px-3 py-1 text-xs ${viewMode === 'list' ? 'bg-zinc-900 text-white shadow-sm dark:bg-zinc-600' : 'text-zinc-500 dark:text-zinc-300'}`}
+            className={`rounded-md px-3 py-1 text-xs ${viewMode === 'list' ? 'segment-on shadow-sm' : 'text-zinc-500 dark:text-zinc-300'}`}
             onClick={() => setViewMode('list')}
           >
             List view
@@ -895,7 +895,7 @@ function CallsPagination({
                 className={clsx(
                   'min-w-9 rounded-lg px-3 py-2 text-xs font-semibold transition',
                   item === page
-                    ? 'bg-zinc-900 text-white shadow-sm dark:bg-white dark:text-zinc-900'
+                    ? 'segment-on shadow-sm'
                     : 'text-zinc-600 hover:bg-zinc-100 disabled:opacity-40 dark:text-zinc-400 dark:hover:bg-zinc-800',
                 )}
                 aria-label={`Page ${item}`}

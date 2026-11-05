@@ -9,7 +9,7 @@ import {
   SparklesIcon,
 } from '@heroicons/react/24/outline'
 import { Button } from '@/components/button'
-import { FilterPanel, PageHeader, PageShell } from '@/components/dashboard-ui'
+import { PageHeader, PageShell, dashCardClass } from '@/components/dashboard-ui'
 import { Badge } from '@/components/badge'
 import { Input } from '@/components/input'
 import { Select } from '@/components/select'
@@ -84,7 +84,7 @@ function getSchedulingMeta(
 function ScheduleBadge({ meta }: { meta: SchedulingMeta }) {
   if (meta.state === 'overdue') {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-red-700 ring-1 ring-red-200 dark:bg-red-500/10 dark:text-red-400 dark:ring-red-500/30">
+      <span className="inline-flex max-w-full items-center gap-1 whitespace-normal rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-red-700 ring-1 ring-red-200 dark:bg-red-500/10 dark:text-red-400 dark:ring-red-500/30">
         <ExclamationTriangleIcon className="h-3 w-3" aria-hidden="true" />
         Date passed — needs follow-up
       </span>
@@ -92,7 +92,7 @@ function ScheduleBadge({ meta }: { meta: SchedulingMeta }) {
   }
   if (meta.state === 'today') {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-500/30">
+      <span className="inline-flex max-w-full items-center gap-1 whitespace-normal rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-500/30">
         <span className="relative flex h-2 w-2">
           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-500 opacity-60" />
           <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500" />
@@ -123,6 +123,54 @@ function ScheduledLine({
     return <span className="font-semibold text-amber-600 dark:text-amber-400">{text}</span>
   }
   return <span className="font-medium text-zinc-800 dark:text-zinc-200">{text}</span>
+}
+
+function FieldRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="grid grid-cols-[5.75rem_minmax(0,1fr)] items-start gap-3">
+      <span className="pt-0.5 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+        {label}
+      </span>
+      <div className="min-w-0 text-right text-sm font-medium break-words text-zinc-800 dark:text-zinc-100">
+        {children}
+      </div>
+    </div>
+  )
+}
+
+function ViewSwitch({
+  value,
+  onChange,
+}: {
+  value: 'calendar' | 'box' | 'list'
+  onChange: (next: 'calendar' | 'box' | 'list') => void
+}) {
+  const options = [
+    { id: 'calendar' as const, label: 'Calendar' },
+    { id: 'box' as const, label: 'Box' },
+    { id: 'list' as const, label: 'List' },
+  ]
+  return (
+    <div className="inline-flex rounded-xl bg-zinc-100 p-1 dark:bg-zinc-800" role="tablist" aria-label="Booking view">
+      {options.map((option) => {
+        const active = value === option.id
+        return (
+          <button
+            key={option.id}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            onClick={() => onChange(option.id)}
+            className={`rounded-lg px-3.5 py-2 text-sm font-semibold ${
+              active ? 'view-switch-on' : 'text-zinc-600 hover:text-zinc-950 dark:text-zinc-300 dark:hover:text-white'
+            }`}
+          >
+            {option.label}
+          </button>
+        )
+      })}
+    </div>
+  )
 }
 
 interface ActiveActionState {
@@ -372,133 +420,109 @@ function BookingsPageInner() {
         </Button>
       </PageHeader>
 
-      <div className="inline-flex rounded-lg border border-zinc-200 bg-white p-1 dark:border-zinc-700 dark:bg-zinc-900">
-        <Button
-          plain
-          className={`rounded-md px-3 py-1.5 text-sm ${pageTab === 'calendar' ? 'bg-zinc-900 text-white shadow-sm dark:bg-zinc-600' : 'text-zinc-500 dark:text-zinc-300'}`}
-          onClick={() => setPageTab('calendar')}
-        >
-          Calendar
-        </Button>
-        <Button
-          plain
-          className={`rounded-md px-3 py-1.5 text-sm ${pageTab === 'list' ? 'bg-zinc-900 text-white shadow-sm dark:bg-zinc-600' : 'text-zinc-500 dark:text-zinc-300'}`}
-          onClick={() => setPageTab('list')}
-        >
-          List
-        </Button>
-      </div>
-
-      <FilterPanel>
-        <div className="w-40">
-          <Select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-          >
-            <option value="">All statuses</option>
-            <option value="confirmed">Confirmed</option>
-            <option value="rescheduled">Rescheduled</option>
-            <option value="completed">Completed</option>
-            <option value="cancelled">Cancelled</option>
-            <option value="no_show">No show</option>
-          </Select>
-        </div>
-        <div className="flex gap-2">
-          <Input
-            placeholder="Search by phone or name..."
-            value={phoneSearch}
-            onChange={(e) => setPhoneSearch(e.target.value)}
-          />
-        </div>
-        {pageTab === 'list' && (
-          <div className="flex flex-wrap items-end gap-2">
-            <div className="w-40">
-              <label className="mb-1 block text-xs font-medium text-zinc-500 dark:text-zinc-400">
-                Scheduled from
-              </label>
+      <section className={`${dashCardClass} p-4 sm:p-5`}>
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-end">
+          <div className={`grid flex-1 grid-cols-1 gap-3 sm:grid-cols-2 ${pageTab === 'list' ? 'lg:grid-cols-4' : ''}`}>
+            <label className="block min-w-0">
+              <span className="mb-1.5 block text-xs font-medium text-zinc-500">Status</span>
+              <Select aria-label="Status" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                <option value="">All statuses</option>
+                <option value="confirmed">Confirmed</option>
+                <option value="rescheduled">Rescheduled</option>
+                <option value="completed">Completed</option>
+                <option value="cancelled">Cancelled</option>
+                <option value="no_show">No show</option>
+              </Select>
+            </label>
+            <label className="block min-w-0">
+              <span className="mb-1.5 block text-xs font-medium text-zinc-500">Search</span>
               <Input
-                type="date"
-                value={scheduleDateFrom}
-                onChange={(e) => setScheduleDateFrom(e.target.value)}
-                title="Appointment on or after this date"
+                aria-label="Search bookings"
+                placeholder="Name or phone"
+                value={phoneSearch}
+                onChange={(e) => setPhoneSearch(e.target.value)}
               />
-            </div>
-            <div className="w-40">
-              <label className="mb-1 block text-xs font-medium text-zinc-500 dark:text-zinc-400">
-                Scheduled to
-              </label>
-              <Input
-                type="date"
-                value={scheduleDateTo}
-                onChange={(e) => setScheduleDateTo(e.target.value)}
-                title="Appointment on or before this date"
-              />
-            </div>
-            {(() => {
-              const today = dayKeyInTz(new Date(), tenantTz)
-              const isTodayActive = scheduleDateFrom === today && scheduleDateTo === today
-              return (
-                <Button
-                  plain
-                  aria-pressed={isTodayActive}
-                  title={
-                    isTodayActive
-                      ? 'Clear the today filter'
-                      : 'Show only bookings scheduled for today'
-                  }
-                  className={`text-xs ${
-                    isTodayActive
-                      ? 'bg-amber-100 text-amber-800 ring-1 ring-amber-300 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-500/40'
-                      : ''
-                  }`}
-                  onClick={() => {
-                    if (isTodayActive) {
-                      setScheduleDateFrom('')
-                      setScheduleDateTo('')
-                    } else {
-                      setScheduleDateFrom(today)
-                      setScheduleDateTo(today)
-                    }
-                  }}
-                >
-                  {isTodayActive ? 'Showing today ✓' : 'Today'}
-                </Button>
-              )
-            })()}
+            </label>
+            {pageTab === 'list' ? (
+              <>
+                <label className="block min-w-0">
+                  <span className="mb-1.5 block text-xs font-medium text-zinc-500">From</span>
+                  <Input
+                    type="date"
+                    aria-label="Scheduled from"
+                    value={scheduleDateFrom}
+                    onChange={(e) => setScheduleDateFrom(e.target.value)}
+                  />
+                </label>
+                <label className="block min-w-0">
+                  <span className="mb-1.5 block text-xs font-medium text-zinc-500">To</span>
+                  <Input
+                    type="date"
+                    aria-label="Scheduled to"
+                    value={scheduleDateTo}
+                    onChange={(e) => setScheduleDateTo(e.target.value)}
+                  />
+                </label>
+              </>
+            ) : null}
           </div>
-        )}
-        {hasActiveFilters && (
-          <Button
-            plain
-            onClick={() => {
-              setStatusFilter('')
-              setPhoneSearch('')
-              setScheduleDateFrom('')
-              setScheduleDateTo('')
-            }}
-          >
-            Clear filters
-          </Button>
-        )}
-        {pageTab === 'list' && (
-          <div className="ml-auto inline-flex rounded-lg border border-zinc-200 bg-white p-1 dark:border-zinc-700 dark:bg-zinc-900">
-            <Button
-              plain
-              className={`rounded-md px-3 py-1 text-xs ${layoutMode === 'box' ? 'bg-zinc-900 text-white shadow-sm dark:bg-zinc-600' : 'text-zinc-500 dark:text-zinc-300'}`}
-              onClick={() => setLayoutMode('box')}
-            >
-              Box view
-            </Button>
-            <Button
-              plain
-              className={`rounded-md px-3 py-1 text-xs ${layoutMode === 'list' ? 'bg-zinc-900 text-white shadow-sm dark:bg-zinc-600' : 'text-zinc-500 dark:text-zinc-300'}`}
-              onClick={() => setLayoutMode('list')}
-            >
-              List view
-            </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            {pageTab === 'list'
+              ? (() => {
+                  const today = dayKeyInTz(new Date(), tenantTz)
+                  const isTodayActive = scheduleDateFrom === today && scheduleDateTo === today
+                  return (
+                    <button
+                      type="button"
+                      aria-pressed={isTodayActive}
+                      title={isTodayActive ? 'Clear the today filter' : 'Show bookings scheduled for today'}
+                      className={`h-10 rounded-xl px-3 text-sm font-semibold ${
+                        isTodayActive
+                          ? 'bg-amber-100 text-amber-800 ring-1 ring-amber-300 dark:bg-amber-500/15 dark:text-amber-200 dark:ring-amber-500/40'
+                          : 'bg-white text-zinc-700 ring-1 ring-zinc-200 hover:bg-zinc-50 dark:bg-zinc-900 dark:text-zinc-200 dark:ring-zinc-700'
+                      }`}
+                      onClick={() => {
+                        if (isTodayActive) {
+                          setScheduleDateFrom('')
+                          setScheduleDateTo('')
+                        } else {
+                          setScheduleDateFrom(today)
+                          setScheduleDateTo(today)
+                        }
+                      }}
+                    >
+                      Today
+                    </button>
+                  )
+                })()
+              : null}
+            {hasActiveFilters ? (
+              <button
+                type="button"
+                className="h-10 rounded-xl px-3 text-sm font-semibold text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                onClick={() => {
+                  setStatusFilter('')
+                  setPhoneSearch('')
+                  setScheduleDateFrom('')
+                  setScheduleDateTo('')
+                }}
+              >
+                Clear
+              </button>
+            ) : null}
+            <ViewSwitch
+              value={pageTab === 'calendar' ? 'calendar' : layoutMode}
+              onChange={(next) => {
+                if (next === 'calendar') setPageTab('calendar')
+                else {
+                  setPageTab('list')
+                  setLayoutMode(next)
+                }
+              }}
+            />
           </div>
-        )}
-      </FilterPanel>
+        </div>
+      </section>
 
       {pageTab === 'calendar' ? (
         loading ? (
@@ -573,44 +597,36 @@ function BookingsPageInner() {
                             </span>
                           </div>
 
-                          <div className="space-y-2 rounded-lg bg-zinc-50 p-3 text-sm dark:bg-zinc-800/70">
-                            <div className="flex items-center justify-between rounded-md bg-white/70 px-2.5 py-1.5 dark:bg-zinc-900/50">
-                              <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                                Service
-                              </span>
-                              <span className="font-medium text-zinc-800 dark:text-zinc-200">
-                                {booking.service_type}
-                              </span>
-                            </div>
-                            <div className="flex items-center justify-between gap-2 rounded-md bg-white/70 px-2.5 py-1.5 dark:bg-zinc-900/50">
-                              <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                                Scheduled
-                              </span>
+                          <div className="space-y-2.5 rounded-xl bg-zinc-50 px-3 py-3 dark:bg-zinc-800/70">
+                            <FieldRow label="Service">{booking.service_type}</FieldRow>
+                            <FieldRow label="Scheduled">
                               <ScheduledLine booking={booking} meta={meta} timeZone={tenantTz} />
-                            </div>
-                            <div className="flex items-center justify-between rounded-md bg-white/70 px-2.5 py-1.5 dark:bg-zinc-900/50">
-                              <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                                Source
+                            </FieldRow>
+                            <FieldRow label="Source">
+                              <span className="inline-flex justify-end">
+                                <SourceBadge channel={booking.source_channel} />
                               </span>
-                              <SourceBadge channel={booking.source_channel} />
-                            </div>
+                            </FieldRow>
                             {(booking.source_channel.toLowerCase() === 'call' ||
                               booking.source_channel.toLowerCase() === 'api') && (
-                              <div className="flex items-center justify-between rounded-md bg-white/70 px-2.5 py-1.5 dark:bg-zinc-900/50">
-                                <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                                  {booking.source_channel.toLowerCase() === 'call'
+                              <FieldRow
+                                label={
+                                  booking.source_channel.toLowerCase() === 'call'
                                     ? 'Vapi number'
-                                    : 'Created from'}
-                                </span>
-                                <span className="font-mono text-xs font-medium text-zinc-800 dark:text-zinc-200">
+                                    : 'Created from'
+                                }
+                              >
+                                <span className="font-mono text-xs">
                                   {booking.source_contact || booking.customer_phone || '—'}
                                 </span>
-                              </div>
+                              </FieldRow>
                             )}
                           </div>
 
                           {ACTIVE_STATUSES.has(booking.status) && (
-                            <div className="flex flex-wrap gap-2">{renderActionButtons(booking)}</div>
+                            <div className="flex flex-wrap justify-end gap-1 border-t border-zinc-100 pt-3 dark:border-zinc-800">
+                              {renderActionButtons(booking)}
+                            </div>
                           )}
 
                           {booking.status_note && (
@@ -624,113 +640,97 @@ function BookingsPageInner() {
                   })}
                 </div>
               ) : (
-                <div className="space-y-2">
-                  <div
-                    className="hidden rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:border-zinc-700 dark:bg-zinc-900/80 dark:text-zinc-400 xl:grid xl:grid-cols-[minmax(8rem,1.35fr)_minmax(7rem,1fr)_minmax(6rem,1fr)_auto_auto_minmax(8rem,1.15fr)_minmax(7rem,auto)] xl:gap-4"
-                    aria-hidden
-                  >
-                    <span>Customer</span>
-                    <span>Scheduled</span>
-                    <span>Service</span>
-                    <span className="text-center">Source</span>
-                    <span className="text-center">From</span>
-                    <span>Status</span>
-                    <span className="text-right">Actions</span>
-                  </div>
-                  {filteredBookings.map((booking) => {
-                    const meta = getSchedulingMeta(booking, tenantTz)
-                    const rowTone =
-                      meta.state === 'overdue'
-                        ? 'border-red-300 bg-red-50/40 dark:border-red-500/40 dark:bg-red-500/5'
-                        : meta.state === 'today'
-                          ? 'border-amber-300 bg-amber-50/30 dark:border-amber-500/40 dark:bg-amber-500/5'
-                          : 'border-zinc-200 dark:border-zinc-700'
-                    return (
-                      <Card
-                        key={booking.id}
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => openDetails(booking)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault()
-                            openDetails(booking)
-                          }
-                        }}
-                        className={`group relative cursor-pointer border shadow-sm transition hover:shadow-md focus-visible:outline-2 focus-visible:outline-blue-500 dark:hover:border-zinc-600 ${rowTone}`}
-                      >
-                        <HoverIconActions onEdit={() => openEdit(booking)} />
-                        <CardBody className="p-0">
-                          <div className="flex flex-col gap-3 p-4 xl:grid xl:grid-cols-[minmax(8rem,1.35fr)_minmax(7rem,1fr)_minmax(6rem,1fr)_auto_auto_minmax(8rem,1.15fr)_minmax(7rem,auto)] xl:items-center xl:gap-4 xl:p-3">
-                            <div className="min-w-0 xl:border-0">
-                              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 xl:hidden dark:text-zinc-400">
-                                Customer
-                              </p>
+                <div className="overflow-x-auto rounded-2xl border border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-900/80">
+                  <table className="w-full min-w-[920px] table-fixed text-left text-sm">
+                    <thead className="bg-zinc-50 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:bg-zinc-800/80 dark:text-zinc-400">
+                      <tr>
+                        <th className="w-[18%] px-4 py-3 font-semibold">Customer</th>
+                        <th className="w-[20%] px-3 py-3 font-semibold">Scheduled</th>
+                        <th className="w-[22%] px-3 py-3 font-semibold">Service</th>
+                        <th className="w-[14%] px-3 py-3 font-semibold">Source</th>
+                        <th className="w-[10%] px-3 py-3 font-semibold">Status</th>
+                        <th className="w-[16%] px-4 py-3 text-right font-semibold">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredBookings.map((booking) => {
+                        const meta = getSchedulingMeta(booking, tenantTz)
+                        const rowTone =
+                          meta.state === 'overdue'
+                            ? 'bg-red-50/50 dark:bg-red-500/5'
+                            : meta.state === 'today'
+                              ? 'bg-amber-50/40 dark:bg-amber-500/5'
+                              : ''
+                        return (
+                          <tr
+                            key={booking.id}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => openDetails(booking)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault()
+                                openDetails(booking)
+                              }
+                            }}
+                            className={`cursor-pointer border-t border-zinc-100 align-top hover:bg-zinc-50 focus-visible:outline-2 focus-visible:outline-blue-500 dark:border-zinc-800 dark:hover:bg-white/5 ${rowTone}`}
+                          >
+                            <td className="px-4 py-3">
                               <p className="truncate font-semibold text-zinc-950 dark:text-white">
                                 {booking.customer_name}
                               </p>
-                              <p className="mt-0.5 truncate text-sm text-zinc-500 dark:text-zinc-400">
+                              <p className="mt-0.5 truncate text-xs text-zinc-500 dark:text-zinc-400">
                                 {booking.customer_phone}
                               </p>
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 xl:hidden dark:text-zinc-400">
-                                Scheduled
-                              </p>
-                              <p className="whitespace-nowrap text-sm">
+                            </td>
+                            <td className="px-3 py-3">
+                              <p className="text-sm leading-5">
                                 <ScheduledLine booking={booking} meta={meta} timeZone={tenantTz} />
                               </p>
                               {(meta.state === 'overdue' || meta.state === 'today') && (
-                                <div className="mt-1">
+                                <div className="mt-1.5">
                                   <ScheduleBadge meta={meta} />
                                 </div>
                               )}
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 xl:hidden dark:text-zinc-400">
-                                Service
-                              </p>
-                              <p className="truncate text-sm text-zinc-800 dark:text-zinc-200">
+                            </td>
+                            <td className="px-3 py-3">
+                              <p className="line-clamp-2 text-sm leading-5 text-zinc-800 dark:text-zinc-200">
                                 {booking.service_type}
                               </p>
-                            </div>
-                            <div className="flex items-center gap-2 xl:justify-center">
-                              <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500 xl:hidden dark:text-zinc-400">
-                                Source
-                              </span>
+                            </td>
+                            <td className="px-3 py-3">
                               <SourceBadge channel={booking.source_channel} />
-                            </div>
-                            <div className="min-w-0 xl:text-center">
-                              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 xl:hidden dark:text-zinc-400">
-                                {booking.source_channel.toLowerCase() === 'call' ? 'Vapi number' : 'From'}
-                              </p>
-                              <p className="truncate font-mono text-xs text-zinc-800 dark:text-zinc-200">
-                                {booking.source_contact || booking.customer_phone || '—'}
-                              </p>
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 xl:hidden dark:text-zinc-400">
-                                Status
-                              </p>
-                              <div className="flex flex-col items-start gap-1 xl:items-stretch">
-                                <Badge color={statusColor(booking.status)}>
-                                  {prettyStatus(booking.status)}
-                                </Badge>
-                                <span className="max-w-56 text-[11px] leading-snug text-zinc-500 dark:text-zinc-400">
-                                  Created {formatDateTime(booking.created_at, tenantTz)}
-                                  <br />
-                                  Updated {formatDateTime(booking.updated_at, tenantTz)}
-                                </span>
+                              {booking.source_contact ? (
+                                <p className="mt-1 truncate font-mono text-[11px] text-zinc-500 dark:text-zinc-400">
+                                  {booking.source_contact}
+                                </p>
+                              ) : null}
+                            </td>
+                            <td className="px-3 py-3">
+                              <Badge color={statusColor(booking.status)}>
+                                {prettyStatus(booking.status)}
+                              </Badge>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex flex-wrap items-center justify-end gap-1">
+                                <Button
+                                  plain
+                                  className="text-xs"
+                                  onClick={(e) => {
+                                    stopBubble(e)
+                                    openEdit(booking)
+                                  }}
+                                >
+                                  Edit
+                                </Button>
+                                {ACTIVE_STATUSES.has(booking.status) && renderActionButtons(booking)}
                               </div>
-                            </div>
-                            <div className="flex flex-wrap gap-1 border-t border-zinc-100 pt-3 xl:justify-end xl:border-t-0 xl:pt-0 dark:border-zinc-800">
-                              {ACTIVE_STATUSES.has(booking.status) && renderActionButtons(booking)}
-                            </div>
-                          </div>
-                        </CardBody>
-                      </Card>
-                    )
-                  })}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </div>
