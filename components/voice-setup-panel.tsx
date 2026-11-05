@@ -2310,7 +2310,7 @@ export function VoiceSetupPanel({
                     className={clsx(
                       'rounded-md px-3 py-1.5 text-sm font-semibold capitalize disabled:opacity-50',
                       paidProvider === provider
-                        ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-950'
+                        ? 'segment-on'
                         : 'text-zinc-600 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white',
                     )}
                   >

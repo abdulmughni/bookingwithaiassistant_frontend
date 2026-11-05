@@ -357,7 +357,7 @@ function PeriodToggle({
           className={clsx(
             'rounded-lg px-3 py-1.5 text-sm font-medium transition',
             value === opt.id
-              ? 'bg-zinc-900 text-white dark:bg-[var(--brand-primary)] dark:text-[var(--brand-button-text,#fff)]'
+              ? 'segment-on'
               : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-white',
           )}
         >

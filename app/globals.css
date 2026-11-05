@@ -1047,3 +1047,13 @@ html.dark .theme-hero {
   color: #fafafa;
   border-color: color-mix(in srgb, var(--brand-primary) 42%, #3f3f46) !important;
 }
+
+/* Selected side of a Calendar / List style toggle. Light theme wash, not a black pill. */
+html[data-agency-theme]:not(.dark) .segment-on {
+  background-color: color-mix(in srgb, var(--brand-primary) 14%, #fff) !important;
+  color: var(--brand-primary) !important;
+}
+html.dark[data-agency-theme] .segment-on {
+  background-color: color-mix(in srgb, var(--brand-primary) 34%, #3f3f46) !important;
+  color: color-mix(in srgb, var(--brand-primary) 42%, #fff) !important;
+}
