@@ -945,6 +945,7 @@ export interface AdminChannelAccountRow {
 export interface AdminBookingRow {
   id: string
   customer_name: string
+  customer_phone?: string | null
   service_type: string
   status: string
   source_channel: string
@@ -958,13 +959,22 @@ export interface AdminConversationRow {
   channel: string
   customer_display_name: string | null
   customer_label_name: string | null
+  customer_phone?: string | null
+  channel_account_label?: string | null
   booking_status: string
   intent_category: string | null
+  turn_count?: number
   escalation_flag: boolean
+  escalation_reason?: string | null
+  booking_id?: string | null
   flagged: boolean
   outcome: 'BOOKED' | 'NO BOOKING' | 'ESCALATED'
   updated_at: string | null
   created_at: string | null
+}
+
+export interface AdminConversationDetail extends AdminConversationRow {
+  messages: BookingMessagePreview[]
 }
 
 /** Single-tenant detail (GET /api/admin/tenants/{id}). */

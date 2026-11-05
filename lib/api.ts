@@ -735,6 +735,11 @@ export const api = {
         `/api/admin/tenants/${encodeURIComponent(tenantId)}/bookings?limit=${limit}`,
         { token },
       ),
+    getTenantBooking: (token: string, tenantId: string, bookingId: string) =>
+      request<import('./types').BookingDetails>(
+        `/api/admin/tenants/${encodeURIComponent(tenantId)}/bookings/${encodeURIComponent(bookingId)}`,
+        { token },
+      ),
     updateTenantBooking: (
       token: string,
       tenantId: string,
@@ -748,14 +753,22 @@ export const api = {
     listTenantConversations: (
       token: string,
       tenantId: string,
-      params?: { flagged_only?: boolean },
+      params?: { flagged_only?: boolean; limit?: number },
     ) => {
-      const qs = params?.flagged_only ? '?flagged_only=true' : ''
+      const search = new URLSearchParams()
+      if (params?.flagged_only) search.set('flagged_only', 'true')
+      if (params?.limit) search.set('limit', String(params.limit))
+      const qs = search.toString()
       return request<import('./types').AdminConversationRow[]>(
-        `/api/admin/tenants/${encodeURIComponent(tenantId)}/conversations${qs}`,
+        `/api/admin/tenants/${encodeURIComponent(tenantId)}/conversations${qs ? `?${qs}` : ''}`,
         { token },
       )
     },
+    getTenantConversation: (token: string, tenantId: string, conversationId: string) =>
+      request<import('./types').AdminConversationDetail>(
+        `/api/admin/tenants/${encodeURIComponent(tenantId)}/conversations/${encodeURIComponent(conversationId)}`,
+        { token },
+      ),
     flagTenantConversation: (
       token: string,
       tenantId: string,

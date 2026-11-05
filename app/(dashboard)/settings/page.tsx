@@ -178,6 +178,7 @@ function snapshotFromTenant(
 // ---------------------------------------------------------------------------
 export function TenantConfigTab({
   mode = 'customer',
+  part = 'all',
   tenant,
   credentials,
   onSaved,
@@ -188,6 +189,8 @@ export function TenantConfigTab({
 }: {
   /** Customer edits company name, services and coverage, and scheduling, including timezone. Admin edits every field. */
   mode?: 'customer' | 'admin'
+  /** Agency client page splits the same form across two tabs. The client settings page keeps every section. */
+  part?: 'all' | 'profile' | 'configuration'
   tenant: Tenant
   credentials: Credential[]
   onSaved: () => void
@@ -198,6 +201,8 @@ export function TenantConfigTab({
   onWeeklyReportChange?: (enabled: boolean) => Promise<void>
 }) {
   const isCustomer = mode === 'customer'
+  const showProfile = part === 'all' || part === 'profile'
+  const showConfig = part === 'all' || part === 'configuration'
   const getToken = useApiToken()
   const [reportOn, setReportOn] = useState(weeklyReportEnabled !== false)
   const [reportSaving, setReportSaving] = useState(false)
@@ -558,9 +563,9 @@ export function TenantConfigTab({
     <>
     <form
       onSubmit={(e) => { e.preventDefault(); handleSave() }}
-      className="mt-8 max-w-3xl space-y-10"
+      className={part === 'all' ? 'mt-8 max-w-3xl space-y-10' : 'max-w-3xl space-y-10'}
     >
-      <section>
+      {showProfile ? <section>
         <Subheading>Organization</Subheading>
         <FieldGroup className="mt-4">
           <Field>
@@ -660,9 +665,9 @@ export function TenantConfigTab({
           </>
           )}
         </FieldGroup>
-      </section>
+      </section> : null}
 
-      {!isCustomer && (
+      {showProfile && !isCustomer && (
       <>
       <Divider />
 
@@ -688,9 +693,9 @@ export function TenantConfigTab({
       </>
       )}
 
-      <Divider />
+      {showProfile ? <Divider /> : null}
 
-      <section>
+      {showProfile ? <section>
         <Subheading>Services &amp; coverage</Subheading>
         <FieldGroup className="mt-4">
           <Field><TagInput label="Service types" description="Type and press comma or Enter to add each service." value={serviceTypes} onChange={setServiceTypes} placeholder="e.g. AC repair" /></Field>
@@ -700,11 +705,11 @@ export function TenantConfigTab({
           <Field><TagInput label="Service area ZIP codes" value={serviceAreaZips} onChange={setServiceAreaZips} placeholder="78701" /></Field>
           <Field><TagInput label="Accepted payment methods" description="Shown to customers when they ask 'how can I pay?'. Press comma or Enter to add each method." value={paymentMethods} onChange={setPaymentMethods} placeholder="Cash, Bank transfer, Zelle" /></Field>
         </FieldGroup>
-      </section>
+      </section> : null}
 
-      <Divider />
+      {showProfile && showConfig ? <Divider /> : null}
 
-      <section>
+      {showConfig ? <section>
         <Subheading>Scheduling</Subheading>
         <FieldGroup className="mt-4">
           <Field>
@@ -754,11 +759,11 @@ export function TenantConfigTab({
             <Field><Label>Escalation: low confidence threshold</Label><Input type="number" step="0.01" min={0} max={1} value={escalationLowConfidence} onChange={(e) => setEscalationLowConfidence(e.target.value)} /></Field>
           </div>
         </FieldGroup>
-      </section>
+      </section> : null}
 
-      <Divider />
+      {showConfig ? <Divider /> : null}
 
-      <section>
+      {showConfig ? <section>
         <Subheading>Integrations</Subheading>
         <Text className="mb-4 text-sm text-zinc-500">
           {isCustomer
@@ -784,9 +789,9 @@ export function TenantConfigTab({
             </Select>
           </Field>
         </FieldGroup>
-      </section>
+      </section> : null}
 
-      {!isCustomer && (
+      {showConfig && !isCustomer && (
       <>
       <Divider />
 
@@ -822,8 +827,8 @@ export function TenantConfigTab({
       </div>
     </form>
 
-    {onWeeklyReportChange && (
-      <section className={`${dashCardClass} mt-10 max-w-3xl p-5`}>
+    {showConfig && onWeeklyReportChange && (
+      <section className={part === 'all' ? `${dashCardClass} mt-10 max-w-3xl p-5` : 'max-w-3xl border-t border-zinc-200 pt-8 dark:border-zinc-700'}>
         <Subheading>Weekly report</Subheading>
         <Text className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
           When this is on, this client gets an email every Monday with the last 7 days:
