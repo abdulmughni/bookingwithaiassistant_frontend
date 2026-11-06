@@ -84,7 +84,7 @@ function SettingsBody() {
     <PageShell>
       <PageHeader
         title="Settings"
-        description="The name and logo people see, and the colors used across the portal."
+        description="The sidebar name and logo. Your own name, photo, and email are on the account card at the bottom of the menu."
       />
       <div className={`${dashCardClass} overflow-hidden`}>
       <div className="flex gap-6 overflow-x-auto border-b border-zinc-200/80 px-4 pt-2 dark:border-zinc-700/80 sm:px-6">

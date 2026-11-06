@@ -180,6 +180,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               name="Beyonds Logic"
               subtitle="Admin portal"
               mark="B"
+              markSrc="/favicon_io/apple-touch-icon.png"
               collapsed={adminCollapsed}
               onToggle={() => {
                 setAdminCollapsed((value) => {
@@ -492,7 +493,7 @@ function AgencyProfileCard({
             onClick={() => openUserProfile()}
             className="block w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-zinc-700 data-focus:bg-zinc-100 dark:text-zinc-100 dark:data-focus:bg-white/10"
           >
-            Manage account
+            Name, photo, and email
           </button>
         </MenuItem>
         <MenuItem>
