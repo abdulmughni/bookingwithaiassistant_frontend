@@ -56,9 +56,39 @@ function accountAppearance(mode: ColorMode): ClerkAppearance {
   }
 }
 
+/** The account modal starts on a closed "Update profile" button. Open the name and photo fields. */
+function useOpenProfileFields() {
+  useEffect(() => {
+    let modal: Element | null = null
+    const open = () => {
+      const next = document.querySelector('.cl-modalContent')
+      if (!next) {
+        modal = null
+        return
+      }
+      const formOpen = next.querySelector('input[name="firstName"], input[placeholder="First name"]')
+      if (formOpen) {
+        modal = next
+        return
+      }
+      if (modal === next) return
+      const button = Array.from(next.querySelectorAll('button, [role="button"]')).find(
+        (item) => item.textContent?.replace(/\s+/g, ' ').trim() === 'Update profile',
+      )
+      if (!(button instanceof HTMLElement)) return
+      modal = next
+      button.click()
+    }
+    const observer = new MutationObserver(open)
+    observer.observe(document.body, { childList: true, subtree: true })
+    return () => observer.disconnect()
+  }, [])
+}
+
 export function AppProviders({ children }: { children: ReactNode }) {
   const { mode } = useColorMode()
   const [appearance, setAppearance] = useState<ClerkAppearance>(undefined)
+  useOpenProfileFields()
 
   useEffect(() => {
     const apply = () => setAppearance(accountAppearance(mode))

@@ -17,7 +17,6 @@ import type { Credential, Tenant, TimezoneChoice } from '@/lib/types'
 import { ReadOnlyBanner, useReadOnlyAccount } from '@/components/account-status-gate'
 import { CostPolicyPicker } from '@/components/cost-policy-picker'
 import { AgencyBrandForm } from '@/components/admin/agency-brand-form'
-import { ProfilePhotoForm } from '@/components/profile-photo-form'
 import { GoogleCalendarCard } from '@/components/google-calendar-card'
 import { Subheading } from '@/components/heading'
 
@@ -921,7 +920,7 @@ export default function SettingsPage() {
             onClick={() => setActiveTab('appearance')}
             className={settingsTabClass(activeTab === 'appearance')}
           >
-            Profile and colors
+            Colors
           </button>
           <button
             type="button"
@@ -940,18 +939,7 @@ export default function SettingsPage() {
         </nav>
         <div className="p-4 sm:p-6">
 
-      {activeTab === 'appearance' && (
-        <>
-          <ProfilePhotoForm />
-          <section className="mt-6">
-            <Subheading>Brand & White Label</Subheading>
-            <p className="mt-1 mb-5 text-sm text-zinc-500">
-              Light and dark mode, presets, and colors apply to your dashboard. The logo stays with your agency.
-            </p>
-            <AgencyBrandForm showLogo={false} />
-          </section>
-        </>
-      )}
+      {activeTab === 'appearance' && <AgencyBrandForm showLogo={false} />}
 
       {activeTab === 'calendar' && <GoogleCalendarCard />}
 
