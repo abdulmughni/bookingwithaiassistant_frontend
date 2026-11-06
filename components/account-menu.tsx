@@ -37,7 +37,10 @@ export function AccountMenu({
   if (!user) return null
 
   const email = user.primaryEmailAddress?.emailAddress ?? ''
-  const name = portalName.trim() || 'Account'
+  const person = (user.fullName || user.firstName || '').trim()
+  const named = Boolean(person) && person.toLowerCase() !== email.toLowerCase()
+  const name = named ? person : email || 'Account'
+  const detail = named ? email : portalName.trim()
 
   return (
     <Menu as="div" className="relative">
@@ -46,7 +49,7 @@ export function AccountMenu({
         {compact ? null : (
           <span className="min-w-0">
             <span className="block truncate text-sm font-medium text-zinc-950 dark:text-white">{name}</span>
-            <span className="block truncate text-xs text-zinc-500">{email}</span>
+            {detail ? <span className="block truncate text-xs text-zinc-500">{detail}</span> : null}
           </span>
         )}
       </MenuButton>
@@ -58,7 +61,7 @@ export function AccountMenu({
           <Avatar name={name} email={email} imageUrl={user.imageUrl} />
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-zinc-950 dark:text-white">{name}</p>
-            <p className="truncate text-xs text-zinc-500">{email}</p>
+            {detail ? <p className="truncate text-xs text-zinc-500">{detail}</p> : null}
           </div>
         </div>
         <div className="mx-2 my-1 h-px bg-zinc-100 dark:bg-zinc-800" />
@@ -71,7 +74,7 @@ export function AccountMenu({
             <span className="flex size-8 items-center justify-center rounded-lg bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-300">
               <Cog6ToothIcon className="size-4" />
             </span>
-            Manage account
+            Name, photo, and email
           </button>
         </MenuItem>
         <MenuItem>

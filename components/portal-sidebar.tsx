@@ -29,6 +29,7 @@ export function PortalSidebarBrand({
   collapsed,
   onToggle,
   mark,
+  markSrc,
 }: {
   loading?: boolean
   logoUrl?: string | null
@@ -37,6 +38,8 @@ export function PortalSidebarBrand({
   collapsed: boolean
   onToggle: () => void
   mark?: string
+  /** Fixed platform mark, used for the admin portal. */
+  markSrc?: string
 }) {
   const letter = (mark || name.trim()[0] || 'A').toUpperCase()
   return (
@@ -44,6 +47,9 @@ export function PortalSidebarBrand({
       <span className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-blue-50 text-sm font-semibold text-blue-700 ring-1 ring-blue-100">
         {loading ? null : logoUrl ? (
           <BrandLogo src={logoUrl} alt="" height={40} className="size-10 max-w-10 object-cover" />
+        ) : markSrc ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={markSrc} alt="" className="size-8 object-contain" />
         ) : (
           letter
         )}
@@ -153,23 +159,24 @@ export function PortalNavGroup({
 
 export function PortalProfileCard({
   title,
-  subtitle,
   compact,
-  menuTitle,
   menuLines,
 }: {
   title: string
-  subtitle: string
+  subtitle?: string
   compact: boolean
-  menuTitle: string
+  /** Kept for callers. The card itself always shows the signed-in person. */
+  menuTitle?: string
   menuLines: { label: string; value: string }[]
 }) {
   const { user } = useUser()
   const { openUserProfile, signOut } = useClerk()
   if (!user) return null
   const email = user.primaryEmailAddress?.emailAddress ?? ''
-  const name = user.fullName || user.firstName || email || title
-  const initials = name
+  const person = (user.fullName || user.firstName || '').trim()
+  const named = Boolean(person) && person.toLowerCase() !== email.toLowerCase()
+  const heading = named ? person : email || title
+  const initials = (named ? person : email || title)
     .split(/\s+/)
     .filter(Boolean)
     .slice(0, 2)
@@ -199,8 +206,10 @@ export function PortalProfileCard({
         {compact ? null : (
           <>
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-medium text-zinc-800">{title}</span>
-              <span className="block truncate text-[11px] text-zinc-400">{subtitle || email}</span>
+              <span className="block truncate text-sm font-medium text-zinc-800">{heading}</span>
+              {named && email ? (
+                <span className="block truncate text-[11px] text-zinc-400">{email}</span>
+              ) : null}
             </span>
             <span className="shrink-0 text-zinc-300" aria-hidden>
               ›
@@ -212,7 +221,7 @@ export function PortalProfileCard({
 
   return (
     <Menu as="div" className={clsx('relative', compact && 'flex justify-center')}>
-      {compact ? <Tip content={title}>{button}</Tip> : button}
+      {compact ? <Tip content={heading}>{button}</Tip> : button}
       <MenuItems
         transition
         anchor="top start"
@@ -221,8 +230,8 @@ export function PortalProfileCard({
         <div className="flex items-center gap-3 rounded-xl bg-zinc-50 px-2.5 py-2.5 dark:bg-white/8">
           {avatar}
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-zinc-950 dark:text-white">{menuTitle}</p>
-            <p className="truncate text-xs text-zinc-500">{email}</p>
+            <p className="truncate text-sm font-semibold text-zinc-950 dark:text-white">{heading}</p>
+            {named && email ? <p className="truncate text-xs text-zinc-500">{email}</p> : null}
           </div>
         </div>
         <div className="mt-2 space-y-1 px-2.5 py-1 text-xs text-zinc-500">
@@ -239,7 +248,7 @@ export function PortalProfileCard({
             onClick={() => openUserProfile()}
             className="block w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-zinc-700 data-focus:bg-zinc-100 dark:text-zinc-100 dark:data-focus:bg-white/10"
           >
-            Manage account
+            Name, photo, and email
           </button>
         </MenuItem>
         <MenuItem>

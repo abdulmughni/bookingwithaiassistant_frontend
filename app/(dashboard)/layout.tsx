@@ -90,7 +90,7 @@ export default function DashboardLayout({
           <PortalSidebarBrand
             loading={brandLoading || adminLoading}
             logoUrl={brandAssetUrl(brand?.logo_url)}
-            name={brand?.company_name || organization?.name || 'Client'}
+            name={brand?.company_name || 'Agency'}
             subtitle="Client portal"
             collapsed={collapsed}
             onToggle={() => {
@@ -144,11 +144,11 @@ export default function DashboardLayout({
           <div className={clsx('mt-auto', collapsed ? 'px-2 pb-3' : 'px-3 pb-3')}>
             <SidebarUsageCard compact={collapsed} />
             <PortalProfileCard
-              title={organization?.name || brand?.company_name || 'Client'}
+              title="Account"
               subtitle={user?.primaryEmailAddress?.emailAddress ?? ''}
               compact={collapsed}
-              menuTitle={organization?.name || brand?.company_name || 'Client'}
-              menuLines={[{ label: 'Workspace', value: organization?.name || brand?.company_name || 'Client' }]}
+              menuTitle="Account"
+              menuLines={[{ label: 'Company', value: organization?.name || 'Client' }]}
             />
           </div>
         </PortalSidebarShell>
