@@ -27,7 +27,8 @@ import {
 import { Button } from '@/components/button'
 import { PageHeader, PageShell, SkeletonBlock } from '@/components/dashboard-ui'
 import { Card, CardBody } from '@/components/card'
-import { useApiData } from '@/lib/hooks'
+import { useApiData, useTenantTimezone } from '@/lib/hooks'
+import { sampleCallStats, useClientPortalDemo } from '@/lib/client-portal-demo'
 import { api } from '@/lib/api'
 import { formatDate } from '@/lib/utils'
 
@@ -77,10 +78,20 @@ function periodRangeLabel(start: string, end: string, tz: string): string {
 
 export default function CallStatsPage() {
   const [period, setPeriod] = useState<Period>('week')
-  const { data, loading, error, refetch } = useApiData(
+  const tenantTz = useTenantTimezone()
+  const { enabled: showSample } = useClientPortalDemo()
+  const { data: live, loading, error, refetch } = useApiData(
     (token) => api.calls.stats(token, period),
     [period],
   )
+  const data = showSample
+    ? sampleCallStats(
+        period,
+        new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()),
+        tenantTz,
+      )
+    : live
+  const statsLoading = showSample ? false : loading
 
   const dailyData = useMemo(() => data?.daily_volume ?? [], [data?.daily_volume])
 
@@ -109,8 +120,8 @@ export default function CallStatsPage() {
             : 'What your AI phone line earned this period — jobs booked, dollars, and coverage you would have missed.'
         }
       >
-        <Button plain onClick={() => void refetch()} disabled={loading}>
-          <ArrowPathIcon data-slot="icon" className={clsx(loading && 'animate-spin')} />
+        <Button plain onClick={() => void refetch()} disabled={statsLoading}>
+          <ArrowPathIcon data-slot="icon" className={clsx(statsLoading && 'animate-spin')} />
           Refresh
         </Button>
         <Button href="/calls" outline>
@@ -119,13 +130,13 @@ export default function CallStatsPage() {
         <PeriodToggle value={period} onChange={setPeriod} />
       </PageHeader>
 
-      {error && (
+      {!showSample && error && (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-800/60 dark:bg-red-900/20 dark:text-red-200">
           {error}
         </div>
       )}
 
-      {loading || !data || !cur ? (
+      {statsLoading || !data || !cur ? (
         <div className="space-y-4">
           <SkeletonBlock className="h-40" />
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

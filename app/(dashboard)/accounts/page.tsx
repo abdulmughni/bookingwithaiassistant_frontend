@@ -20,6 +20,7 @@ import { Field, FieldGroup, Label } from '@/components/fieldset'
 import { Card, CardBody } from '@/components/card'
 import { ChannelIcon } from '@/components/channel-icon'
 import { useApiData, useApiToken, useFreshOrgToken } from '@/lib/hooks'
+import { sampleChannels, useClientPortalDemo } from '@/lib/client-portal-demo'
 import { ApiError, api } from '@/lib/api'
 import { notifyError, notifySuccess } from '@/lib/notify'
 import { formatDate } from '@/lib/utils'
@@ -161,7 +162,18 @@ function ChannelAccountCard({
               <h3 className="mt-3 text-base font-semibold tracking-tight text-zinc-950 dark:text-white">
                 {ch.label || 'Unnamed account'}
               </h3>
-              <p className="mt-1 text-xs capitalize text-zinc-500 dark:text-zinc-400">{ch.channel}</p>
+              <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-300">
+                {ch.channel === 'facebook'
+                  ? 'Facebook Page · Messenger'
+                  : ch.channel === 'instagram'
+                    ? 'Instagram · direct messages'
+                    : ch.channel}
+              </p>
+              <p className="mt-1 text-xs text-zinc-500">
+                {ch.ai_enabled === false
+                  ? 'AI replies are off. Messages are saved, but the assistant will not answer.'
+                  : 'AI replies are on. New messages can be turned into bookings.'}
+              </p>
             </div>
           </div>
           <div className="flex shrink-0 flex-col items-end gap-1 text-right">
@@ -217,9 +229,17 @@ function AccountsPageInner() {
   const getToken = useApiToken()
   const getFreshToken = useFreshOrgToken()
 
+  const { enabled: showSample } = useClientPortalDemo()
   const { data: channels, loading, refetch } = useApiData<ChannelAccount[]>(
     (token) => api.channels.list(token),
   )
+  const sampleToday = new Intl.DateTimeFormat('en-CA', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date())
+  const visibleChannels = showSample ? sampleChannels(sampleToday) : channels
+  const listLoading = showSample ? false : loading
 
   useEffect(() => {
     const fb = searchParams.get('fb_oauth')
@@ -300,6 +320,10 @@ function AccountsPageInner() {
   }
 
   const handleToggle = async (ch: ChannelAccount) => {
+    if (showSample) {
+      notifySuccess('Sample account. Turn sample data off in Settings to change a live connection.')
+      return
+    }
     try {
       const token = await getToken()
       if (ch.is_active) {
@@ -316,6 +340,10 @@ function AccountsPageInner() {
   }
 
   const handleDelete = async (ch: ChannelAccount) => {
+    if (showSample) {
+      notifySuccess('Sample account. Turn sample data off in Settings to change a live connection.')
+      return
+    }
     try {
       const token = await getToken()
       await api.channels.remove(token, ch.channel, ch.account_id)
@@ -327,6 +355,10 @@ function AccountsPageInner() {
   }
 
   const handleVerify = async (ch: ChannelAccount) => {
+    if (showSample) {
+      notifySuccess('Skyline HVAC is already connected in this sample.')
+      return
+    }
     const key = `${ch.channel}-${ch.account_id}`
     setVerifyingKey(key)
     try {
@@ -362,7 +394,7 @@ function AccountsPageInner() {
       </PageHeader>
 
       <div>
-        {loading ? (
+        {listLoading ? (
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {Array.from({ length: 3 }).map((_, i) => (
               <div
@@ -371,9 +403,9 @@ function AccountsPageInner() {
               />
             ))}
           </div>
-        ) : channels && channels.length > 0 ? (
+        ) : visibleChannels && visibleChannels.length > 0 ? (
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {channels.map((ch) => (
+            {visibleChannels.map((ch) => (
               <ChannelAccountCard
                 key={`${ch.channel}-${ch.account_id}`}
                 ch={ch}

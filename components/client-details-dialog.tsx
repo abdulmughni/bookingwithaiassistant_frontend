@@ -16,6 +16,7 @@ import { useApiToken } from '@/lib/hooks'
 import { api } from '@/lib/api'
 import { formatDate, formatDateTime } from '@/lib/utils'
 import type { Customer, CustomerDetail } from '@/lib/types'
+import { sampleCustomerDetail } from '@/lib/client-portal-demo'
 
 function DetailRow({
   icon: Icon,
@@ -62,6 +63,16 @@ export function ClientDetailsDialog({
     const id = (clientId || '').trim()
     if (!id) {
       setData(null)
+      return
+    }
+    if (id.startsWith('sample-customer-')) {
+      const today = new Intl.DateTimeFormat('en-CA', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(new Date())
+      setData(sampleCustomerDetail(id, today, Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'))
+      setLoading(false)
       return
     }
     setLoading(true)

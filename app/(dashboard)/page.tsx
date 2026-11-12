@@ -36,6 +36,7 @@ import {
   shiftDateKey,
 } from '@/lib/report-range'
 import type { TenantStats, Booking, ChannelAccount } from '@/lib/types'
+import { clientDashboardDemo, useClientPortalDemo } from '@/lib/client-portal-demo'
 import { Cell, Pie, PieChart, ResponsiveContainer } from 'recharts'
 
 // ---------------------------------------------------------------------------
@@ -564,6 +565,11 @@ function DashboardPageInner() {
   const today = dayKeyInTz(new Date(), tenantTz)
   const last7 = { start: shiftDateKey(today, -6), end: today }
   const last30 = { start: shiftDateKey(today, -29), end: today }
+  const { enabled: showSample } = useClientPortalDemo()
+  const sample = useMemo(
+    () => clientDashboardDemo({ today, timeZone: tenantTz, start: range?.start, end: range?.end }),
+    [today, tenantTz, range?.start, range?.end],
+  )
 
   const { data: stats, loading: statsLoading } = useApiData<TenantStats>(
     (token) => {
@@ -572,8 +578,8 @@ function DashboardPageInner() {
     },
     [pendingLink, range?.start ?? '', range?.end ?? ''],
   )
-  const statsView = pendingLink ? null : stats
-  const statsBusy = statsLoading || pendingLink
+  const statsView = showSample ? sample.stats : pendingLink ? null : stats
+  const statsBusy = showSample ? false : statsLoading || pendingLink
 
   const [draftStart, setDraftStart] = useState(range?.start ?? '')
   const [draftEnd, setDraftEnd] = useState(range?.end ?? '')
@@ -608,6 +614,8 @@ function DashboardPageInner() {
   )
   const chartStats = statsView
   const chartBusy = statsBusy
+  const dashboardBookings = showSample ? sample.bookings : bookingsQuery.data ?? []
+  const dashboardChannels = showSample ? sample.channels : channelsQuery.data
 
   const businessName = organization?.name || 'Dashboard'
 
@@ -845,9 +853,9 @@ function DashboardPageInner() {
           </div>
           <div className={chartMin ? 'min-w-0 @min-[720px]:flex-1' : 'h-full'}>
             <BookingListCard
-              bookings={bookingsQuery.data ?? []}
+              bookings={dashboardBookings}
               tz={tenantTz}
-              loading={bookingsQuery.loading}
+              loading={showSample ? false : bookingsQuery.loading}
               pageFind={pageFind}
               minimized={listMin}
               onToggle={() => setListMin((value) => !value)}
@@ -860,13 +868,21 @@ function DashboardPageInner() {
         <CompletionGauge stats={statsView} loading={statsBusy} />
         <SocialAccountCard
           channel="facebook"
-          account={pickChannel(channelsQuery.data, 'facebook')}
-          bookings={(bookingsQuery.data ?? []).filter((booking) => booking.source_channel === 'facebook').length}
+          account={pickChannel(dashboardChannels, 'facebook')}
+          bookings={
+            showSample
+              ? sample.facebookBookings
+              : dashboardBookings.filter((booking) => booking.source_channel === 'facebook').length
+          }
         />
         <SocialAccountCard
           channel="instagram"
-          account={pickChannel(channelsQuery.data, 'instagram')}
-          bookings={(bookingsQuery.data ?? []).filter((booking) => booking.source_channel === 'instagram').length}
+          account={pickChannel(dashboardChannels, 'instagram')}
+          bookings={
+            showSample
+              ? sample.instagramBookings
+              : dashboardBookings.filter((booking) => booking.source_channel === 'instagram').length
+          }
         />
       </div>
     </PageShell>

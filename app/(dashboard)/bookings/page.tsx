@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useEffect, useRef, useState } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
   ArrowPathIcon,
@@ -35,6 +35,7 @@ import { slotDurationMinutesFromBuffers } from '@/lib/booking-calendar'
 import { decodeBookingId } from '@/lib/booking-link'
 import { formatDateTime, statusColor } from '@/lib/utils'
 import type { Booking, Tenant } from '@/lib/types'
+import { sampleBookings, useClientPortalDemo } from '@/lib/client-portal-demo'
 
 type PageTab = 'calendar' | 'list'
 type LayoutMode = 'box' | 'list'
@@ -283,9 +284,14 @@ function BookingsPageInner() {
     router.replace(q ? `/bookings?${q}` : '/bookings', { scroll: false })
   }
 
+  const { enabled: showSample } = useClientPortalDemo()
   const { data: bookings, loading, refetch } = useApiData<Booking[]>(
     (token) => api.bookings.list(token, statusFilter ? { status: statusFilter } : undefined),
     [statusFilter],
+  )
+  const sampleRows = useMemo(
+    () => sampleBookings(dayKeyInTz(new Date(), tenantTz), tenantTz),
+    [tenantTz],
   )
 
   const { data: tenant } = useApiData<Tenant>((token) => api.tenants.me(token))
@@ -363,7 +369,10 @@ function BookingsPageInner() {
     }
   }
 
-  const displayBookings = bookings ?? []
+  const displayBookings = (showSample ? sampleRows : bookings ?? []).filter(
+    (booking) => !showSample || !statusFilter || booking.status === statusFilter,
+  )
+  const listLoading = showSample ? false : loading
 
   const matchesScheduleRange = (booking: Booking) => {
     if (!scheduleDateFrom && !scheduleDateTo) return true
@@ -458,21 +467,30 @@ function BookingsPageInner() {
         description="View your schedule on the calendar or browse the list. Create, edit, and update booking status from either view."
       >
         {overdueCount > 0 && (
-          <span className="inline-flex items-center gap-2 rounded-full bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 ring-1 ring-red-200 dark:bg-red-500/10 dark:text-red-300 dark:ring-red-500/30">
-            <ExclamationTriangleIcon className="h-4 w-4" aria-hidden="true" />
+          <Button outline className="text-red-700 dark:text-red-300" onClick={() => setPageTab('list')}>
+            <ExclamationTriangleIcon data-slot="icon" />
             {overdueCount} overdue
-          </span>
+          </Button>
         )}
         {todayCount > 0 && (
-          <span className="inline-flex items-center gap-2 rounded-full bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/30">
-            <SparklesIcon className="h-4 w-4" aria-hidden="true" />
+          <Button
+            outline
+            className="text-amber-800 dark:text-amber-200"
+            onClick={() => {
+              const today = dayKeyInTz(new Date(), tenantTz)
+              setPageTab('list')
+              setScheduleDateFrom(today)
+              setScheduleDateTo(today)
+            }}
+          >
+            <SparklesIcon data-slot="icon" />
             {todayCount} today
-          </span>
+          </Button>
         )}
-        <Button outline onClick={() => refetch()} disabled={loading}>
+        <Button outline onClick={() => refetch()} disabled={listLoading}>
           <ArrowPathIcon
             data-slot="icon"
-            className={loading ? 'animate-spin' : undefined}
+            className={listLoading ? 'animate-spin' : undefined}
           />
           Refresh
         </Button>
@@ -587,7 +605,7 @@ function BookingsPageInner() {
       </section>
 
       {pageTab === 'calendar' ? (
-        loading ? (
+        listLoading ? (
           <div className="h-128 animate-pulse rounded-2xl border border-zinc-200 bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800" />
         ) : (
           <BookingsCalendar
@@ -602,7 +620,7 @@ function BookingsPageInner() {
         )
       ) : (
         <div>
-          {loading ? (
+          {listLoading ? (
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {Array.from({ length: 6 }).map((_, i) => (
                 <div

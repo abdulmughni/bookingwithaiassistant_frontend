@@ -19,6 +19,7 @@ import { CostPolicyPicker } from '@/components/cost-policy-picker'
 import { AgencyBrandForm } from '@/components/admin/agency-brand-form'
 import { GoogleCalendarCard } from '@/components/google-calendar-card'
 import { Subheading } from '@/components/heading'
+import { ClientDemoDataSwitch } from '@/lib/client-portal-demo'
 
 /**
  * Disables every form control inside (native fieldset semantics) and blocks
@@ -900,6 +901,7 @@ export default function SettingsPage() {
       <div className="space-y-6">
         <div className="h-8 w-48 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
         <div className="h-96 animate-pulse rounded-lg bg-zinc-100 dark:bg-zinc-800" />
+        <ClientDemoDataSwitch />
       </div>
     )
   }
@@ -952,6 +954,8 @@ export default function SettingsPage() {
       )}
         </div>
       </div>
+
+      <ClientDemoDataSwitch />
     </PageShell>
   )
 }
