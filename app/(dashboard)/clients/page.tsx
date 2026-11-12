@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useCallback, useEffect, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { MagnifyingGlassIcon, PlusIcon } from '@heroicons/react/20/solid'
 import { Button } from '@/components/button'
@@ -16,9 +16,18 @@ import { useApiToken } from '@/lib/hooks'
 import { api } from '@/lib/api'
 import { formatDate } from '@/lib/utils'
 import type { Customer } from '@/lib/types'
+import { sampleCustomers, useClientPortalDemo } from '@/lib/client-portal-demo'
+
+function clientInitials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return '?'
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase()
+}
 
 function ClientsPageInner() {
   const getToken = useApiToken()
+  const { enabled: showSample } = useClientPortalDemo()
   const router = useRouter()
   const searchParams = useSearchParams()
   const [q, setQ] = useState('')
@@ -33,7 +42,30 @@ function ClientsPageInner() {
   } | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Customer | null>(null)
 
+  const sampleRows = useMemo(() => {
+    const today = new Intl.DateTimeFormat('en-CA', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date())
+    return sampleCustomers(today, Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC')
+  }, [])
+
   const load = useCallback(async () => {
+    if (showSample) {
+      const needle = search.trim().toLowerCase()
+      setCustomers(
+        needle
+          ? sampleRows.filter((row) =>
+              `${row.display_name} ${row.phone ?? ''} ${row.email ?? ''} ${row.primary_address ?? ''}`
+                .toLowerCase()
+                .includes(needle),
+            )
+          : sampleRows,
+      )
+      setLoading(false)
+      return
+    }
     setLoading(true)
     try {
       const token = await getToken()
@@ -44,7 +76,7 @@ function ClientsPageInner() {
     } finally {
       setLoading(false)
     }
-  }, [getToken, search])
+  }, [getToken, sampleRows, search, showSample])
 
   useEffect(() => {
     void load()
@@ -175,84 +207,56 @@ function ClientsPageInner() {
                       onDelete={() => setDeleteTarget(c)}
                     />
                     <CardBody className="space-y-3">
-                      <div className="flex items-start justify-between gap-3 pr-10">
-                        <div className="min-w-0">
-                          <p className="truncate font-semibold text-zinc-950 dark:text-white">
-                            {c.display_name}
-                          </p>
-                          <p className="mt-0.5 truncate text-sm text-zinc-500 dark:text-zinc-400">
-                            {[c.phone, c.email].filter(Boolean).join(' · ') || 'No phone or email'}
-                          </p>
-                        </div>
-                        <div className="flex shrink-0 flex-col items-end gap-1">
-                          <Badge color="zinc">
-                            {c.bookings_count} booking{c.bookings_count === 1 ? '' : 's'}
-                          </Badge>
-                          {c.jobber_client_id ? <Badge color="lime">Jobber</Badge> : null}
+                      <div className="flex items-start gap-3 pr-8">
+                        <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-blue-50 text-sm font-semibold text-blue-700 ring-1 ring-blue-100">
+                          {clientInitials(c.display_name)}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="truncate font-semibold text-zinc-950 dark:text-white">{c.display_name}</p>
+                            <Badge color="zinc">{c.bookings_count} job{c.bookings_count === 1 ? '' : 's'}</Badge>
+                          </div>
+                          <p className="mt-0.5 truncate text-sm text-zinc-600 dark:text-zinc-300">{c.phone || 'No phone'}</p>
+                          <p className="truncate text-sm text-zinc-500">{c.email || 'No email'}</p>
                         </div>
                       </div>
-                      <p className="text-xs text-zinc-400">
-                        Last seen {c.last_seen_at ? formatDate(c.last_seen_at) : '—'}
-                      </p>
+                      <p className="truncate text-sm text-zinc-500">{c.primary_address || 'No address on file'}</p>
+                      <div className="flex items-center justify-between gap-2 border-t border-zinc-100 pt-3 text-xs text-zinc-500 dark:border-zinc-800">
+                        <span>Last visit {c.last_seen_at ? formatDate(c.last_seen_at) : '—'}</span>
+                        {c.jobber_client_id ? <Badge color="lime">In Jobber</Badge> : <span>Not in Jobber</span>}
+                      </div>
                     </CardBody>
                   </Card>
                 ))}
               </div>
             ) : (
-              <div className="space-y-2">
-                <div className="hidden px-2 text-xs font-semibold uppercase tracking-wide text-zinc-500 xl:grid xl:grid-cols-[1.4fr_1.2fr_0.7fr_0.8fr_0.5fr] xl:gap-4 dark:text-zinc-400">
+              <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
+                <div className="hidden grid-cols-[1.3fr_0.9fr_1.2fr_1.4fr_0.45fr_0.7fr] gap-3 border-b border-zinc-100 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 md:grid dark:border-zinc-800">
                   <span>Name</span>
-                  <span>Contact</span>
-                  <span>Bookings</span>
-                  <span>Last seen</span>
-                  <span>Jobber</span>
+                  <span>Phone</span>
+                  <span>Email</span>
+                  <span>Address</span>
+                  <span>Jobs</span>
+                  <span>Last visit</span>
                 </div>
-                {customers.map((c) => (
-                  <Card
-                    key={c.id}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => openClient(c.id)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault()
-                        openClient(c.id)
-                      }
-                    }}
-                    className="group relative cursor-pointer border border-zinc-200 shadow-sm transition hover:border-brand-300 hover:shadow-md focus-visible:outline-2 focus-visible:outline-blue-500 dark:border-zinc-700 dark:hover:border-brand-600/50"
-                  >
-                    <HoverIconActions
-                      onEdit={() => openEdit(c)}
-                      onDelete={() => setDeleteTarget(c)}
-                    />
-                    <CardBody className="xl:grid xl:grid-cols-[1.4fr_1.2fr_0.7fr_0.8fr_0.5fr] xl:items-center xl:gap-4">
-                      <div className="min-w-0 pr-10 xl:pr-0">
-                        <p className="font-semibold text-zinc-950 dark:text-white">{c.display_name}</p>
-                        <p className="mt-0.5 text-xs text-zinc-500 xl:hidden">
-                          {[c.phone, c.email].filter(Boolean).join(' · ') || 'No contact'}
-                        </p>
-                      </div>
-                      <p className="hidden truncate text-sm text-zinc-500 xl:block">
-                        {[c.phone, c.email].filter(Boolean).join(' · ') || '—'}
-                      </p>
-                      <p className="text-sm text-zinc-600 dark:text-zinc-300">
-                        <span className="font-medium xl:hidden">Bookings: </span>
-                        {c.bookings_count}
-                      </p>
-                      <p className="text-sm text-zinc-500">
-                        <span className="font-medium xl:hidden">Last seen: </span>
-                        {c.last_seen_at ? formatDate(c.last_seen_at) : '—'}
-                      </p>
-                      <div>
-                        {c.jobber_client_id ? (
-                          <Badge color="lime">Yes</Badge>
-                        ) : (
-                          <span className="text-sm text-zinc-400">—</span>
-                        )}
-                      </div>
-                    </CardBody>
-                  </Card>
-                ))}
+                <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                  {customers.map((c) => (
+                    <li key={c.id}>
+                      <button
+                        type="button"
+                        onClick={() => openClient(c.id)}
+                        className="grid w-full gap-1 px-4 py-3 text-left transition hover:bg-zinc-50 md:grid-cols-[1.3fr_0.9fr_1.2fr_1.4fr_0.45fr_0.7fr] md:items-center md:gap-3 dark:hover:bg-zinc-800/60"
+                      >
+                        <span className="truncate text-sm font-semibold text-zinc-950 dark:text-white">{c.display_name}</span>
+                        <span className="truncate text-sm text-zinc-600 dark:text-zinc-300">{c.phone || '—'}</span>
+                        <span className="truncate text-sm text-zinc-500">{c.email || '—'}</span>
+                        <span className="truncate text-sm text-zinc-500">{c.primary_address || '—'}</span>
+                        <span className="text-sm font-medium tabular-nums text-zinc-800 dark:text-zinc-100">{c.bookings_count}</span>
+                        <span className="text-sm text-zinc-500">{c.last_seen_at ? formatDate(c.last_seen_at) : '—'}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
           </div>

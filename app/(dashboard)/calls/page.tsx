@@ -33,6 +33,7 @@ import {
 import { ConfirmDeleteDialog } from '@/components/confirm-delete-dialog'
 import { BookingDetailsDialog } from '@/components/booking-details-dialog'
 import { useApiToken, useTenantTimezone } from '@/lib/hooks'
+import { sampleCallDetail, sampleCallLogs, useClientPortalDemo } from '@/lib/client-portal-demo'
 import { ApiError, api } from '@/lib/api'
 import { notifyError, notifySuccess } from '@/lib/notify'
 import { formatDateTime, statusColor as bookingStatusColor } from '@/lib/utils'
@@ -216,6 +217,7 @@ const PAGE_SIZE = 20
 export default function CallsPage() {
   const getToken = useApiToken()
   const tenantTz = useTenantTimezone()
+  const { enabled: showSample } = useClientPortalDemo()
   const [calls, setCalls] = useState<CallLogSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [total, setTotal] = useState<number | null>(null)
@@ -242,8 +244,8 @@ export default function CallsPage() {
 
   const filterKey = useMemo(
     () =>
-      [debouncedQuery, directionFilter, statusFilter, callDateFrom, callDateTo].join('\u0001'),
-    [debouncedQuery, directionFilter, statusFilter, callDateFrom, callDateTo],
+      [debouncedQuery, directionFilter, statusFilter, callDateFrom, callDateTo, showSample ? 'sample' : 'live'].join('\u0001'),
+    [debouncedQuery, directionFilter, statusFilter, callDateFrom, callDateTo, showSample],
   )
 
   const hasActiveFilters =
@@ -262,6 +264,28 @@ export default function CallsPage() {
     async (targetPage: number) => {
       setLoading(true)
       try {
+        if (showSample) {
+          const today = new Intl.DateTimeFormat('en-CA', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+          }).format(new Date())
+          const needle = debouncedQuery.toLowerCase()
+          const filtered = sampleCallLogs(today, tenantTz).filter((call) => {
+            if (directionFilter !== 'all' && call.direction !== directionFilter) return false
+            if (statusFilter !== 'all' && call.status !== statusFilter) return false
+            if (needle && !`${call.caller_name} ${call.phone_number}`.toLowerCase().includes(needle)) return false
+            const day = (call.started_at || call.created_at).slice(0, 10)
+            if (callDateFrom && day < callDateFrom) return false
+            if (callDateTo && day > callDateTo) return false
+            return true
+          })
+          const start = (targetPage - 1) * PAGE_SIZE
+          setCalls(filtered.slice(start, start + PAGE_SIZE))
+          setTotal(filtered.length)
+          setLoading(false)
+          return
+        }
         const token = await getToken()
         const data = await api.calls.listPaged(token, {
           limit: PAGE_SIZE,
@@ -285,7 +309,7 @@ export default function CallsPage() {
         setLoading(false)
       }
     },
-    [debouncedQuery, directionFilter, statusFilter, callDateFrom, callDateTo, getToken],
+    [debouncedQuery, directionFilter, statusFilter, callDateFrom, callDateTo, getToken, showSample, tenantTz],
   )
 
   useEffect(() => {
@@ -328,6 +352,15 @@ export default function CallsPage() {
     setDetail(null)
     setDetailLoading(true)
     try {
+      if (showSample && id.startsWith('sample-call-')) {
+        const today = new Intl.DateTimeFormat('en-CA', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+        }).format(new Date())
+        setDetail(sampleCallDetail(id, today, tenantTz))
+        return
+      }
       const token = await getToken()
       const result = await api.calls.get(token, id)
       setDetail(result)
@@ -527,16 +560,17 @@ export default function CallsPage() {
                   </div>
                 ) : (
                   <>
-                    <div className="mb-2 hidden rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-zinc-500 xl:grid xl:grid-cols-[minmax(6rem,1.35fr)_minmax(7rem,1fr)_auto_auto_minmax(4.5rem,min-content)_minmax(9rem,1.15fr)_minmax(8rem,auto)] xl:gap-4 dark:border-zinc-700 dark:bg-zinc-900/80 dark:text-zinc-400">
+                    <div className="mb-2 hidden rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 xl:grid xl:grid-cols-[1.4fr_1.15fr_0.85fr_0.55fr_0.5fr_0.5fr_0.9fr_auto] xl:gap-3 dark:border-zinc-700 dark:bg-zinc-900/80 dark:text-zinc-400">
                       <span>Caller</span>
                       <span>When</span>
-                      <span className="text-center">Direction</span>
-                      <span className="text-center">Meta</span>
-                      <span className="text-center">Bookings</span>
+                      <span>Direction</span>
+                      <span>Length</span>
+                      <span>Cost</span>
+                      <span>Jobs</span>
                       <span>Status</span>
                       <span className="text-right">Actions</span>
                     </div>
-                    <div className="space-y-3">
+                    <div className="space-y-1.5">
                       {calls.map((call) => (
                         <CallListRow
                           key={call.id}
@@ -1041,12 +1075,6 @@ function CallGridCard({
               )}
             </div>
 
-            <p className="mt-2 text-[11px] leading-snug text-zinc-500 dark:text-zinc-400">
-              Created {formatDateTime(call.created_at, timeZone)}
-              <br />
-              Updated {formatDateTime(call.updated_at, timeZone)}
-            </p>
-
             <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-zinc-600 dark:text-zinc-400">
               <span className="inline-flex items-center gap-1">
                 <ClockIcon className="size-3.5 text-zinc-400" />
@@ -1120,89 +1148,30 @@ function CallListRow({
   return (
     <Card className="overflow-hidden border border-zinc-200 shadow-sm transition hover:border-zinc-300 hover:shadow-md dark:border-zinc-700 dark:hover:border-zinc-600">
       <CardBody className="p-0">
-        <div className="flex flex-col gap-3 p-4 xl:grid xl:grid-cols-[minmax(6rem,1.35fr)_minmax(7rem,1fr)_auto_auto_minmax(4.5rem,min-content)_minmax(9rem,1.15fr)_minmax(8rem,auto)] xl:items-center xl:gap-4 xl:p-3">
+        <div className="flex flex-col gap-2 px-3 py-2.5 xl:grid xl:grid-cols-[1.4fr_1.15fr_0.85fr_0.55fr_0.5fr_0.5fr_0.9fr_auto] xl:items-center xl:gap-3">
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 xl:hidden dark:text-zinc-400">
-              Caller
-            </p>
-            <p className="truncate font-semibold text-zinc-950 dark:text-white">{callerPrimaryLine(call)}</p>
-            <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">{call.vapi_call_id}</p>
+            <p className="truncate text-sm font-semibold text-zinc-950 dark:text-white">{call.caller_name || callerPrimaryLine(call)}</p>
+            <p className="truncate text-xs text-zinc-500">{call.phone_number || 'No number'}</p>
           </div>
-
-          <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 xl:hidden dark:text-zinc-400">
-              When
-            </p>
-            <p className="whitespace-nowrap text-sm text-zinc-800 dark:text-zinc-200">{whenLabel(call, timeZone)}</p>
-          </div>
-
-          <div className="flex items-center gap-2 xl:justify-center">
-            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 xl:hidden dark:text-zinc-400">
-              Direction
-            </p>
+          <p className="whitespace-nowrap text-sm text-zinc-700 dark:text-zinc-200">{whenLabel(call, timeZone)}</p>
+          <div className="flex items-center gap-2">
             <span
-              className="flex size-9 shrink-0 items-center justify-center rounded-full text-white shadow-sm"
+              className="flex size-7 shrink-0 items-center justify-center rounded-full text-white"
               style={{ background: directionGradient(call.direction) }}
               aria-hidden
             >
-              <DirectionIcon direction={call.direction} className="size-4" />
+              <DirectionIcon direction={call.direction} className="size-3.5" />
             </span>
-            <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{directionLabel}</span>
+            <span className="text-sm text-zinc-700 dark:text-zinc-300">{directionLabel}</span>
           </div>
-
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-600 xl:justify-center dark:text-zinc-400">
-            <span className="inline-flex items-center gap-1">
-              <ClockIcon className="size-3.5" />
-              {formatDuration(call.duration_seconds)}
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <CurrencyDollarIcon className="size-3.5" />
-              {formatCost(call.cost)}
-            </span>
-            {call.has_recording && (
-              <span className="inline-flex text-brand-600 dark:text-brand-400" aria-label="Has recording">
-                <SpeakerWaveIcon className="size-4" />
-              </span>
-            )}
-            {call.has_transcript && (
-              <span className="inline-flex text-sky-600 dark:text-sky-400" aria-label="Has transcript">
-                <ChatBubbleBottomCenterTextIcon className="size-4" />
-              </span>
-            )}
+          <span className="text-sm tabular-nums text-zinc-700 dark:text-zinc-200">{formatDuration(call.duration_seconds)}</span>
+          <span className="text-sm tabular-nums text-zinc-700 dark:text-zinc-200">{formatCost(call.cost)}</span>
+          <span className="text-sm font-medium tabular-nums text-violet-700 dark:text-violet-300">{callBookingsCount(call)}</span>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Badge color={statusColor(call.status)}>{call.status}</Badge>
+            <CallSpamBadges category={call.call_category} quotaExcluded={call.quota_excluded} />
           </div>
-
-          <div className="flex flex-col items-start gap-1 xl:items-center">
-            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 xl:hidden dark:text-zinc-400">
-              Bookings
-            </p>
-            <span className="inline-flex items-center gap-1 text-sm font-semibold tabular-nums text-violet-700 dark:text-violet-300">
-              <CalendarDaysIcon className="size-4 shrink-0 opacity-80" />
-              {callBookingsCount(call)}
-            </span>
-          </div>
-
-          <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 xl:hidden dark:text-zinc-400">
-              Status
-            </p>
-            <div className="flex flex-col items-start gap-1">
-              <Badge color={statusColor(call.status)}>{call.status}</Badge>
-              <CallSpamBadges
-                category={call.call_category}
-                quotaExcluded={call.quota_excluded}
-              />
-              <span className="max-w-56 text-[11px] leading-snug text-zinc-500 dark:text-zinc-400">
-                Created {formatDateTime(call.created_at, timeZone)}
-                <br />
-                Updated {formatDateTime(call.updated_at, timeZone)}
-              </span>
-              {call.ended_reason && (
-                <span className="text-[11px] text-zinc-400">{call.ended_reason}</span>
-              )}
-            </div>
-          </div>
-
-          <div className="flex flex-wrap gap-1 border-t border-zinc-100 pt-3 xl:justify-end xl:border-t-0 xl:pt-0 dark:border-zinc-800">
+          <div className="flex flex-wrap gap-1 xl:justify-end">
             <Button plain className="text-xs" onClick={onOpen}>
               Details
             </Button>

@@ -19,6 +19,7 @@ import {
 } from '@heroicons/react/24/solid'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useApiToken } from '@/lib/hooks'
+import { sampleConversations, sampleThread, useClientPortalDemo } from '@/lib/client-portal-demo'
 import { useRealtimeEvent } from '@/lib/realtime'
 import { api, ApiError } from '@/lib/api'
 import { notifyError, notifySuccess } from '@/lib/notify'
@@ -584,6 +585,7 @@ export default function ConversationsPage() {
   const MESSAGES_PAGE_SIZE = 80
 
   const getToken = useApiToken()
+  const { enabled: showSample } = useClientPortalDemo()
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [conversationsLoading, setConversationsLoading] = useState(true)
   const [conversationsLoadingMore, setConversationsLoadingMore] = useState(false)
@@ -684,6 +686,30 @@ export default function ConversationsPage() {
         setConversationsLoadingMore(true)
       }
       try {
+        if (showSample) {
+          const today = new Intl.DateTimeFormat('en-CA', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+          }).format(new Date())
+          const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+          const needle = debouncedQuery.toLowerCase()
+          const items = sampleConversations(today, timeZone).filter((row) => {
+            if (channelTab !== 'all' && row.channel !== channelTab) return false
+            if (!needle) return true
+            return `${row.customer_name ?? ''} ${row.last_message_preview ?? ''}`.toLowerCase().includes(needle)
+          })
+          setConversations(items)
+          setConversationsHasMore(false)
+          if (reset) {
+            const first = items[0]
+            setSelectedId(first?.id ?? null)
+            setMessages(first ? sampleThread(first.id, today, timeZone) : [])
+            setMessagesLoading(false)
+            setMessagesHasMore(false)
+          }
+          return
+        }
         const token = await getToken()
         const offset = reset ? 0 : conversationsOffsetRef.current
         const page = await api.conversations.listPaged(token, {
@@ -709,7 +735,7 @@ export default function ConversationsPage() {
         setConversationsLoadingMore(false)
       }
     },
-    [channelTab, debouncedQuery, getToken],
+    [channelTab, debouncedQuery, getToken, showSample],
   )
 
   useEffect(() => {
@@ -881,6 +907,20 @@ export default function ConversationsPage() {
   }, [composeDisabled, draft, getToken, selected, selectedId])
 
   const loadMessages = async (convId: string) => {
+    if (showSample) {
+      const today = new Intl.DateTimeFormat('en-CA', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(new Date())
+      const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+      setSelectedId(convId)
+      setMessages(sampleThread(convId, today, timeZone))
+      setMessagesLoading(false)
+      setMessagesOffset(0)
+      setMessagesHasMore(false)
+      return
+    }
     setSelectedId(convId)
     setMessagesLoading(true)
     setMessages([])
