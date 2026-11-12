@@ -16,14 +16,7 @@ import { useApiToken } from '@/lib/hooks'
 import { api } from '@/lib/api'
 import { formatDate } from '@/lib/utils'
 import type { Customer } from '@/lib/types'
-import { sampleCustomers, useClientPortalDemo } from '@/lib/client-portal-demo'
-
-function clientInitials(name: string) {
-  const parts = name.trim().split(/\s+/).filter(Boolean)
-  if (parts.length === 0) return '?'
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
-  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase()
-}
+import { sampleCustomers, samplePortrait, useClientPortalDemo } from '@/lib/client-portal-demo'
 
 function ClientsPageInner() {
   const getToken = useApiToken()
@@ -110,7 +103,7 @@ function ClientsPageInner() {
     <PageShell>
       <PageHeader
         title="Clients"
-        description="Your end customers — deduplicated across chat, voice, and Jobber."
+        description="Customers from phone calls, Facebook, and Instagram."
       >
         <Button color="brand" onClick={() => setFormState({ mode: 'create' })}>
           <PlusIcon data-slot="icon" />
@@ -208,9 +201,17 @@ function ClientsPageInner() {
                     />
                     <CardBody className="space-y-3">
                       <div className="flex items-start gap-3 pr-8">
-                        <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-blue-50 text-sm font-semibold text-blue-700 ring-1 ring-blue-100">
-                          {clientInitials(c.display_name)}
-                        </span>
+                        {showSample ? (
+                          <img
+                            src={samplePortrait(c.display_name)}
+                            alt=""
+                            className="size-11 shrink-0 rounded-full object-cover ring-1 ring-zinc-200"
+                          />
+                        ) : (
+                          <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-blue-50 text-sm font-semibold text-blue-700 ring-1 ring-blue-100">
+                            {c.display_name.slice(0, 1).toUpperCase()}
+                          </span>
+                        )}
                         <div className="min-w-0 flex-1">
                           <div className="flex items-start justify-between gap-2">
                             <p className="truncate font-semibold text-zinc-950 dark:text-white">{c.display_name}</p>
@@ -221,9 +222,8 @@ function ClientsPageInner() {
                         </div>
                       </div>
                       <p className="truncate text-sm text-zinc-500">{c.primary_address || 'No address on file'}</p>
-                      <div className="flex items-center justify-between gap-2 border-t border-zinc-100 pt-3 text-xs text-zinc-500 dark:border-zinc-800">
-                        <span>Last visit {c.last_seen_at ? formatDate(c.last_seen_at) : '—'}</span>
-                        {c.jobber_client_id ? <Badge color="lime">In Jobber</Badge> : <span>Not in Jobber</span>}
+                      <div className="border-t border-zinc-100 pt-3 text-xs text-zinc-500 dark:border-zinc-800">
+                        Last visit {c.last_seen_at ? formatDate(c.last_seen_at) : '—'}
                       </div>
                     </CardBody>
                   </Card>
@@ -231,32 +231,56 @@ function ClientsPageInner() {
               </div>
             ) : (
               <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
-                <div className="hidden grid-cols-[1.3fr_0.9fr_1.2fr_1.4fr_0.45fr_0.7fr] gap-3 border-b border-zinc-100 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 md:grid dark:border-zinc-800">
-                  <span>Name</span>
-                  <span>Phone</span>
-                  <span>Email</span>
-                  <span>Address</span>
-                  <span>Jobs</span>
-                  <span>Last visit</span>
-                </div>
-                <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
-                  {customers.map((c) => (
-                    <li key={c.id}>
-                      <button
-                        type="button"
+                <table className="w-full table-fixed border-collapse text-left">
+                  <colgroup>
+                    <col className="w-[22%]" />
+                    <col className="w-[16%]" />
+                    <col className="w-[22%]" />
+                    <col className="w-[24%]" />
+                    <col className="w-[6%]" />
+                    <col className="w-[10%]" />
+                  </colgroup>
+                  <thead>
+                    <tr className="border-b border-zinc-100 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:border-zinc-800">
+                      <th className="px-4 py-2.5 font-semibold">Name</th>
+                      <th className="px-4 py-2.5 font-semibold">Phone</th>
+                      <th className="px-4 py-2.5 font-semibold">Email</th>
+                      <th className="px-4 py-2.5 font-semibold">Address</th>
+                      <th className="px-4 py-2.5 font-semibold">Jobs</th>
+                      <th className="px-4 py-2.5 font-semibold">Last visit</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                    {customers.map((c) => (
+                      <tr
+                        key={c.id}
+                        tabIndex={0}
                         onClick={() => openClient(c.id)}
-                        className="grid w-full gap-1 px-4 py-3 text-left transition hover:bg-zinc-50 md:grid-cols-[1.3fr_0.9fr_1.2fr_1.4fr_0.45fr_0.7fr] md:items-center md:gap-3 dark:hover:bg-zinc-800/60"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            openClient(c.id)
+                          }
+                        }}
+                        className="cursor-pointer transition hover:bg-zinc-50 dark:hover:bg-zinc-800/60"
                       >
-                        <span className="truncate text-sm font-semibold text-zinc-950 dark:text-white">{c.display_name}</span>
-                        <span className="truncate text-sm text-zinc-600 dark:text-zinc-300">{c.phone || '—'}</span>
-                        <span className="truncate text-sm text-zinc-500">{c.email || '—'}</span>
-                        <span className="truncate text-sm text-zinc-500">{c.primary_address || '—'}</span>
-                        <span className="text-sm font-medium tabular-nums text-zinc-800 dark:text-zinc-100">{c.bookings_count}</span>
-                        <span className="text-sm text-zinc-500">{c.last_seen_at ? formatDate(c.last_seen_at) : '—'}</span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
+                        <td className="px-4 py-3">
+                          <span className="flex min-w-0 items-center gap-3">
+                            {showSample ? (
+                              <img src={samplePortrait(c.display_name)} alt="" className="size-8 shrink-0 rounded-full object-cover" />
+                            ) : null}
+                            <span className="truncate text-sm font-semibold text-zinc-950 dark:text-white">{c.display_name}</span>
+                          </span>
+                        </td>
+                        <td className="truncate px-4 py-3 text-sm text-zinc-600 dark:text-zinc-300">{c.phone || '—'}</td>
+                        <td className="truncate px-4 py-3 text-sm text-zinc-500">{c.email || '—'}</td>
+                        <td className="truncate px-4 py-3 text-sm text-zinc-500">{c.primary_address || '—'}</td>
+                        <td className="px-4 py-3 text-sm font-medium tabular-nums text-zinc-800 dark:text-zinc-100">{c.bookings_count}</td>
+                        <td className="truncate px-4 py-3 text-sm text-zinc-500">{c.last_seen_at ? formatDate(c.last_seen_at) : '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>

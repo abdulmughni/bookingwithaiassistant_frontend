@@ -1124,7 +1124,7 @@ export default function ConversationsPage() {
   })
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-white dark:bg-zinc-950">
+    <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-white dark:bg-zinc-950">
       {/* Channel tabs — Meta Business Suite style */}
       <div className="shrink-0 border-b border-zinc-200 bg-white px-2 pt-2 dark:border-zinc-800 dark:bg-zinc-900">
         <div className="flex min-h-11 items-stretch gap-1 overflow-x-auto pb-0 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -1152,7 +1152,7 @@ export default function ConversationsPage() {
 
       <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden bg-zinc-100/80 dark:bg-zinc-950">
         {/* Sidebar inbox */}
-        <aside className="flex h-full min-h-0 w-full min-w-0 shrink-0 flex-col border-r border-zinc-200/90 bg-white dark:border-zinc-800 dark:bg-zinc-900 md:w-[min(100%,22rem)] lg:w-[min(100%,24rem)]">
+        <aside className="flex h-full min-h-0 w-full min-w-0 shrink-0 flex-col border-r border-zinc-200/90 bg-white dark:border-zinc-800 dark:bg-zinc-900 md:w-[min(100%,22rem)] lg:w-[min(100%,26rem)]">
           <div className="border-b border-zinc-100 px-3 pb-3 pt-3 dark:border-zinc-800">
             <div className="flex gap-2">
               <div className="relative min-w-0 flex-1">
@@ -1275,7 +1275,7 @@ export default function ConversationsPage() {
         </aside>
 
         {/* Thread */}
-        <section className="flex min-h-0 min-w-0 flex-1 flex-col bg-white dark:bg-zinc-900">
+        <section className="flex h-full min-h-0 min-w-0 flex-1 flex-col bg-white dark:bg-zinc-900">
           {selectedId && selected ? (
             <div className="flex min-h-0 min-w-0 flex-1 flex-col">
               <header className="z-10 flex shrink-0 items-center justify-between gap-3 border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
