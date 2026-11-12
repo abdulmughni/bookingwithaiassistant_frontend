@@ -16,6 +16,7 @@ import type {
   Customer,
   CustomerDetail,
   Message,
+  Notification,
   TenantStats,
 } from '@/lib/types'
 
@@ -362,8 +363,47 @@ export function sampleBookings(today: string, timeZone: string): Booking[] {
   }).sort((a, b) => (b.selected_slot ?? '').localeCompare(a.selected_slot ?? ''))
 }
 
-function pagePhoto(seed: string, background: string) {
-  return `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(seed)}&backgroundColor=${background}&textColor=ffffff&fontWeight=600`
+const PORTRAITS: Record<string, number> = {
+  'Maria Alvarez': 47,
+  'James Whitfield': 12,
+  'Priya Shah': 45,
+  'Daniel Okonkwo': 11,
+  'Helen Brooks': 44,
+  'Chris Nguyen': 15,
+  'Sofia Reyes': 25,
+  'Robert Hale': 52,
+  'Amina Farouk': 48,
+  'Kevin Marsh': 18,
+  'Lauren Peck': 26,
+  'Omar Haddad': 22,
+  'Nina Patel': 32,
+  'George Bennett': 51,
+  'Emily Cho': 28,
+  'Andre Williams': 36,
+  'Rachel Stein': 21,
+  'Luis Romero': 33,
+  'Hannah Cole': 39,
+  'Malik Johnson': 14,
+  'Grace Kim': 49,
+  'Victor Alvarez': 8,
+  'Natalie Brooks': 17,
+  'Ian Foster': 60,
+  'Diane Walsh': 29,
+  'Samir Rahman': 7,
+  'Olivia Grant': 43,
+  'Ben Carter': 53,
+  'Jason Hale': 57,
+  'Megan Ortiz': 24,
+  'Paul Ricci': 59,
+  'Keisha Brown': 31,
+  'Skyline HVAC': 68,
+  'skyline.hvac': 49,
+}
+
+/** Stable face photo for a sample customer or connected page. */
+export function samplePortrait(name: string) {
+  const img = PORTRAITS[name] ?? (hash(name) % 70) + 1
+  return `https://i.pravatar.cc/240?img=${img}`
 }
 
 export function sampleChannels(today: string): ChannelAccount[] {
@@ -375,7 +415,7 @@ export function sampleChannels(today: string): ChannelAccount[] {
       channel: 'facebook',
       account_id: 'skyline-hvac',
       label: 'Skyline HVAC',
-      picture_url: pagePhoto('Skyline HVAC', '1d4ed8'),
+      picture_url: samplePortrait('Skyline HVAC'),
       is_active: true,
       verify_token: '',
       has_access_token: true,
@@ -391,7 +431,7 @@ export function sampleChannels(today: string): ChannelAccount[] {
       channel: 'instagram',
       account_id: 'skyline.hvac',
       label: 'skyline.hvac',
-      picture_url: pagePhoto('SH', '9d174d'),
+      picture_url: samplePortrait('skyline.hvac'),
       is_active: true,
       verify_token: '',
       has_access_token: true,
@@ -531,11 +571,16 @@ const SAMPLE_THREADS: {
     status: 'active',
     daysAgo: 0,
     lines: [
-      { role: 'user', text: 'No heat at all in the house. The thermostat is set to 70 and it is 61 inside.', hour: 9, minute: 4 },
-      { role: 'assistant', text: 'That sounds like a no-heat call. Are you in San Francisco, and is anyone home this afternoon?', hour: 9, minute: 4 },
-      { role: 'user', text: 'Yes, 90 Clayton St. I can be here after 1.', hour: 9, minute: 6 },
-      { role: 'assistant', text: 'I held 1:30 PM today for a heat pump check. If the temperature drops further or you smell gas, leave and call 911.', hour: 9, minute: 7 },
-      { role: 'user', text: 'No gas smell. 1:30 works. Thank you.', hour: 9, minute: 8 },
+      { role: 'user', text: 'No heat at all in the house. The thermostat is set to 70 and it is 61 inside.', hour: 8, minute: 42 },
+      { role: 'assistant', text: 'That sounds like a no-heat call. Are you in San Francisco, and is anyone home this afternoon?', hour: 8, minute: 43 },
+      { role: 'user', text: 'Yes, 90 Clayton St. The system is a heat pump, about eight years old.', hour: 8, minute: 46 },
+      { role: 'assistant', text: 'Thanks. Is the outdoor unit running, or is it completely quiet?', hour: 8, minute: 47 },
+      { role: 'user', text: 'It clicks and then stops. No air from the vents.', hour: 8, minute: 49 },
+      { role: 'assistant', text: 'Please leave it off so it does not short-cycle. I can send a tech today.', hour: 8, minute: 50 },
+      { role: 'user', text: 'I can be here after 1. Gate code is 1942.', hour: 8, minute: 53 },
+      { role: 'assistant', text: 'I held 1:30 PM today for a heat pump check. If you smell gas, leave and call 911.', hour: 8, minute: 54 },
+      { role: 'user', text: 'No gas smell. 1:30 works. Thank you.', hour: 8, minute: 56 },
+      { role: 'assistant', text: 'You are booked. James Whitfield, 90 Clayton St, heat pump, today at 1:30 PM. We will text when the tech is on the way.', hour: 8, minute: 57 },
     ],
   },
   {
@@ -599,6 +644,94 @@ const SAMPLE_THREADS: {
       { role: 'assistant', text: 'Saturday at 10:30 AM is reserved. See you then.', hour: 10, minute: 18 },
     ],
   },
+  {
+    id: 'sample-thread-helen',
+    channel: 'facebook',
+    name: 'Helen Brooks',
+    phone: '(415) 555-0160',
+    status: 'active',
+    daysAgo: 0,
+    lines: [
+      { role: 'user', text: 'Can I book the yearly heating inspection before it gets colder?', hour: 7, minute: 40 },
+      { role: 'assistant', text: 'Yes. We check the furnace, filter, and safety switches. What is the address?', hour: 7, minute: 41 },
+      { role: 'user', text: '740 18th Ave. Mornings are best.', hour: 7, minute: 44 },
+      { role: 'assistant', text: 'Monday at 8:30 AM is open. Should I book that?', hour: 7, minute: 45 },
+      { role: 'user', text: 'Yes please.', hour: 7, minute: 47 },
+      { role: 'assistant', text: 'Booked. You will get a reminder the evening before.', hour: 7, minute: 48 },
+    ],
+  },
+  {
+    id: 'sample-thread-chris',
+    channel: 'instagram',
+    name: 'Chris Nguyen',
+    phone: '(650) 555-0188',
+    status: 'active',
+    daysAgo: 0,
+    lines: [
+      { role: 'user', text: 'Woke up to a cold house in San Mateo. Can someone come today?', hour: 6, minute: 55 },
+      { role: 'assistant', text: 'We can take a no-heat call today. What is the street address?', hour: 6, minute: 56 },
+      { role: 'user', text: '418 Elm St. I work from home so anytime works.', hour: 6, minute: 58 },
+      { role: 'assistant', text: 'I have 11:00 AM. The visit covers the furnace and thermostat.', hour: 6, minute: 59 },
+      { role: 'user', text: 'Book it.', hour: 7, minute: 1 },
+    ],
+  },
+  {
+    id: 'sample-thread-sofia',
+    channel: 'facebook',
+    name: 'Sofia Reyes',
+    phone: '(415) 555-0117',
+    status: 'active',
+    daysAgo: 1,
+    lines: [
+      { role: 'user', text: 'We need the mini-split visit moved. Friday morning no longer works.', hour: 15, minute: 10 },
+      { role: 'assistant', text: 'I can move it. Do you want Friday at 4:00 PM or Monday at 9:00 AM?', hour: 15, minute: 11 },
+      { role: 'user', text: 'Friday at 4 is better.', hour: 15, minute: 14 },
+      { role: 'assistant', text: 'Done. Mini-split installation at 12 Precita Ave is now Friday at 4:00 PM.', hour: 15, minute: 15 },
+    ],
+  },
+  {
+    id: 'sample-thread-rachel',
+    channel: 'instagram',
+    name: 'Rachel Stein',
+    phone: '(650) 555-0114',
+    status: 'active',
+    daysAgo: 2,
+    lines: [
+      { role: 'user', text: 'Do you service homes in Millbrae? Our furnace is due for a checkup.', hour: 11, minute: 20 },
+      { role: 'assistant', text: 'Yes, Millbrae is in our area. I can do a heating inspection next week.', hour: 11, minute: 21 },
+      { role: 'user', text: '22 Hillcrest Dr. Tuesday morning?', hour: 11, minute: 24 },
+      { role: 'assistant', text: 'Tuesday at 10:30 AM is reserved for Rachel Stein.', hour: 11, minute: 25 },
+    ],
+  },
+  {
+    id: 'sample-thread-omar',
+    channel: 'facebook',
+    name: 'Omar Haddad',
+    phone: '(650) 555-0142',
+    status: 'closed',
+    daysAgo: 4,
+    lines: [
+      { role: 'user', text: 'The blower is loud and the heat cuts out after ten minutes.', hour: 9, minute: 5 },
+      { role: 'assistant', text: 'That can be the blower motor. I can book a repair visit in San Carlos.', hour: 9, minute: 6 },
+      { role: 'user', text: '910 Laurel St. Tomorrow at 9 works.', hour: 9, minute: 9 },
+      { role: 'assistant', text: 'Booked for 9:00 AM. We will confirm parts if the motor needs replacing.', hour: 9, minute: 10 },
+      { role: 'user', text: 'Tech finished today. Heat is steady again. Thank you.', hour: 16, minute: 40 },
+    ],
+  },
+  {
+    id: 'sample-thread-natalie',
+    channel: 'instagram',
+    name: 'Natalie Brooks',
+    phone: '(415) 555-0128',
+    status: 'active',
+    daysAgo: 5,
+    lines: [
+      { role: 'user', text: 'Looking for a quote on a mini-split for a back bedroom.', hour: 13, minute: 2 },
+      { role: 'assistant', text: 'We install single-zone mini-splits. The visit includes a measurement and a written price.', hour: 13, minute: 3 },
+      { role: 'user', text: '99 Sanchez St. Can you come next week?', hour: 13, minute: 8 },
+      { role: 'assistant', text: 'Wednesday at 1:30 PM is open. I will put Natalie Brooks on the schedule.', hour: 13, minute: 9 },
+    ],
+  },
 ]
 
 export function sampleConversations(today: string, timeZone: string): Conversation[] {
@@ -618,7 +751,7 @@ export function sampleConversations(today: string, timeZone: string): Conversati
       customer_display_name: thread.name,
       customer_label_name: thread.name,
       customer_phone: thread.phone,
-      customer_avatar_url: pagePhoto(thread.name, thread.channel === 'instagram' ? '9d174d' : '1d4ed8'),
+      customer_avatar_url: samplePortrait(thread.name),
       channel_account_label: thread.channel === 'instagram' ? '@skyline.hvac' : 'Skyline HVAC',
       intent: 'booking',
       status: thread.status,
@@ -827,4 +960,78 @@ export function sampleCallStats(period: 'week' | 'month', today: string, timeZon
       no_show: Math.max(0, jobs - Math.round(jobs * 0.35) - Math.round(jobs * 0.55)),
     },
   }
+}
+
+function hoursAgo(hours: number) {
+  return new Date(Date.now() - hours * 60 * 60 * 1000).toISOString()
+}
+
+/** Recent bell items for the client dashboard while sample data is on. */
+export function sampleNotifications(): Notification[] {
+  return [
+    {
+      id: 'sample-note-1',
+      type: 'booking.created',
+      booking_id: 'sample-booking-2',
+      title: 'New booking — James Whitfield',
+      body: 'Heat pump maintenance · today, 1:30 PM',
+      is_read: false,
+      created_at: hoursAgo(1),
+    },
+    {
+      id: 'sample-note-2',
+      type: 'booking.created',
+      booking_id: 'sample-booking-1',
+      title: 'New booking — Maria Alvarez',
+      body: 'Furnace tune-up · Thursday, 9:00 AM',
+      is_read: false,
+      created_at: hoursAgo(3),
+    },
+    {
+      id: 'sample-note-3',
+      type: 'booking.rescheduled',
+      booking_id: 'sample-booking-7',
+      title: 'Rescheduled — Sofia Reyes',
+      body: 'Mini-split installation moved to Friday, 4:00 PM',
+      is_read: false,
+      created_at: hoursAgo(8),
+    },
+    {
+      id: 'sample-note-4',
+      type: 'emergency.reported',
+      booking_id: null,
+      conversation_id: 'sample-thread-chris',
+      title: 'No-heat call — Chris Nguyen',
+      body: '418 Elm St, San Mateo. Booked today at 11:00 AM.',
+      is_read: false,
+      created_at: hoursAgo(20),
+    },
+    {
+      id: 'sample-note-5',
+      type: 'booking.created',
+      booking_id: 'sample-booking-5',
+      title: 'New booking — Helen Brooks',
+      body: 'Annual heating inspection · Monday, 8:30 AM',
+      is_read: true,
+      created_at: hoursAgo(28),
+    },
+    {
+      id: 'sample-note-6',
+      type: 'booking.cancelled',
+      booking_id: 'sample-booking-13',
+      title: 'Cancelled — Nina Patel',
+      body: 'Thermostat visit cancelled by the customer.',
+      is_read: true,
+      created_at: hoursAgo(50),
+    },
+    {
+      id: 'sample-note-7',
+      type: 'booking.created',
+      booking_id: 'sample-booking-4',
+      title: 'New booking — Daniel Okonkwo',
+      body: 'Duct cleaning · Monday, 3:00 PM',
+      is_read: true,
+      created_at: hoursAgo(70),
+    },
+  ]
 }

@@ -4,10 +4,12 @@ import * as Headless from '@headlessui/react'
 import clsx from 'clsx'
 import { useRouter } from 'next/navigation'
 import { BellIcon, XMarkIcon } from '@heroicons/react/24/outline'
+import { useState } from 'react'
 import { useRealtime } from '@/lib/realtime'
 import { useTenantTimezone } from '@/lib/hooks'
 import { formatDateTime } from '@/lib/utils'
 import type { Notification } from '@/lib/types'
+import { sampleNotifications, useClientPortalDemo } from '@/lib/client-portal-demo'
 
 function timeAgo(iso: string, timeZone: string): string {
   const d = new Date(iso)
@@ -87,14 +89,27 @@ function typeMeta(type: string): { label: string; className: string } {
 export function NotificationBell({ className, circle = false }: { className?: string; circle?: boolean }) {
   const router = useRouter()
   const tenantTz = useTenantTimezone()
-  const {
-    notifications,
-    unreadCount,
-    markRead,
-    markAllRead,
-    removeNotification,
-    clearAllNotifications,
-  } = useRealtime()
+  const { enabled: showSample } = useClientPortalDemo()
+  const [sampleItems, setSampleItems] = useState<Notification[]>(() => sampleNotifications())
+  const live = useRealtime()
+  const notifications = showSample ? sampleItems : live.notifications
+  const unreadCount = showSample ? sampleItems.filter((item) => !item.is_read).length : live.unreadCount
+  const markRead = (id: string) => {
+    if (!showSample) return live.markRead(id)
+    setSampleItems((items) => items.map((item) => (item.id === id ? { ...item, is_read: true } : item)))
+  }
+  const markAllRead = () => {
+    if (!showSample) return live.markAllRead()
+    setSampleItems((items) => items.map((item) => ({ ...item, is_read: true })))
+  }
+  const removeNotification = (id: string) => {
+    if (!showSample) return live.removeNotification(id)
+    setSampleItems((items) => items.filter((item) => item.id !== id))
+  }
+  const clearAllNotifications = () => {
+    if (!showSample) return live.clearAllNotifications()
+    setSampleItems([])
+  }
 
   const handleOpen = (notif: Notification, close: () => void) => {
     void markRead(notif.id)

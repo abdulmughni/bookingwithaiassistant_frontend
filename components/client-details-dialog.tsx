@@ -111,7 +111,6 @@ export function ClientDetailsDialog({
           ) : null}
         </div>
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-          {data?.jobber_client_id ? <Badge color="lime">Jobber</Badge> : null}
           {data ? (
             <Badge color="zinc">
               {data.bookings_count} booking{data.bookings_count === 1 ? '' : 's'}
